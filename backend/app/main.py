@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.auth import router as auth_router
+from app.core.audit_middleware import AuditLogMiddleware
 from app.core.config import settings
 
 
@@ -40,6 +41,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Immutable Audit Logging Middleware
+app.add_middleware(AuditLogMiddleware)
 
 # Authentication & Identity Router
 app.include_router(auth_router, prefix=settings.API_V1_STR)
