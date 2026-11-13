@@ -1,0 +1,47 @@
+/* TRELLIS Design Tokens & Base Styles */
+@import "tailwindcss";
+
+:root {
+  --color-bg-base: #0B0D12;
+  --color-brand-cyan: #1294C4;
+  --color-brand-red: #8B3A3A;
+  --color-text-main: #F8FAFC;
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Accessibility Focus Visible Ring */
+:focus-visible {
+  outline: 2px solid var(--color-brand-cyan);
+  outline-offset: 2px;
+}
+
+/* Dyslexia-friendly font utility */
+.dyslexia-mode {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
+  letter-spacing: 0.05em;
+  line-height: 1.8;
+}
+
+/* Skip Link for Keyboard Users */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: var(--color-brand-cyan);
+  color: #0B0D12;
+  padding: 8px 16px;
+  font-weight: 700;
+  z-index: 9999;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0;
+}

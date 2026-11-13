@@ -1,0 +1,134 @@
+name: TRELLIS CI Quality Gate
+
+on:
+  push:
+    branches: [master, main, 'slice/**']
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-lint-and-types:
+    name: Backend Lint, Format & Strict Typing
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Tooling Dependencies
+        run: |
+          python -m pip install --upgrade "pip>=26.2.0"
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run Ruff Lint Checks
+        run: ruff check .
+
+      - name: Run Ruff Format Checks
+        run: ruff format --check .
+
+      - name: Run Mypy Strict Typing
+        run: mypy --strict .
+
+  permission-matrix-verification:
+    name: Role-Permission Matrix & Default-Deny Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify Permission Matrix Coverage (100% Default-Deny)
+        run: python docs/security/coverage_report.py
+
+      - name: Run Matrix Automated Tests
+        run: |
+          pip install pytest pytest-asyncio
+          pytest backend/tests/test_permission_matrix.py -v
+
+  backend-tests:
+    name: Backend Unit & Integration Tests
+    needs: [backend-lint-and-types, permission-matrix-verification]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade "pip>=26.2.0"
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run Pytest with Coverage
+        run: pytest -v --cov=app --cov-report=term-missing --cov-report=xml
+
+  frontend-build:
+    name: Frontend Compilation & DOMPurify Audit Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24.15 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Pinned Frontend Dependencies
+        run: npm ci
+
+      - name: Verify Clean Vulnerability Audit (DOMPurify Override)
+        run: |
+          # Assert zero critical vulnerabilities
+          npm audit --audit-level=critical
+
+      - name: Build Angular Application (Production)
+        run: npm run build -- --configuration=production
+
+  accessibility-audit:
+    name: Automated Axe-Core WCAG 2.2 AA Accessibility Audit
+    needs: frontend-build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24.15 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.15.0"
+
+      - name: Run Axe-Core Accessibility Check
+        run: npm run test:axe
