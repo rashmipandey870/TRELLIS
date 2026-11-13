@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TRELLIS - Interactive Prototype (CSM Technology)</title>
+  <style>
+    :root {
+      --bg-dark: #0B0D12;
+      --surface-dark: #161B22;
+      --surface-card: #1F242C;
+      --border-dark: #30363D;
+      --brand-blue: #1294C4;
+      --brand-blue-hover: #0E7490;
+      --brand-maroon: #8B3A3A;
+      --text-primary: #FFFFFF;
+      --text-muted: #9CA3AF;
+      --evidence-strong: #10B981;
+      --evidence-dev: #3B82F6;
+      --evidence-gap: #EF4444;
+      --focus-ring: #00FFFF;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.5;
+      padding-bottom: 60px;
+    }
+
+    a, button {
+      font-family: inherit;
+    }
+
+    a:focus-visible, button:focus-visible, input:focus-visible {
+      outline: 2px solid var(--focus-ring);
+      outline-offset: 2px;
+    }
+
+    /* Demo Banner */
+    .banner {
+      background-color: #F59E0B;
+      color: #000000;
+      text-align: center;
+      padding: 8px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    /* Header Nav */
+    header {
+      background-color: var(--surface-dark);
+      border-bottom: 1px solid var(--border-dark);
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, var(--brand-blue), var(--brand-maroon));
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    .brand-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .cmd-trigger {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-dark);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .cmd-trigger:hover {
+      border-color: var(--brand-blue);
+      color: var(--text-primary);
+    }
+
+    .kbd-shortcut {
+      background-color: var(--bg-dark);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      border: 1px solid var(--border-dark);
+    }
+
+    /* Screen Selector Navigation */
+    .screen-nav {
+      background-color: var(--surface-dark);
+      border-bottom: 1px solid var(--border-dark);
+      display: flex;
+      overflow-x: auto;
+      padding: 0 24px;
+      gap: 8px;
+    }
+
+    .screen-tab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+
+    .screen-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .screen-tab.active {
+      color: var(--brand-blue);
+      border-bottom-color: var(--brand-blue);
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 24px;
+    }
+
+    .screen-view {
+      display: none;
+    }
+
+    .screen-view.active {
+      display: block;
+    }
+
+    /* Card Utilities */
+    .card {
+      background-color: var(--surface-dark);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-subtitle {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(180deg, rgba(18, 148, 196, 0.12) 0%, rgba(22, 27, 34, 1) 100%);
+      border: 1px solid rgba(18, 148, 196, 0.3);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s;
+    }
+
+    .btn-primary {
+      background-color: var(--brand-blue);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--brand-blue-hover);
+    }
+
+    .btn-outline {
+      background-color: transparent;
+      border-color: var(--border-dark);
+      color: var(--text-primary);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--brand-blue);
+    }
+
+    .btn-danger-outline {
+      background-color: transparent;
+      border-color: var(--brand-maroon);
+      color: #F87171;
+    }
+
+    .btn-danger-outline:hover {
+      background-color: rgba(139, 58, 58, 0.2);
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .badge-strong { background-color: rgba(16, 185, 129, 0.15); color: var(--evidence-strong); border: 1px solid var(--evidence-strong); }
+    .badge-dev { background-color: rgba(59, 130, 246, 0.15); color: var(--evidence-dev); border: 1px solid var(--evidence-dev); }
+    .badge-gap { background-color: rgba(239, 68, 68, 0.15); color: var(--evidence-gap); border: 1px solid var(--evidence-gap); }
+
+    /* Grid Layouts */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* Data Table */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid var(--border-dark);
+    }
+
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      background-color: var(--surface-card);
+    }
+
+    /* Modal Command Bar */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 15vh;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background-color: var(--surface-dark);
+      border: 1px solid var(--brand-blue);
+      border-radius: 8px;
+      width: 100%;
+      max-width: 640px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+
+    .modal-input {
+      width: 100%;
+      background: none;
+      border: none;
+      border-bottom: 1px solid var(--border-dark);
+      padding: 16px;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    .cmd-group {
+      padding: 12px 16px;
+    }
+
+    .cmd-group-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .cmd-item {
+      padding: 8px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+    }
+
+    .cmd-item:hover, .cmd-item.selected {
+      background-color: var(--surface-card);
+      color: var(--brand-blue);
+    }
+
+    /* Hash Ledger Block */
+    .ledger-block {
+      background-color: var(--surface-card);
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+      font-family: monospace;
+      font-size: 0.8125rem;
+    }
+
+    .ledger-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border-dark);
+      padding-bottom: 8px;
+      color: var(--brand-blue);
+      font-weight: bold;
+    }
+
+    .hash-string {
+      color: #34D399;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Demo Notice -->
+  <div class="banner">
+    [!] SYNTHETIC DEMO MODE ACTIVE &bull; PLACEHOLDER BRANDING &bull; PROTOTYPE FOR REVIEW ONLY
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">T</div>
+      <div>
+        <div class="brand-title">TRELLIS</div>
+        <div class="brand-subtitle">CSM Technology &bull; Where every Tendril climbs</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="cmd-trigger" id="openCmdBtn" onclick="toggleCmd(true)">
+        <span>Search or jump to...</span>
+        <span class="kbd-shortcut">Ctrl+K</span>
+      </button>
+      <div style="font-size: 0.875rem; font-weight: 600;">Priya S. (Backend Track)</div>
+    </div>
+  </header>
+
+  <!-- Prototype Navigation Tabs -->
+  <nav class="screen-nav" aria-label="Prototype Screens">
+    <button class="screen-tab active" onclick="showScreen('home', this)">1. Personalised Home</button>
+    <button class="screen-tab" onclick="showScreen('report', this)">2. Growth Ring Report</button>
+    <button class="screen-tab" onclick="showScreen('privacy', this)">3. Consent Passport</button>
+    <button class="screen-tab" onclick="showScreen('evidence', this)">4. Evidence Ledger View</button>
+    <button class="screen-tab" onclick="toggleCmd(true)">5. Command Bar (Ctrl+K)</button>
+  </nav>
+
+  <main id="main-content">
+
+    <!-- SCREEN 1: PERSONALISED HOME -->
+    <div id="screen-home" class="screen-view active">
+      <section class="card hero">
+        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--brand-blue); font-weight: 700; margin-bottom: 4px;">
+          Continue Climbing
+        </div>
+        <h1 class="card-title">Welcome back, Priya!</h1>
+        <p style="margin-bottom: 16px;">
+          Next priority step in your <strong>Senior Backend Engineer (Python)</strong> pathway:<br>
+          <span style="color: var(--text-muted);">&bull; Module 4: Asynchronous Task Queues with Celery & Redis (Est: 45 mins)</span>
+        </p>
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <button class="btn btn-primary" onclick="alert('Launching interactive lesson player...')">&gt; Resume Lesson</button>
+          <button class="btn btn-outline" onclick="showScreen('report')">View Growth Ring</button>
+          <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: auto;">Target Completion: Nov 28, 2026</span>
+        </div>
+      </section>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2 class="card-title">Active Skill Profile (Growth Ring)</h2>
+          <p class="card-subtitle">12 skills validated by evidence &bull; 2 active gaps to target</p>
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Python Core & Concurrency</span>
+              <span class="badge badge-strong">Level 4 &bull; STRONG</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>System Design & Schema Modeling</span>
+              <span class="badge badge-dev">Level 3 &bull; DEVELOPING</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Asynchronous Task Semantics</span>
+              <span class="badge badge-gap">Level 2 &bull; GAP</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>DPDP Compliance & Data Privacy</span>
+              <span class="badge badge-gap">Level 1 &bull; GAP</span>
+            </div>
+          </div>
+          <button class="btn btn-outline" style="width: 100%;" onclick="showScreen('report')">Open Full Growth Ring Report &rarr;</button>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Assigned Learning & Upcoming Sessions</h2>
+          <p class="card-subtitle">Coordinated around your calendar availability</p>
+          <div style="margin-bottom: 16px; border-left: 3px solid var(--brand-blue); padding-left: 12px;">
+            <div style="font-weight: 600;">Advanced FastAPI & DB Concurrency</div>
+            <div style="font-size: 0.8125rem; color: var(--text-muted);">Tomorrow @ 14:00 IST &bull; Trainer: Rajesh Mohan</div>
+            <div style="margin-top: 6px;">
+              <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.75rem;" onclick="alert('Synced to your M365 Outlook calendar!')">Sync with Teams</button>
+            </div>
+          </div>
+          <div style="border-left: 3px solid var(--brand-maroon); padding-left: 12px;">
+            <div style="font-weight: 600;">Q4 Growth Check: Backend Systems</div>
+            <div style="font-size: 0.8125rem; color: var(--text-muted);">Due in 6 days &bull; Pausable accommodation enabled</div>
+            <div style="margin-top: 6px;">
+              <button class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;" onclick="alert('Starting sandboxed Growth Check session...')">Start Growth Check</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2 class="card-title">Greenhouse: Featured Innovation of the Month</h2>
+        <div style="font-weight: 600; font-size: 1.125rem; margin-bottom: 4px;">
+          "Zero-Downtime Database Migration Framework using Alembic & Vitess"
+        </div>
+        <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 12px;">
+          Authored by Ananya Sharma &bull; Stage: <strong>In Build</strong> &bull; 42 Upvotes &bull; 14 Trainer & Peer Reviews
+        </p>
+        <button class="btn btn-outline" onclick="alert('Opening Greenhouse Graft & Diff Viewer...')">Read Proposal & View Code Diff</button>
+      </section>
+    </div>
+
+    <!-- SCREEN 2: GROWTH RING REPORT -->
+    <div id="screen-report" class="screen-view">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+          <h1 style="font-size: 1.5rem; font-weight: 700;">Growth Ring Assessment Report</h1>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">Backend Engineering Diagnostic &bull; Verified by Trainer Moderation</p>
+        </div>
+        <button class="btn btn-primary" onclick="alert('Generating verified PDF report...')">Download PDF Report</button>
+      </div>
+
+      <div class="card" style="display: flex; gap: 24px; align-items: center;">
+        <div>
+          <div style="font-size: 2.5rem; font-weight: 800; color: var(--brand-blue);">84 <span style="font-size: 1rem; color: var(--text-muted);">/ 100</span></div>
+          <div style="font-size: 0.875rem; color: var(--text-muted);">Overall Score</div>
+        </div>
+        <div style="border-left: 1px solid var(--border-dark); padding-left: 24px;">
+          <div style="font-size: 1.25rem; font-weight: 700;">78th Percentile</div>
+          <div style="font-size: 0.8125rem; color: var(--text-muted);">Cohort comparison statistically meaningful (n=48, coverage 96%)</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <section class="card">
+          <h2 class="card-title">Radar Visual (Graphic)</h2>
+          <div style="text-align: center; padding: 24px 0;">
+            <svg width="240" height="240" viewBox="0 0 240 240" style="margin: 0 auto;">
+              <polygon points="120,20 220,120 120,220 20,120" fill="none" stroke="#30363D" stroke-width="1"/>
+              <polygon points="120,60 180,120 120,180 60,120" fill="none" stroke="#30363D" stroke-width="1"/>
+              <!-- Candidate shape -->
+              <polygon points="120,35 195,120 120,190 75,120" fill="rgba(18, 148, 196, 0.35)" stroke="#1294C4" stroke-width="2"/>
+              <text x="120" y="16" fill="#FFF" font-size="10" text-anchor="middle">Python Core (92%)</text>
+              <text x="225" y="124" fill="#FFF" font-size="10" text-anchor="start">System Design (82%)</text>
+              <text x="120" y="235" fill="#FFF" font-size="10" text-anchor="middle">Security & DPDP (52%)</text>
+              <text x="15" y="124" fill="#FFF" font-size="10" text-anchor="end">Async/Celery (64%)</text>
+            </svg>
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted); text-align: center;">WCAG 2.2 compliant: Full data-table alternative presented on right.</p>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Data-Table Alternative (Accessible)</h2>
+          <p class="card-subtitle">Complete tabular breakdown with sample sizes</p>
+          <table aria-label="Growth Ring Competencies Breakdown">
+            <thead>
+              <tr>
+                <th scope="col">Competency</th>
+                <th scope="col">Score</th>
+                <th scope="col">Target</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Python Core & Syntax</td>
+                <td>92%</td>
+                <td>85%</td>
+                <td><span class="badge badge-strong">STRONG</span></td>
+              </tr>
+              <tr>
+                <td>System Architecture</td>
+                <td>82%</td>
+                <td>80%</td>
+                <td><span class="badge badge-strong">STRONG</span></td>
+              </tr>
+              <tr>
+                <td>Async & Task Semantics</td>
+                <td>64%</td>
+                <td>75%</td>
+                <td><span class="badge badge-dev">DEVELOPING</span></td>
+              </tr>
+              <tr>
+                <td>DPDP & Data Protection</td>
+                <td>52%</td>
+                <td>70%</td>
+                <td><span class="badge badge-gap">GAP</span></td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 12px;">
+            Item Response Theory (IRT 2PL) SE: 0.12 &bull; DIF Bias Check: Passed
+          </div>
+        </section>
+      </div>
+
+      <section class="card">
+        <h2 class="card-title">Exactly 3 Prioritised Next Steps</h2>
+        <ol style="margin-left: 20px; display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+          <li>
+            <strong>Review Lesson 4.2:</strong> "Idempotent Consumers and Outbox Pattern in Celery".<br>
+            <button class="btn btn-outline" style="margin-top: 6px; padding: 4px 8px; font-size: 0.75rem;" onclick="alert('Opening lesson...')">Launch Lesson</button>
+          </li>
+          <li>
+            <strong>Complete Sandboxed Lab:</strong> "Debugging Deadlocks in Redis Pub/Sub".<br>
+            <button class="btn btn-outline" style="margin-top: 6px; padding: 4px 8px; font-size: 0.75rem;" onclick="alert('Spawning sandbox container...')">Start Lab</button>
+          </li>
+          <li>
+            <strong>Schedule 30-min Teach-Back in Grove:</strong> Present outbox pattern to Mentor Rajesh Mohan.<br>
+            <button class="btn btn-primary" style="margin-top: 6px; padding: 4px 8px; font-size: 0.75rem;" onclick="alert('Opening Grove booking slots...')">Book Mentoring Slot</button>
+          </li>
+        </ol>
+      </section>
+    </div>
+
+    <!-- SCREEN 3: CONSENT PASSPORT -->
+    <div id="screen-privacy" class="screen-view">
+      <h1 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 4px;">Consent Passport & Access Receipts</h1>
+      <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 24px;">
+        India DPDP Act Data Principal Sovereignty Portal &bull; Inspect who accesses your data and revoke sharing in one click.
+      </p>
+
+      <section class="card">
+        <h2 class="card-title">Active Consent Purposes</h2>
+        <div style="display: flex; flex-direction: column; gap: 16px;">
+          <div style="border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 600;">1. Manager Aggregated Growth Ring Summary</div>
+              <div style="font-size: 0.8125rem; color: var(--text-muted);">Allows direct manager to view high-level skill summaries for 1:1 career conversations.</div>
+              <div style="font-size: 0.75rem; color: var(--evidence-strong); margin-top: 4px;">Status: GRANTED &bull; Granted on Oct 12, 2026</div>
+            </div>
+            <button class="btn btn-danger-outline" onclick="alert('Consent revoked in 1-click! Manager view reverted to anonymized aggregate.')">Revoke Consent</button>
+          </div>
+
+          <div style="border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 600;">2. Opportunities Internal Talent Marketplace Matching</div>
+              <div style="font-size: 0.8125rem; color: var(--text-muted);">Recommends stretch projects and gig shadowing based on your Growth Ring skills.</div>
+              <div style="font-size: 0.75rem; color: var(--evidence-strong); margin-top: 4px;">Status: GRANTED &bull; Granted on Oct 15, 2026</div>
+            </div>
+            <button class="btn btn-danger-outline" onclick="alert('Consent revoked in 1-click! Profile unlisted from marketplace.')">Revoke Consent</button>
+          </div>
+
+          <div style="border: 1px solid var(--border-dark); border-radius: 6px; padding: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-weight: 600;">3. Voluntary Developmental Psychometrics</div>
+              <div style="font-size: 0.8125rem; color: var(--text-muted);">Optional IPIP Big Five self-reflection. Field-level encrypted; never evaluated for jobs.</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Status: OPTED OUT</div>
+            </div>
+            <button class="btn btn-outline" onclick="alert('Opt-in consent flow initiated with encrypted keys...')">Opt In</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Access Receipts Log (Who Viewed Your Data)</h2>
+        <p class="card-subtitle">Every read of your personal records generates an immutable receipt</p>
+        <table aria-label="Data Access Receipts">
+          <thead>
+            <tr>
+              <th scope="col">Timestamp</th>
+              <th scope="col">Accessor</th>
+              <th scope="col">Data Category</th>
+              <th scope="col">Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2026-11-12 16:42:10 UTC</td>
+              <td>Vikram Malhotra (Manager)</td>
+              <td>Consented Growth Ring Summary</td>
+              <td>1:1 Career Discussion Prep</td>
+            </tr>
+            <tr>
+              <td>2026-11-08 10:15:32 UTC</td>
+              <td>Opportunities Engine</td>
+              <td>Skills Graph Competency Vector</td>
+              <td>Stretch Gig Matching</td>
+            </tr>
+            <tr>
+              <td>2026-11-01 09:30:00 UTC</td>
+              <td>HR Induction Hub</td>
+              <td>Onboarding Pathway Milestones</td>
+              <td>Induction Completion Audit</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Data Portability & Statutory Erasure</h2>
+        <div style="display: flex; gap: 16px;">
+          <button class="btn btn-outline" onclick="alert('Generating W3C Verifiable Credential package for download...')">Export Skills Passport (JSON-LD)</button>
+          <button class="btn btn-danger-outline" onclick="if(confirm('Are you sure you want to exercise DPDP Right to Erasure? Your personal details will be crypto-shredded.')) alert('Erasure request registered. Personal records purged; cryptographic hash chain preserved.')">Request Right to Erasure (Crypto-Shred)</button>
+        </div>
+      </section>
+    </div>
+
+    <!-- SCREEN 4: EVIDENCE LEDGER VIEW -->
+    <div id="screen-evidence" class="screen-view">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div>
+          <h1 style="font-size: 1.5rem; font-weight: 700;">Tamper-Evident Evidence Ledger</h1>
+          <p style="color: var(--text-muted); font-size: 0.875rem;">
+            Employee Pseudonym: <code>7f8a9b2c-3d4e-4f5a...</code> &bull; Append-Only Hash Chained (RFC 8785)
+          </p>
+        </div>
+        <button class="btn btn-outline" onclick="alert('Running live SHA-256 verification across all blocks...\nResult: ALL BLOCKS INTACT. Signed checkpoint 2026-11-13 VALID.')">
+          &check; Verify Chain Integrity
+        </button>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <span style="font-weight: 600;">Chain Status: <span style="color: var(--evidence-strong);">&check; INTACT</span></span>
+          <span style="font-size: 0.8125rem; color: var(--text-muted);">Signed Root Checkpoint: 2026-11-13 00:00:00 UTC (KMS HSM Signature Valid)</span>
+        </div>
+
+        <!-- Block 4 -->
+        <div class="ledger-block">
+          <div class="ledger-header">
+            <span>BLOCK #4 &bull; Sequence: 4</span>
+            <span>Recorded: 2026-11-13 09:15:22 UTC &bull; Weight: 0.85 &bull; Decay: 180d</span>
+          </div>
+          <div><strong>Skill:</strong> Python Core &gt; Asynchronous Architecture</div>
+          <div><strong>Source:</strong> Growth Check #GC-2026-884 (Sandbox Unit Tests 14/14 Passed)</div>
+          <div style="margin-top: 8px;">
+            <div>Prev Block Hash: <span class="hash-string">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</span></div>
+            <div>Canonical Data Hash: <span class="hash-string">8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4</span></div>
+            <div>Current Block Hash: <span class="hash-string">4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b</span></div>
+          </div>
+        </div>
+
+        <!-- Block 3 -->
+        <div class="ledger-block">
+          <div class="ledger-header">
+            <span>BLOCK #3 &bull; Sequence: 3</span>
+            <span>Recorded: 2026-11-02 14:30:10 UTC &bull; Weight: 0.70 &bull; Decay: 180d</span>
+          </div>
+          <div><strong>Skill:</strong> System Design &gt; Database Migrations</div>
+          <div><strong>Source:</strong> Greenhouse Shipped Idea #GH-42 (Reviewed by Trainer Rajesh Mohan)</div>
+          <div style="margin-top: 8px;">
+            <div>Prev Block Hash: <span class="hash-string">1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b</span></div>
+            <div>Current Block Hash: <span class="hash-string">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- SCREEN 5: GLOBAL COMMAND BAR MODAL (CTRL+K) -->
+  <div id="cmdModal" class="modal-overlay" onclick="if(event.target === this) toggleCmd(false)">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-label="Global Command Bar">
+      <input type="text" id="cmdInput" class="modal-input" placeholder="Type a command, skill, course, or person... (Press ESC to close)" onkeyup="filterCmd(this.value)">
+      <div id="cmdResults" style="max-height: 360px; overflow-y: auto;">
+        <div class="cmd-group">
+          <div class="cmd-group-title">Quick Actions</div>
+          <div class="cmd-item" onclick="toggleCmd(false); alert('Launching Growth Check...');">&gt; Start my Scheduled Growth Check</div>
+          <div class="cmd-item" onclick="toggleCmd(false); alert('Opening Grove mentoring booking...');">&gt; Request a 1:1 Mentoring Session in Grove</div>
+          <div class="cmd-item" onclick="toggleCmd(false); showScreen('privacy');">&gt; Open Consent Passport &amp; View Access Receipts</div>
+          <div class="cmd-item" onclick="toggleCmd(false); showScreen('evidence');">&gt; Verify Tamper-Evident Evidence Ledger</div>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">Courses &amp; Pathways</div>
+          <div class="cmd-item" onclick="toggleCmd(false); alert('Navigating to course...');">[Course] Async Python 3.11+: Concurrency, Tasks &amp; Event Loops</div>
+          <div class="cmd-item" onclick="toggleCmd(false); alert('Navigating to pathway...');">[Pathway] New Joiner Onboarding Induction (Tech Cohort 2026-B)</div>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-title">Approved Knowledge Wiki</div>
+          <div class="cmd-item" onclick="toggleCmd(false); alert('Opening wiki...');">[Wiki] Handling India DPDP Consent Tokens in Microservices</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showScreen(screenId, tabBtn) {
+      document.querySelectorAll('.screen-view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.screen-tab').forEach(el => el.classList.remove('active'));
+
+      const target = document.getElementById('screen-' + screenId);
+      if (target) target.classList.add('active');
+
+      if (tabBtn) {
+        tabBtn.classList.add('active');
+      } else {
+        const matchingTab = Array.from(document.querySelectorAll('.screen-tab')).find(b => b.textContent.toLowerCase().includes(screenId));
+        if (matchingTab) matchingTab.classList.add('active');
+      }
+    }
+
+    function toggleCmd(show) {
+      const modal = document.getElementById('cmdModal');
+      if (show) {
+        modal.classList.add('active');
+        setTimeout(() => document.getElementById('cmdInput').focus(), 50);
+      } else {
+        modal.classList.remove('active');
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        toggleCmd(true);
+      }
+      if (e.key === 'Escape') {
+        toggleCmd(false);
+      }
+    });
+
+    function filterCmd(query) {
+      const items = document.querySelectorAll('.cmd-item');
+      items.forEach(item => {
+        if (item.textContent.toLowerCase().includes(query.toLowerCase())) {
+          item.style.display = 'flex';
+        } else {
+          item.style.display = 'none';
+        }
+      });
+    }
+  </script>
+</body>
+</html>
