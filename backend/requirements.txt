@@ -5,6 +5,7 @@ pydantic-settings==2.16.2
 sqlalchemy==2.1.8
 alembic==1.20.1
 asyncmy==0.2.18
+greenlet==3.5.6
 cryptography==50.0.2
 argon2-cffi==25.1.0
 pyjwt==2.15.1
