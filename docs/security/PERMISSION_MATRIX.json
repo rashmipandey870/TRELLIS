@@ -1,0 +1,251 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TrellisPermissionMatrix",
+  "version": "1.0.0",
+  "description": "Unified ABAC/RBAC Data Matrix for the TRELLIS Policy Engine (can(subject, action, resource, context))",
+  "active_roles": [
+    "EMPLOYEE",
+    "TRAINER_MENTOR",
+    "MANAGER",
+    "LK_ADMIN",
+    "SUPER_ADMIN"
+  ],
+  "future_roles_modeled": [
+    "LK_HEAD_CLO",
+    "DEPARTMENT_HEAD",
+    "CONTENT_AUTHOR",
+    "ASSESSMENT_REVIEWER",
+    "HR_PARTNER",
+    "GUEST_CANDIDATE",
+    "AUDITOR"
+  ],
+  "actions": [
+    "create",
+    "read",
+    "update",
+    "delete",
+    "approve",
+    "export",
+    "impersonate",
+    "override",
+    "publish",
+    "grade",
+    "review",
+    "assign",
+    "enrol",
+    "download",
+    "share"
+  ],
+  "scopes": [
+    "OWN",
+    "TEAM_DIRECT",
+    "COHORT",
+    "DEPARTMENT",
+    "ORGANIZATION",
+    "ANONYMIZED_AGGREGATE",
+    "BLIND_GRADING",
+    "NONE"
+  ],
+  "rules": [
+    {
+      "resource": "growth_ring",
+      "action": "read",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "approval_required": false, "audit": true, "access_receipt": true },
+        "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "approval_required": false, "audit": true, "access_receipt": true, "condition": "consent.growth_ring == true" },
+        "LK_ADMIN": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "approval_required": false, "audit": true },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "access_receipt": true },
+        "LK_HEAD_CLO": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "approval_required": false, "audit": true },
+        "DEPARTMENT_HEAD": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "approval_required": false, "audit": true },
+        "HR_PARTNER": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "approval_required": false, "audit": true },
+        "AUDITOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false }
+      }
+    },
+    {
+      "resource": "evidence_ledger",
+      "action": "read",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "approval_required": false, "audit": true, "access_receipt": true },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "approval_required": false, "audit": true },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "access_receipt": true },
+        "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "hash_verification_only" }
+      }
+    },
+    {
+      "resource": "evidence_ledger",
+      "action": "create",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": true, "audit": true, "condition": "type == 'self_reflection_or_endorsement'" },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "approval_required": false, "audit": true },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false }
+      }
+    },
+    {
+      "resource": "evidence_ledger",
+      "action": "update",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "LK_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" }
+      }
+    },
+    {
+      "resource": "evidence_ledger",
+      "action": "delete",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "LK_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "APPEND_ONLY_INVARIANT" }
+      }
+    },
+    {
+      "resource": "assessment_attempt",
+      "action": "grade",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "BLIND_GRADING", "approval_required": false, "audit": true, "condition": "candidate_identity_redacted" },
+        "ASSESSMENT_REVIEWER": { "allowed": true, "scope": "BLIND_GRADING", "approval_required": false, "audit": true, "condition": "candidate_identity_redacted" },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false }
+      }
+    },
+    {
+      "resource": "assessment_score",
+      "action": "override",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "mandatory_justification_logged" },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "mandatory_justification_logged" }
+      }
+    },
+    {
+      "resource": "psychometric_profile",
+      "action": "read",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "HR_PARTNER": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "consented_summary_only" },
+        "LK_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false }
+      }
+    },
+    {
+      "resource": "audit_log",
+      "action": "read",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": false, "audit": false, "note": "CONSENT_PASSPORT_ACCESS_RECEIPTS" },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true }
+      }
+    },
+    {
+      "resource": "audit_log",
+      "action": "update",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "LK_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "AUDITOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" }
+      }
+    },
+    {
+      "resource": "audit_log",
+      "action": "delete",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "LK_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" },
+        "AUDITOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false, "note": "IMMUTABLE_LOG_INVARIANT" }
+      }
+    },
+    {
+      "resource": "user_role_grant",
+      "action": "create",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "max_role != SUPER_ADMIN" },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "dual_custody_or_expiry_required" }
+      }
+    },
+    {
+      "resource": "knowledge_article",
+      "action": "publish",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "CONTENT_AUTHOR": { "allowed": false, "scope": "NONE", "approval_required": true, "audit": true, "note": "SEPARATION_OF_DUTIES_CANNOT_SELF_APPROVE" },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "author != subject" },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "author != subject" },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true }
+      }
+    },
+    {
+      "resource": "analytics_dashboard",
+      "action": "read",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "approval_required": false, "audit": false },
+        "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "approval_required": false, "audit": false, "condition": "k_anonymity_min_5" },
+        "DEPARTMENT_HEAD": { "allowed": true, "scope": "DEPARTMENT", "approval_required": false, "audit": true, "condition": "k_anonymity_min_5" },
+        "LK_HEAD_CLO": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "k_anonymity_min_5" },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "k_anonymity_min_5" },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true }
+      }
+    },
+    {
+      "resource": "greenhouse_idea",
+      "action": "create",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "MANAGER": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true }
+      }
+    },
+    {
+      "resource": "greenhouse_idea",
+      "action": "approve",
+      "permissions": {
+        "EMPLOYEE": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "approval_required": false, "audit": true, "condition": "author != subject" },
+        "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "approval_required": false, "audit": true, "condition": "author != subject" },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "author != subject" },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true }
+      }
+    },
+    {
+      "resource": "data_export",
+      "action": "export",
+      "permissions": {
+        "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": false, "audit": true, "note": "SKILLS_PASSPORT_EXPORT" },
+        "TRAINER_MENTOR": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "MANAGER": { "allowed": false, "scope": "NONE", "approval_required": false, "audit": false },
+        "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "anonymized_or_dpo_approved" },
+        "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "anonymized_or_dpo_approved" },
+        "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "audit_logs_only" }
+      }
+    }
+  ]
+}
