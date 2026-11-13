@@ -1,6 +1,7 @@
 """TRELLIS ORM Models Registry."""
 
 from app.models.audit import AccessReceipt, AuditLog
+from app.models.auth import RefreshToken
 from app.models.base import Base
 from app.models.ledger import EvidenceLedger, EvidenceRecord, LedgerCheckpoint
 from app.models.skill import RoleRequirement, Skill, SkillEdge, SkillLevel
@@ -11,6 +12,7 @@ __all__ = [
     "Base",
     "Organisation",
     "User",
+    "RefreshToken",
     "EmploymentRecord",
     "Role",
     "Grant",
