@@ -25,7 +25,7 @@
   - Reactive form validations, state transition effects, and keyboard event handlers.
 
 ### Layer 2: Automated Permission Tests (Generated from Matrix)
-- A dedicated test generator parses [docs/security/PERMISSION_MATRIX.json](file:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/docs/security/PERMISSION_MATRIX.json) and programmatically generates test fixtures for every single `(role, resource, action, scope)` tuple.
+- A dedicated test generator parses [docs/security/PERMISSION_MATRIX.json](../security/PERMISSION_MATRIX.json) and programmatically generates test fixtures for every single `(role, resource, action, scope)` tuple.
 - Proves that unauthorized roles receive `403 Forbidden` and that allowed actions succeed and emit an audit event.
 
 ### Layer 3: Integration & Contract Tests (Testcontainers)

@@ -13,11 +13,11 @@
 
 | Feature ID | AI Feature Name | Purpose | Target Model ID | Training / Context Data Used | Human Oversight Point | Feature Owner | Evaluation Interval |
 |---|---|---|---|---|---|---|---|
-| `AI-001` | **Gardener AI Coach** | Grounded Q&A, study plans, mistake breakdowns | `meta/llama-3.1-70b-instruct` (NVIDIA NIM) | Approved `kb_articles`, learner's active skill gaps | Self-service learner; unanswerable routes to Human Expert | Head of L&K | Continuous CI + Weekly audit |
-| `AI-002` | **Communication CEFR Grader** | Evaluates email writing and communication rubrics | `meta/llama-3.1-70b-instruct` (NVIDIA NIM) | Candidate response + CEFR rubric definitions | **Mandatory**: Assessment reviewer must approve/adjust grade before posting | Lead Communication Trainer | Bi-weekly against benchmark cohort |
-| `AI-003` | **Teach-Back Verification Assistant** | Evaluates learner concept explanations | `meta/llama-3.1-70b-instruct` (NVIDIA NIM) | Concept definition + learner transcript | **Mandatory**: Trainer or designated peer confirms | Senior Technical Trainer | Monthly |
-| `AI-004` | **Leadership Briefing Drafter** | Synthesizes monthly learning metrics into impact narrative | `meta/llama-3.1-70b-instruct` (NVIDIA NIM) | Aggregated read-model statistics (`n >= 5`) | **Mandatory**: CLO must edit, approve, and sign off before export | Chief Learning Officer | Monthly |
-| `AI-005` | **Skills Inference Engine** | Identifies potential skills from project contributions | `meta/llama-3.1-70b-instruct` (NVIDIA NIM) | Merged Greenhouse diffs, task completions | **Mandatory**: Employee confirms, edits, or rejects inference | Skills Lead | Monthly |
+| `AI-001` | **Gardener AI Coach** | Grounded Q&A, study plans, mistake breakdowns | `nvidia/llama-3.1-nemotron-70b-instruct` (NVIDIA NIM Nemotron Placeholder) | Approved `kb_articles`, learner's active skill gaps | Self-service learner; unanswerable routes to Human Expert | Head of L&K | Continuous CI + Weekly audit |
+| `AI-002` | **Communication CEFR Grader** | Evaluates email writing and communication rubrics | `nvidia/llama-3.1-nemotron-70b-instruct` (NVIDIA NIM Nemotron Placeholder) | Candidate response + CEFR rubric definitions | **Mandatory**: Assessment reviewer must approve/adjust grade before posting | Lead Communication Trainer | Bi-weekly against benchmark cohort |
+| `AI-003` | **Teach-Back Verification Assistant** | Evaluates learner concept explanations | `nvidia/llama-3.1-nemotron-70b-instruct` (NVIDIA NIM Nemotron Placeholder) | Concept definition + learner transcript | **Mandatory**: Trainer or designated peer confirms | Senior Technical Trainer | Monthly |
+| `AI-004` | **Leadership Briefing Drafter** | Synthesizes monthly learning metrics into impact narrative | `nvidia/llama-3.1-nemotron-70b-instruct` (NVIDIA NIM Nemotron Placeholder) | Aggregated read-model statistics (`n >= 5`) | **Mandatory**: CLO must edit, approve, and sign off before export | Chief Learning Officer | Monthly |
+| `AI-005` | **Skills Inference Engine** | Identifies potential skills from project contributions | `nvidia/llama-3.1-nemotron-70b-instruct` (NVIDIA NIM Nemotron Placeholder) | Merged Greenhouse diffs, task completions | **Mandatory**: Employee confirms, edits, or rejects inference | Skills Lead | Monthly |
 
 ---
 

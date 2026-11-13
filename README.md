@@ -23,4 +23,4 @@ trellis/
 ```
 
 ## Quick Start
-See [docs/PRODUCT_BRIEF.md](file:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/docs/PRODUCT_BRIEF.md) for master specifications and delivery roadmap.
+See [docs/PRODUCT_BRIEF.md](docs/PRODUCT_BRIEF.md) for master specifications and delivery roadmap.

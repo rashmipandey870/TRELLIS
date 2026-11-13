@@ -9,7 +9,7 @@ Enterprise learning and skill data carries significant privacy, ethical, and leg
 ## Decision
 We implement a **Centralized Policy Engine** backed by a machine-readable permission data matrix:
 1. **Single Evaluation Function**: `can(subject, action, resource, context) -> PolicyDecision`.
-2. **Authority Source**: [docs/security/PERMISSION_MATRIX.json](file:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/docs/security/PERMISSION_MATRIX.json) defines all rules across `Resource × Action × Role × Scope × Approval × Audit`.
+2. **Authority Source**: [docs/security/PERMISSION_MATRIX.json](../security/PERMISSION_MATRIX.json) defines all rules across `Resource × Action × Role × Scope × Approval × Audit`.
 3. **Repository-Level Row Filtering**: Queries automatically apply tenant (`org_id`), cohort, team, and consent boundaries at the SQL level via SQLAlchemy query hooks.
 4. **Mandatory Separation of Duties**:
    - Content authors cannot approve their own materials.
