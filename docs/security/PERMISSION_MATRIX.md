@@ -1,6 +1,6 @@
 # TRELLIS Policy Engine & Role-Permission Matrix
 
-## 1. Architectural Overview
+## 1. Architectural Overview & Default-Deny Security Model
 The TRELLIS authorization engine operates on a single pure policy evaluation function:
 ```python
 def can(subject: UserContext, action: Action, resource: Resource, context: RequestContext) -> PolicyDecision:
@@ -9,45 +9,49 @@ def can(subject: UserContext, action: Action, resource: Resource, context: Reque
     Returns: PolicyDecision(allowed: bool, reason: str, requires_approval: bool, audit_required: bool, access_receipt: bool)
     """
 ```
-As required by Section 16 and Section 21 of the Master Prompt:
-- **No Route May Bypass It**: The policy engine executes in FastAPI dependency injection prior to any service or database access.
-- **Repository-Level Row Filtering**: Queries automatically apply tenant (`org_id`), cohort, team, and consent boundaries at the SQL level so a missed route check cannot leak unauthorized rows.
-- **Data Matrix Source**: The authoritative rules are stored as machine-readable data in [docs/security/PERMISSION_MATRIX.json](file:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/docs/security/PERMISSION_MATRIX.json). In Phase 1, automated backend pytest suites will be synthesized directly from this JSON.
+- **Strict Default-Deny**: Any `(resource, action, role)` tuple not explicitly permitted in [PERMISSION_MATRIX.json](PERMISSION_MATRIX.json) is unconditionally **DENIED** (`allowed: false`, `reason: "Default-deny policy enforced"`).
+- **Repository-Level Row Filtering**: Queries automatically apply tenant (`org_id`), cohort, team, and consent boundaries at the SQL level via SQLAlchemy query hooks.
+- **Coverage Validation**: The test script `coverage_report.py` verifies 100% evaluation of the $20 \times 15 \times 12 = 3,600$ Cartesian tuples across all monitored resources, actions, and roles.
 
 ---
 
-## 2. Active Roles & Modeled Future Roles
+## 2. Monitored Resources (20 Resources)
 
-### Active Roles (Phase 0 - 1)
-1. `EMPLOYEE`: The individual learner and knowledge contributor. Full self-ownership of their own Growth Ring, learning history, consent passport, and ideas.
-2. `TRAINER_MENTOR`: Coaches cohorts, grades assessments blindly, facilitates Grove spaces and Sessions, creates evidence.
-3. `MANAGER`: Direct line leader. Views consented summaries of team members only (`k >= 5` or explicit consent grant). Never sees individual psychometric raw data or unconsented assessments.
-4. `LK_ADMIN`: Learning & Knowledge administrator. Manages question banks, taxonomy seed files, pathways, and anonymized org-wide learning analytics.
-5. `SUPER_ADMIN`: System-level operator. Manages platform infrastructure, tenant configuration, and time-bounded emergency grants. Cannot override audit immutability or ledger append-only rules.
-
-### Modeled Future Roles (Phase 2 - 5)
-6. `LK_HEAD_CLO`: Executive learning officer. Views high-level aggregate Learning Pulse dashboards, budget what-if simulators, and leadership briefings with small-cell suppression.
-7. `DEPARTMENT_HEAD`: Departmental director. Views departmental skill gap distributions and cohort benchmarks.
-8. `CONTENT_AUTHOR`: Curriculum creator. Authors learning pathways, lessons, and assessment questions. Bound by separation of duties (cannot self-approve content).
-9. `ASSESSMENT_REVIEWER`: Subject-matter evaluator for blind grading and manual rubric moderation.
-10. `HR_PARTNER`: Human Resources collaborator. Tracks compliance completion, onboarding induction milestones, and consented high-level psychometric summaries.
-11. `GUEST_CANDIDATE`: Prospective candidate taking a pre-hire Growth Check with strictly sandboxed temporary access.
-12. `AUDITOR`: Independent compliance/DPO reviewer. Reads immutable audit trails, access receipts, and cryptographic ledger checkpoints. Has zero access to personal assessment answers.
-
----
-
-## 3. ABAC Contextual Attributes
-Beyond coarse role strings, `can()` enforces attribute-based controls (ABAC):
-- `subject.department == resource.department`
-- `subject.cohort_id == resource.cohort_id`
-- `subject.reporting_line.includes(resource.owner_id)` (Manager direct line)
-- `resource.consent_status[subject.role] == GRANTED` (Consent Passport check)
-- `resource.anonymity_cell_count >= 5` (Small-group suppression gate)
-- `resource.is_blind_grading == True` -> Candidate identity redacted to `candidate_hash`
+1. `users`: Employee accounts, profile settings, accessibility preferences.
+2. `roles_grants`: Role assignments, time-bounded grants, dual-custody elevations.
+3. `consents`: DPDP purpose-bound consent passport records.
+4. `skills`: Skills taxonomy nodes, levels, and prerequisite graph edges.
+5. `pathways`: Role learning curves, onboarding pathways, courses, and modules.
+6. `enrolments`: Learner pathway and course progression records.
+7. `assessments`: Growth Check assessment definitions, question banks, and rubrics.
+8. `items`: Question items, test cases, and difficulty parameters.
+9. `attempts`: Candidate test sessions and active attempts.
+10. `responses`: Candidate answers, rubric scores, and reviewer feedback.
+11. `growth_ring`: Materialized developmental profiles and radar visualizations.
+12. `evidence_ledger`: Append-only, hash-chained skill evidence records.
+13. `sessions`: Virtual classes, calendar batches, and attendance records.
+14. `greenhouse_ideas`: Innovation pipeline proposals, diff grafts, and reviews.
+15. `grove_spaces`: Cohort discussion spaces, doubt threads, and mentoring slots.
+16. `kb_articles`: Approved wiki articles, project learnings, and expert captures.
+17. `ai_runs`: Gardener AI coach prompt runs, inferences, and audit telemetry.
+18. `audit_log`: Immutable SOC 2 security event trail.
+19. `access_receipts`: Cross-user personal data access records.
+20. `credentials`: W3C Verifiable Credentials, Open Badges 3.0, and certificates.
 
 ---
 
-## 4. Separation of Duties Invariants
+## 3. Functional Actions (15 Actions)
+`create, read, update, delete, approve, export, impersonate, override, publish, grade, review, assign, enrol, download, share`
+
+---
+
+## 4. Roles Monitored (12 Roles: 5 Active, 7 Modeled Future)
+- **Active Roles (Phase 0–1)**: `EMPLOYEE`, `TRAINER_MENTOR`, `MANAGER`, `LK_ADMIN`, `SUPER_ADMIN`.
+- **Modeled Future Roles (Phase 2–5)**: `LK_HEAD_CLO`, `DEPARTMENT_HEAD`, `CONTENT_AUTHOR`, `ASSESSMENT_REVIEWER`, `HR_PARTNER`, `GUEST_CANDIDATE`, `AUDITOR`.
+
+---
+
+## 5. Separation of Duties Invariants
 1. **Content Approval**: An author cannot approve or publish their own pathway, question, or article (`subject.id != resource.author_id`).
 2. **Blind Grading**: Candidate identities are stripped and replaced with deterministic pseudonyms during grading. Graders cannot see employee name, employee ID, or department.
 3. **Audit Log Immutability**: No role—including `SUPER_ADMIN`—possesses `update` or `delete` grants on `audit_log` or `access_receipts`.
