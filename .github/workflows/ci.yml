@@ -116,6 +116,9 @@ jobs:
       - name: Configure Dual DB Users & Per-Table Engine Immutability Grants
         run: python ../scripts/init_db_users.py
 
+      - name: Verify Database Grants & ORM Models Reconciliation
+        run: python ../scripts/check_db_grants.py
+
       - name: Run Pytest with Coverage & Immutability Integration Tests
         run: pytest -v --cov=app --cov-report=term-missing --cov-report=xml
 

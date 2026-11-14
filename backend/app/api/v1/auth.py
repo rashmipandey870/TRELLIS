@@ -26,10 +26,9 @@ from app.services.auth_service import (
     setup_totp_mfa,
     verify_mfa_challenge,
 )
-from app.services.oidc_adapter import MockOidcAdapter
+from app.services.oidc_adapter import get_oidc_adapter
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-oidc_adapter = MockOidcAdapter()
 
 
 @router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
@@ -173,5 +172,6 @@ def oidc_login_redirect(
     state: str = "default_state", redirect_uri: str = "http://localhost:4200/auth/callback"
 ) -> dict[str, str]:
     """Return Microsoft Entra ID authorization redirect URL."""
-    url = oidc_adapter.get_authorization_url(state, redirect_uri)
+    adapter = get_oidc_adapter()
+    url = adapter.get_authorization_url(state, redirect_uri)
     return {"authorization_url": url}

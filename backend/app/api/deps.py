@@ -1,15 +1,17 @@
 """TRELLIS FastAPI Request Dependencies & Authentication Guards."""
 
+import contextlib
 from collections.abc import Generator
 from typing import Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import decode_access_token
+from app.core.uow import UnitOfWork
 from app.models import Base, User
 
 # Database session dependency
@@ -44,6 +46,24 @@ def get_db() -> Generator[Session, None, None]:
 
 
 security_bearer = HTTPBearer(auto_error=False)
+
+
+def get_uow(
+    request: Request,
+    db: Session = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_bearer),
+) -> Generator[UnitOfWork, None, None]:
+    """Provide UnitOfWork with in-transaction audit logging for mutating endpoints."""
+    claims = None
+    if credentials and credentials.credentials:
+        with contextlib.suppress(Exception):
+            claims = decode_access_token(credentials.credentials)
+    uow = UnitOfWork(session=db, request=request, claims=claims)
+    try:
+        yield uow
+    except Exception:
+        uow.rollback()
+        raise
 
 
 def get_current_user_claims(

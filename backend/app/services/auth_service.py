@@ -31,6 +31,25 @@ from app.services.rate_limiter import rate_limiter
 _MFA_TICKETS: dict[str, tuple[str, datetime, bool]] = {}
 
 
+def get_active_user_roles(user: User, as_of: datetime | None = None) -> list[str]:
+    """Derive active role codes, strictly excluding expired time-limited grants."""
+    now = as_of or datetime.now(UTC)
+    active_roles: list[str] = []
+    for g in user.grants:
+        if not g.role or not g.role.code:
+            continue
+        if getattr(g, "status", "GRANTED") != "GRANTED":
+            continue
+        if g.expires_at is not None:
+            exp = g.expires_at
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=UTC)
+            if exp <= now:
+                continue
+        active_roles.append(g.role.code)
+    return active_roles or ["EMPLOYEE"]
+
+
 def authenticate_user(
     session: Session,
     email: str,
@@ -57,10 +76,8 @@ def authenticate_user(
     # Successful authentication clears failed attempt counts
     rate_limiter.record_login_success(email)
 
-    # Collect active role codes
-    role_codes = [g.role.code for g in user.grants if g.role and g.role.code]
-    if not role_codes:
-        role_codes = ["EMPLOYEE"]
+    # Collect active role codes strictly excluding expired grants
+    role_codes = get_active_user_roles(user)
 
     return user, role_codes
 
@@ -112,8 +129,12 @@ def login_flow(
             },
             request_id=request_id,
         )
-        session.add(audit)
-        session.commit()
+        try:
+            session.add(audit)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
         if is_enrolment_required:
             return LoginResponse(
@@ -184,8 +205,12 @@ def issue_tokens_for_user(
         request_id=request_id,
     )
     try:
-        session.add(audit)
-        session.commit()
+        try:
+            session.add(audit)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
     except Exception:
         session.rollback()
         raise
@@ -245,14 +270,18 @@ def verify_mfa_challenge(
             reason="Invalid TOTP authentication code submitted; bypass codes rejected",
             request_id=request_id,
         )
-        session.add(audit)
-        session.commit()
+        try:
+            session.add(audit)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
         raise ValueError("Invalid multi-factor authentication code.")
 
     # Consume ticket
     del _MFA_TICKETS[mfa_ticket]
 
-    role_codes = [g.role.code for g in user.grants if g.role and g.role.code]
+    role_codes = get_active_user_roles(user)
     return issue_tokens_for_user(
         session, user, role_codes, device_info, ip_address, request_id=request_id
     )
@@ -305,13 +334,21 @@ def complete_admin_mfa_enrolment(
         after_state_json={"totp_enabled": True},
         request_id=request_id,
     )
-    session.add(audit)
-    session.commit()
+    try:
+        try:
+            session.add(audit)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+    except Exception:
+        session.rollback()
+        raise
 
     # Consume ticket
     del _MFA_TICKETS[mfa_ticket]
 
-    role_codes = [g.role.code for g in user.grants if g.role and g.role.code]
+    role_codes = get_active_user_roles(user)
     return issue_tokens_for_user(
         session, user, role_codes, device_info, ip_address, request_id=request_id
     )
@@ -354,8 +391,12 @@ def rotate_refresh_token(
             reason="CRITICAL: Replay attack detected on rotated refresh token. Session family revoked.",
             request_id=request_id,
         )
-        session.add(audit)
-        session.commit()
+        try:
+            session.add(audit)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
 
         raise PermissionError(
             "Security Violation: Token reuse detected. The active session family has been terminated."
@@ -380,7 +421,7 @@ def rotate_refresh_token(
     if not user or not user.is_active:
         raise ValueError("User account is inactive.")
 
-    role_codes = [g.role.code for g in user.grants if g.role and g.role.code]
+    role_codes = get_active_user_roles(user)
 
     # Issue new token continuing the SAME family
     new_tokens = issue_tokens_for_user(

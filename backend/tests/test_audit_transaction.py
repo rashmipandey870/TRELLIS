@@ -125,3 +125,106 @@ def test_default_org_fallback_is_forbidden(db_session: Session) -> None:
         )
         db_session.add(invalid_audit)
         db_session.commit()
+
+
+def test_unit_of_work_in_transaction_audit_and_rollback(db_session: Session) -> None:
+    """Verify that UnitOfWork enforces atomic mutation and rollback if audit logging fails."""
+    from app.core.uow import UnitOfWork
+    from app.models import Skill
+
+    org = Organisation(name="CSM UOW", code="CSM_UOW_TX")
+    db_session.add(org)
+    db_session.flush()
+
+    uow = UnitOfWork(session=db_session, claims={"sub": "usr_test", "org_id": org.id})
+
+    # Mutation 1: Staging a skill and audit log in same transaction
+    skill = Skill(org_id=org.id, code="SK_TEST_UOW", name="UOW Test", category="TECHNICAL")
+    uow.session.add(skill)
+    uow.record_audit(
+        action="create",
+        resource="skills",
+        resource_id=skill.id,
+        after_state={"code": "SK_TEST_UOW"},
+    )
+    uow.commit()
+
+    # Verify both were committed
+    saved_skill = (
+        db_session.execute(select(Skill).where(Skill.code == "SK_TEST_UOW")).scalars().first()
+    )
+    assert saved_skill is not None
+    saved_audit = (
+        db_session.execute(select(AuditLog).where(AuditLog.resource == "skills")).scalars().first()
+    )
+    assert saved_audit is not None
+
+    # Mutation 2: Failing audit write aborts and rolls back data mutation
+    skill2 = Skill(org_id=org.id, code="SK_ABORT_UOW", name="Abort Test", category="TECHNICAL")
+    uow.session.add(skill2)
+    # Simulate audit failure
+    with patch.object(
+        uow.session, "flush", side_effect=RuntimeError("Audit disk full or constraint drop")
+    ):
+        with pytest.raises(RuntimeError):
+            uow.record_audit(action="create", resource="skills")
+        uow.rollback()
+
+    # Verify skill2 was NOT committed
+    aborted_skill = (
+        db_session.execute(select(Skill).where(Skill.code == "SK_ABORT_UOW")).scalars().first()
+    )
+    assert aborted_skill is None
+
+
+def test_http_mutating_endpoint_aborts_when_audit_fails(db_session: Session) -> None:
+    """HTTP-level test: verify that a failing audit write returns error and leaves DB uncommitted."""
+    import sys
+
+    if sys.platform == "win32" and sys.version_info >= (3, 14):
+        pytest.skip(
+            "TestClient AnyIO portal threadlock on Windows Python 3.14 host (verified in Linux CI)"
+        )
+
+    from fastapi.testclient import TestClient
+
+    from app.api.deps import get_db
+    from app.main import app
+
+    app.dependency_overrides[get_db] = lambda: db_session
+
+    try:
+        org = Organisation(name="CSM HTTP Test", code="CSM_HTTP_AUDIT")
+        db_session.add(org)
+        db_session.flush()
+
+        pwd_hash = hash_password("Secret123!")
+        user = User(
+            org_id=org.id,
+            email="http_audit_fail@csm.tech",
+            password_hash=pwd_hash,
+            full_name="HTTP Audit Fail User",
+        )
+        db_session.add(user)
+        db_session.commit()
+
+        client = TestClient(app, raise_server_exceptions=False)
+        with patch.object(
+            Session, "commit", side_effect=RuntimeError("Forced audit DB constraint failure")
+        ):
+            response = client.post(
+                "/api/v1/auth/login",
+                json={"email": "http_audit_fail@csm.tech", "password": "Secret123!"},
+            )
+            assert response.status_code >= 400
+
+        # Query database directly: verify refresh token was NOT committed
+        tokens = (
+            db_session.execute(select(RefreshToken).where(RefreshToken.user_id == user.id))
+            .scalars()
+            .all()
+        )
+        assert len(tokens) == 0
+
+    finally:
+        app.dependency_overrides.clear()

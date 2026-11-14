@@ -44,18 +44,18 @@ def main() -> None:
 
         # 1. Create migrator user
         cur.execute(
-            f"CREATE USER IF NOT EXISTS 'trellis_migrator'@'%' IDENTIFIED BY %s;",
+            "CREATE USER IF NOT EXISTS 'trellis_migrator'@'%' IDENTIFIED BY %s;",
             (migrator_password,),
         )
         cur.execute(f"GRANT ALL PRIVILEGES ON `{db_name}`.* TO 'trellis_migrator'@'%';")
 
         # 2. Create app user
         cur.execute(
-            f"CREATE USER IF NOT EXISTS 'trellis_app'@'%' IDENTIFIED BY %s;",
+            "CREATE USER IF NOT EXISTS 'trellis_app'@'%' IDENTIFIED BY %s;",
             (app_password,),
         )
 
-        # 3. Explicit per-table mutable grants
+        # 3. Explicit per-table mutable grants (reconciled with Base.metadata.tables)
         mutable_tables = [
             "organisations",
             "users",
@@ -65,8 +65,10 @@ def main() -> None:
             "consents",
             "refresh_tokens",
             "skills",
+            "skill_levels",
             "skill_edges",
-            "skill_evidence_links",
+            "role_requirements",
+            "evidence_records",
         ]
         for tbl in mutable_tables:
             cur.execute(

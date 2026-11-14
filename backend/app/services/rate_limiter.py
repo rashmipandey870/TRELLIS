@@ -1,8 +1,11 @@
 """TRELLIS Rate Limiter & Account Lockout Service.
 
 Tracks failed authentication attempts and enforces temporary account lockout
-via Redis with thread-safe fallback cache for offline test runners.
+via Redis. Outside TRELLIS_ENV=dev, Redis is strictly mandatory; if unavailable,
+the service fails closed and raises a loud operational alert.
 """
+
+from __future__ import annotations
 
 import contextlib
 from datetime import UTC, datetime, timedelta
@@ -11,7 +14,7 @@ import redis
 
 from app.core.config import settings
 
-# Thread-safe in-memory cache fallback for environments without active Redis
+# In-memory fallback used strictly in TRELLIS_ENV=dev for headless testing
 _IN_MEMORY_ATTEMPTS: dict[str, tuple[int, datetime]] = {}
 _IN_MEMORY_LOCKOUTS: dict[str, datetime] = {}
 
@@ -32,7 +35,13 @@ def _get_redis_client() -> redis.Redis | None:
 
 
 class LoginRateLimiter:
-    """Manages login attempt counting and account lockout enforcement."""
+    """Manages login attempt counting and account lockout enforcement.
+
+    Invariants:
+    1. Outside TRELLIS_ENV=dev, rate limiting MUST fail closed if Redis is unavailable.
+       Silent in-memory fallback in staging/production is forbidden.
+    2. Accounts are locked for lockout_seconds after exceeding max_attempts.
+    """
 
     def __init__(self, max_attempts: int = 5, lockout_seconds: int = 900) -> None:
         self.max_attempts = max_attempts
@@ -42,6 +51,12 @@ class LoginRateLimiter:
         """Check if account is currently locked out; raises PermissionError if locked."""
         client = _get_redis_client()
         lockout_key = f"trellis:lockout:{identifier.lower()}"
+
+        if not client and settings.ENVIRONMENT != "dev":
+            raise RuntimeError(
+                "REDIS_UNAVAILABLE: Production rate limiting requires an operational Redis cluster. "
+                "Silent in-memory fallback is forbidden outside TRELLIS_ENV=dev."
+            )
 
         if client:
             try:
@@ -54,10 +69,13 @@ class LoginRateLimiter:
                 return
             except PermissionError:
                 raise
-            except Exception:
-                pass  # Fall back to in-memory check
+            except Exception as exc:
+                if settings.ENVIRONMENT != "dev":
+                    raise RuntimeError(
+                        f"REDIS_ERROR: Failed communicating with Redis rate limiting cluster: {exc}"
+                    ) from exc
 
-        # In-memory check
+        # In-memory check (permitted in TRELLIS_ENV=dev only)
         now = datetime.now(UTC)
         locked_until = _IN_MEMORY_LOCKOUTS.get(identifier.lower())
         if locked_until and locked_until > now:
@@ -73,6 +91,12 @@ class LoginRateLimiter:
         key = f"trellis:attempts:{identifier.lower()}"
         lockout_key = f"trellis:lockout:{identifier.lower()}"
 
+        if not client and settings.ENVIRONMENT != "dev":
+            raise RuntimeError(
+                "REDIS_UNAVAILABLE: Production rate limiting requires an operational Redis cluster. "
+                "Silent in-memory fallback is forbidden outside TRELLIS_ENV=dev."
+            )
+
         if client:
             try:
                 attempts = client.incr(key)
@@ -82,10 +106,13 @@ class LoginRateLimiter:
                     client.setex(lockout_key, self.lockout_seconds, "locked")
                     client.delete(key)
                 return attempts
-            except Exception:
-                pass  # Fall back to in-memory
+            except Exception as exc:
+                if settings.ENVIRONMENT != "dev":
+                    raise RuntimeError(
+                        f"REDIS_ERROR: Failed communicating with Redis rate limiting cluster: {exc}"
+                    ) from exc
 
-        # In-memory record
+        # In-memory record (permitted in TRELLIS_ENV=dev only)
         now = datetime.now(UTC)
         current = _IN_MEMORY_ATTEMPTS.get(identifier.lower())
         attempts = 1 if not current or current[1] < now else current[0] + 1

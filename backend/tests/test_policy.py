@@ -333,3 +333,226 @@ def test_access_receipt_recording(db_session: Session) -> None:
     saved = db_session.get(AccessReceipt, receipt.id)
     assert saved is not None
     assert saved.resource_type == "growth_ring"
+
+
+def test_multi_role_evaluation_all_roles_evaluated_and_explicit_deny_wins() -> None:
+    """Verify that a subject with multiple roles is evaluated against all of them, with explicit deny winning."""
+    # 1. Subject with EMPLOYEE and TRAINER_MENTOR:
+    # TRAINER_MENTOR has publish permission on pathways (scope ORGANIZATION, condition author != subject)
+    user_multi = UserContext(
+        user_id="user_trainer_1",
+        org_id="org_csm",
+        roles=["EMPLOYEE", "TRAINER_MENTOR"],
+    )
+
+    # When SoD condition holds (author != subject), user gets the grant from TRAINER_MENTOR role
+    assert (
+        can(
+            user_multi,
+            "publish",
+            "pathways",
+            {"author_id": "other_author", "target_org_id": "org_csm"},
+        )
+        is True
+    )
+
+    # 2. When SoD condition fails (author == subject), SoD deny wins immediately
+    assert (
+        can(
+            user_multi,
+            "publish",
+            "pathways",
+            {"author_id": "user_trainer_1", "target_org_id": "org_csm"},
+        )
+        is False
+    )
+
+    # 3. Explicit deny wins: if action is forbidden under strict default-deny or unallowed
+    assert can(user_multi, "delete", "audit_log", {}) is False
+
+
+def test_separation_of_duties_requires_real_db_author_and_denies_unknown_author(
+    db_session: Session,
+) -> None:
+    """Verify SoD loads real author from DB and denies approve/publish when author cannot be determined."""
+    from app.core.policy import resolve_server_side_context
+    from app.models import EvidenceRecord, Organisation, Skill, User
+
+    org = Organisation(name="CSM Tech", code="CSM_SOD_TEST")
+    db_session.add(org)
+    db_session.flush()
+
+    user_author = User(
+        org_id=org.id, email="author@csm.tech", password_hash="h", full_name="Author"
+    )
+    user_reviewer = User(
+        org_id=org.id, email="reviewer@csm.tech", password_hash="h", full_name="Reviewer"
+    )
+    db_session.add_all([user_author, user_reviewer])
+    db_session.flush()
+
+    skill = Skill(org_id=org.id, code="SK_LEADERSHIP", name="Leadership", category="BEHAVIOURAL")
+    db_session.add(skill)
+    db_session.flush()
+
+    # Create real EvidenceRecord authored by user_author
+    ev_record = EvidenceRecord(
+        org_id=org.id,
+        user_id=user_author.id,
+        skill_id=skill.id,
+        evidence_type="ASSESSMENT_ATTEMPT",
+    )
+    db_session.add(ev_record)
+    db_session.commit()
+
+    reviewer_ctx = UserContext(user_id=user_reviewer.id, org_id=org.id, roles=["TRAINER_MENTOR"])
+    author_ctx = UserContext(user_id=user_author.id, org_id=org.id, roles=["TRAINER_MENTOR"])
+
+    # 1. Server-side context loads real author from DB
+    ctx_loaded = resolve_server_side_context(
+        db_session, "evidence_records", ev_record.id, reviewer_ctx
+    )
+    assert ctx_loaded["author_id"] == user_author.id
+    assert ctx_loaded["target_org_id"] == org.id
+
+    # Reviewer (different user) is allowed to publish (author != subject)
+    assert can(reviewer_ctx, "publish", "pathways", ctx_loaded) is True
+
+    # Author (same user) is strictly forbidden from self-publishing
+    assert can(author_ctx, "publish", "pathways", ctx_loaded) is False
+
+    # 2. Invariant: Deny approve/publish when author CANNOT be determined
+    unknown_ctx = resolve_server_side_context(
+        db_session, "evidence_records", "non_existent_record_id", reviewer_ctx
+    )
+    assert unknown_ctx["author_id"] is None
+    assert can(reviewer_ctx, "approve", "greenhouse_ideas", unknown_ctx) is False
+    assert can(reviewer_ctx, "publish", "pathways", unknown_ctx) is False
+
+
+def test_require_permission_with_real_database_row_no_hand_supplied_author(
+    db_session: Session,
+) -> None:
+    """Test require_permission dependency with a real database row, deriving author from DB only."""
+    from fastapi import HTTPException
+    from starlette.requests import Request
+
+    from app.core.policy import require_permission
+    from app.models import EvidenceRecord, Organisation, Skill, User
+
+    org = Organisation(name="CSM Tech", code="CSM_REQ_PERM")
+    db_session.add(org)
+    db_session.flush()
+
+    author = User(
+        org_id=org.id, email="author_row@csm.tech", password_hash="h", full_name="Author Row"
+    )
+    reviewer = User(
+        org_id=org.id, email="rev_row@csm.tech", password_hash="h", full_name="Reviewer Row"
+    )
+    db_session.add_all([author, reviewer])
+    db_session.flush()
+
+    skill = Skill(org_id=org.id, code="SK_ARCH", name="Architecture", category="TECHNICAL")
+    db_session.add(skill)
+    db_session.flush()
+
+    # Real DB row
+    record = EvidenceRecord(
+        org_id=org.id,
+        user_id=author.id,
+        skill_id=skill.id,
+        evidence_type="PROJECT_WORK",
+    )
+    db_session.add(record)
+    db_session.commit()
+
+    # Mock request with path_params referencing real record.id
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": f"/api/v1/evidence/{record.id}/approve",
+        "path_params": {"id": record.id},
+        "headers": [],
+    }
+    request = Request(scope)
+
+    # 1. Author attempting self-approval via require_permission: MUST raise 403 Forbidden
+    author_claims = {"sub": author.id, "org_id": org.id, "roles": ["TRAINER_MENTOR"]}
+    author_dep = require_permission("publish", "pathways")
+
+    with pytest.raises(HTTPException) as exc_info:
+        author_dep(request=request, claims=author_claims, db=db_session)
+    assert exc_info.value.status_code == 403
+
+    # 2. Reviewer calling require_permission: Succeeds because author != subject
+    reviewer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["TRAINER_MENTOR"]}
+    reviewer_dep = require_permission("publish", "pathways")
+    res_ctx = reviewer_dep(request=request, claims=reviewer_claims, db=db_session)
+    assert res_ctx.user_id == reviewer.id
+
+    # 3. Non-existent ID: Author cannot be determined -> MUST raise 403 Forbidden
+    non_existent_scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/evidence/missing_id/approve",
+        "path_params": {"id": "missing_id"},
+        "headers": [],
+    }
+    missing_req = Request(non_existent_scope)
+    with pytest.raises(HTTPException) as exc_info:
+        reviewer_dep(request=missing_req, claims=reviewer_claims, db=db_session)
+    assert exc_info.value.status_code == 403
+
+
+def test_time_limited_grant_expiry_excludes_role(db_session: Session) -> None:
+    """Verify that expired grants are excluded from active user roles."""
+    from datetime import UTC, datetime, timedelta
+
+    from app.models import Grant, Organisation, Role, User
+    from app.services.auth_service import get_active_user_roles
+
+    org = Organisation(name="CSM Tech", code="CSM_EXP_GRANT")
+    db_session.add(org)
+    db_session.flush()
+
+    user = User(
+        org_id=org.id, email="exp_user@csm.tech", password_hash="h", full_name="Expiring User"
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    role_emp = Role(code="EMPLOYEE", name="Employee Role")
+    role_trainer = Role(code="TRAINER_MENTOR", name="Trainer Role")
+    db_session.add_all([role_emp, role_trainer])
+    db_session.flush()
+
+    now = datetime.now(UTC)
+
+    # Permanent grant for EMPLOYEE
+    grant_perm = Grant(
+        user_id=user.id,
+        role_id=role_emp.id,
+        org_id=org.id,
+        expires_at=None,
+    )
+    # Expired grant for TRAINER_MENTOR (expired 1 hour ago)
+    grant_expired = Grant(
+        user_id=user.id,
+        role_id=role_trainer.id,
+        org_id=org.id,
+        expires_at=now - timedelta(hours=1),
+    )
+    db_session.add_all([grant_perm, grant_expired])
+    db_session.commit()
+
+    db_session.refresh(user)
+
+    # Active roles strictly excludes expired grant
+    active_roles = get_active_user_roles(user, as_of=now)
+    assert "EMPLOYEE" in active_roles
+    assert "TRAINER_MENTOR" not in active_roles
+
+    # If evaluated prior to expiration, role was active
+    past_roles = get_active_user_roles(user, as_of=now - timedelta(hours=2))
+    assert "TRAINER_MENTOR" in past_roles

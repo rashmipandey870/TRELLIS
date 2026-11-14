@@ -24,6 +24,14 @@ class Settings(BaseSettings):
     TRELLIS_ENV: str = "dev"
     LOG_LEVEL: str = "INFO"
 
+    @property
+    def ENVIRONMENT(self) -> str:
+        return self.TRELLIS_ENV
+
+    @ENVIRONMENT.setter
+    def ENVIRONMENT(self, val: str) -> None:
+        self.TRELLIS_ENV = val
+
     # Database Configuration (No hardcoded credentials; sourced from environment)
     DATABASE_URL: str = ""
     DATABASE_MIGRATION_URL: str = ""

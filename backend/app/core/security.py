@@ -11,9 +11,10 @@ import jwt
 import pyotp
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
-from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import serialization
+from cryptography.fernet import Fernet, MultiFernet
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.core.config import settings
 
@@ -212,28 +213,81 @@ def hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
-# 4. Field-Level Encryption (AES-256 / Fernet)
-def _get_fernet() -> Fernet:
-    """Derive authenticated Fernet cipher instance from configured field encryption key."""
-    key_bytes = hashlib.sha256(settings.FIELD_ENCRYPTION_KEY.encode("utf-8")).digest()
-    b64_key = base64.urlsafe_b64encode(key_bytes)
-    return Fernet(b64_key)
+# 4. Field-Level Authenticated Encryption (Fernet: AES-128-CBC + HMAC-SHA256, MultiFernet Key Rotation)
+# Note: Fernet uses 128-bit AES in CBC mode with PKCS7 padding and HMAC-SHA256 authentication
+# with a 256-bit compound key (128-bit encryption key + 128-bit signing key). It is NOT AES-256.
+
+_PREVIOUS_FIELD_KEYS: list[bytes] = []
+
+
+def derive_fernet_key(raw_key: str | bytes) -> bytes:
+    """Derive authenticated 32-byte URL-safe base64 Fernet key using HKDF-SHA256.
+
+    If input is already a valid 32-byte URL-safe base64 key, returns it directly.
+    Otherwise derives a cryptographically strong 32-byte key via HKDF with a fixed salt.
+    """
+    key_bytes = raw_key.encode("utf-8") if isinstance(raw_key, str) else raw_key
+    try:
+        decoded = base64.urlsafe_b64decode(key_bytes)
+        if len(decoded) == 32:
+            return key_bytes
+    except Exception:
+        pass
+
+    # Derive via HKDF with SHA-256
+    hkdf = HKDF(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=b"trellis_field_encryption_salt_2026",
+        info=b"trellis-field-encryption-v1",
+    )
+    derived = hkdf.derive(key_bytes)
+    return base64.urlsafe_b64encode(derived)
+
+
+def register_rotated_field_key(new_key: str | bytes) -> None:
+    """Register a new active field encryption key while retaining previous keys for MultiFernet decryption."""
+    global _PREVIOUS_FIELD_KEYS
+    current_active = derive_fernet_key(settings.FIELD_ENCRYPTION_KEY)
+    if current_active not in _PREVIOUS_FIELD_KEYS:
+        _PREVIOUS_FIELD_KEYS.insert(0, current_active)
+    settings.FIELD_ENCRYPTION_KEY = (
+        new_key.decode("utf-8") if isinstance(new_key, bytes) else new_key
+    )
+
+
+def _get_multi_fernet() -> MultiFernet:
+    """Construct MultiFernet instance with active key first, followed by rotated historical keys."""
+    active_key = derive_fernet_key(settings.FIELD_ENCRYPTION_KEY)
+    fernet_instances = [Fernet(active_key)]
+    for prev_k in _PREVIOUS_FIELD_KEYS:
+        if prev_k != active_key:
+            fernet_instances.append(Fernet(prev_k))
+    return MultiFernet(fernet_instances)
 
 
 def encrypt_field(plaintext: str) -> str:
-    """Encrypt sensitive attribute at rest using AES-256 authenticated cipher."""
+    """Encrypt sensitive attribute at rest using primary active key (AES-128-CBC + HMAC-SHA256)."""
     if not plaintext:
         return ""
-    fernet = _get_fernet()
-    return fernet.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+    multi_fernet = _get_multi_fernet()
+    return multi_fernet.encrypt(plaintext.encode("utf-8")).decode("utf-8")
 
 
 def decrypt_field(ciphertext: str) -> str:
-    """Decrypt sensitive attribute retrieved from storage."""
+    """Decrypt sensitive attribute retrieved from storage using MultiFernet (trying active and historical keys)."""
     if not ciphertext:
         return ""
-    fernet = _get_fernet()
-    return fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+    multi_fernet = _get_multi_fernet()
+    return multi_fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+
+
+def rotate_encrypted_field(ciphertext: str) -> str:
+    """Re-encrypt ciphertext under the newest primary active key."""
+    if not ciphertext:
+        return ""
+    multi_fernet = _get_multi_fernet()
+    return multi_fernet.rotate(ciphertext.encode("utf-8")).decode("utf-8")
 
 
 # 5. TOTP MFA (RFC 6238)
