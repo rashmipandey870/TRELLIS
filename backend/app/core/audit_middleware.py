@@ -1,8 +1,9 @@
 """TRELLIS Immutable Audit Logging Middleware & Interceptors."""
 
+import uuid
 from collections.abc import Awaitable, Callable
 
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -12,72 +13,98 @@ from app.models import AccessReceipt, AuditLog
 
 
 class AuditLogMiddleware(BaseHTTPMiddleware):
-    """FastAPI ASGI middleware intercepting state mutations and logging immutable audit events."""
+    """FastAPI ASGI middleware intercepting state mutations and logging immutable audit events.
+
+    Invariants:
+    1. Every mutating request must have a verified tenant org_id; 'default_org' fallback is forbidden.
+    2. If the audit log insert fails, the request MUST FAIL. Silent pass is strictly forbidden.
+    3. Correlation request ID and approval references must be tracked.
+    """
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        # Extract or generate correlation Request ID
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        approval_ref = request.headers.get("X-Approval-Ref")
+
+        # Skip high-frequency read-only health checks or static docs
+        path = request.url.path
+        is_mutation = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        is_exempt = (
+            path.endswith("/health") or path.endswith("/docs") or path.endswith("/openapi.json")
+        )
+
+        # Execute downstream route handler
         response: Response = await call_next(request)
 
         # Intercept state-mutating requests with successful HTTP status (2xx)
-        if (
-            request.method in {"POST", "PUT", "PATCH", "DELETE"}
-            and 200 <= response.status_code < 300
-        ):
-            path = request.url.path
+        if is_mutation and not is_exempt and 200 <= response.status_code < 300:
+            actor_id = None
+            org_id = None
 
-            # Skip high-frequency health probes or auth login (login logs internally)
-            if (
-                not path.endswith("/health")
-                and not path.endswith("/login")
-                and not path.endswith("/refresh")
-            ):
-                actor_id = None
-                org_id = "default_org"
-
-                # Extract actor from Authorization header if present
-                auth_header = request.headers.get("Authorization")
-                if auth_header and auth_header.startswith("Bearer "):
-                    try:
-                        token = auth_header.split(" ")[1]
-                        claims = decode_access_token(token)
-                        actor_id = claims.get("sub")
-                        org_id = claims.get("org_id", "default_org")
-                    except Exception:
-                        pass
-
-                # Derive resource from path segment
-                segments = [s for s in path.split("/") if s and s != "api" and s != "v1"]
-                resource = segments[0] if segments else "system"
-                action_map = {
-                    "POST": "create",
-                    "PUT": "update",
-                    "PATCH": "update",
-                    "DELETE": "delete",
-                }
-                action = action_map.get(request.method, "mutation")
-
-                client_ip = request.client.host if request.client else "127.0.0.1"
-                user_agent = request.headers.get("User-Agent")
-
+            # Extract actor and org from Authorization Bearer token
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
                 try:
-                    engine = get_sync_engine()
-                    with Session(engine) as session:
-                        audit_entry = AuditLog(
-                            org_id=org_id,
-                            actor_id=actor_id,
-                            action=action,
-                            resource=resource,
-                            resource_id=segments[1] if len(segments) > 1 else None,
-                            ip_address=client_ip,
-                            user_agent=user_agent,
-                            reason=f"HTTP {request.method} {path} completed with {response.status_code}",
-                        )
-                        session.add(audit_entry)
-                        session.commit()
+                    token = auth_header.split(" ")[1]
+                    claims = decode_access_token(token)
+                    actor_id = claims.get("sub")
+                    org_id = claims.get("org_id")
                 except Exception:
-                    # Never crash the client request if audit logging encounters a transient DB error
                     pass
+
+            # In dev/mock testing without auth, check X-Org-ID header if claims absent
+            if not org_id:
+                org_id = request.headers.get("X-Org-ID")
+
+            # Invariant: Mutating requests MUST have an identifiable tenant organisation
+            if not org_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="AUDIT_REJECTED: Mutating operations require a verified tenant org_id in token or headers.",
+                )
+
+            # Derive resource and action from path
+            segments = [s for s in path.split("/") if s and s not in {"api", "v1"}]
+            resource = segments[0] if segments else "system"
+            resource_id = segments[1] if len(segments) > 1 else None
+
+            action_map = {
+                "POST": "create",
+                "PUT": "update",
+                "PATCH": "update",
+                "DELETE": "delete",
+            }
+            action = action_map.get(request.method, "mutation")
+            client_ip = request.client.host if request.client else "127.0.0.1"
+            user_agent = request.headers.get("User-Agent")
+
+            # Persist audit log; if it fails, request MUST abort and raise
+            try:
+                engine = get_sync_engine()
+                with Session(engine) as session:
+                    audit_entry = AuditLog(
+                        org_id=org_id,
+                        actor_id=actor_id,
+                        action=action,
+                        resource=resource,
+                        resource_id=resource_id,
+                        ip_address=client_ip,
+                        user_agent=user_agent,
+                        approval_ref=approval_ref,
+                        request_id=request_id,
+                        reason=f"HTTP {request.method} {path} completed with status {response.status_code}",
+                        after_state_json={"status_code": response.status_code},
+                    )
+                    session.add(audit_entry)
+                    session.commit()
+            except Exception as exc:
+                # Fatal: Never silently swallow audit failures
+                raise RuntimeError(
+                    f"AUDIT_WRITE_FAILED: Failed to persist immutable audit log for {request.method} {path}: {exc}. "
+                    "Transaction aborted to prevent un-audited state mutation."
+                ) from exc
 
         return response
 

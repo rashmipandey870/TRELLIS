@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 
+import pyotp
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 from app.core.security import (
     create_access_token,
     decode_access_token,
+    decrypt_field,
+    generate_totp_secret,
     get_jwks,
     hash_password,
     verify_password,
@@ -16,12 +19,14 @@ from app.core.security import (
 )
 from app.models import AuditLog, Base, Grant, Organisation, RefreshToken, Role, User
 from app.services.auth_service import (
+    complete_admin_mfa_enrolment,
     login_flow,
     logout_session,
     rotate_refresh_token,
     setup_totp_mfa,
     verify_mfa_challenge,
 )
+from app.services.rate_limiter import rate_limiter
 
 
 @pytest.fixture
@@ -110,7 +115,7 @@ def test_standard_employee_login_flow(db_session: Session) -> None:
 
 
 def test_admin_role_requires_totp_mfa(db_session: Session) -> None:
-    """Verify that LK_ADMIN and SUPER_ADMIN users are strictly challenged for TOTP MFA."""
+    """Verify LK_ADMIN requires TOTP MFA, bypass codes are rejected, and enrolment is enforced."""
     org = Organisation(name="CSM Technology", code="CSM_ADMIN_MFA")
     role = Role(code="LK_ADMIN", name="LK Administrator", is_system_role=True)
     db_session.add_all([org, role])
@@ -130,7 +135,7 @@ def test_admin_role_requires_totp_mfa(db_session: Session) -> None:
     db_session.add(grant)
     db_session.commit()
 
-    # Step 1: Login attempt triggers MFA challenge
+    # Step 1: Initial admin login requires MFA and detects missing TOTP enrolment
     resp = login_flow(
         session=db_session,
         email="admin@csm.tech",
@@ -138,18 +143,94 @@ def test_admin_role_requires_totp_mfa(db_session: Session) -> None:
     )
 
     assert resp.mfa_required is True
+    assert resp.mfa_enrolment_required is True
     assert resp.mfa_ticket is not None
     assert resp.tokens is None
 
-    # Step 2: Attempting invalid code fails
-    with pytest.raises(ValueError) as exc:
-        verify_mfa_challenge(db_session, resp.mfa_ticket, "999999")
-    assert "Invalid multi-factor authentication code" in str(exc.value)
+    # Step 2: Proving bypass codes (123456 / 000000) are REJECTED and cannot yield access tokens
+    with pytest.raises(PermissionError) as exc_bypass1:
+        verify_mfa_challenge(db_session, resp.mfa_ticket, "123456")
+    assert "MFA_ENROLMENT_REQUIRED" in str(exc_bypass1.value)
 
-    # Step 3: Submitting valid bootstrap demo code completes login
-    tokens = verify_mfa_challenge(db_session, resp.mfa_ticket, "123456")
+    with pytest.raises(PermissionError) as exc_bypass2:
+        verify_mfa_challenge(db_session, resp.mfa_ticket, "000000")
+    assert "MFA_ENROLMENT_REQUIRED" in str(exc_bypass2.value)
+
+    # Step 3: Admin completes forced TOTP enrolment
+    totp_secret = generate_totp_secret()
+    valid_code = pyotp.TOTP(totp_secret).now()
+
+    tokens = complete_admin_mfa_enrolment(
+        session=db_session,
+        mfa_ticket=resp.mfa_ticket,
+        totp_secret=totp_secret,
+        totp_code=valid_code,
+    )
     assert tokens.access_token is not None
     assert "LK_ADMIN" in tokens.roles
+
+    # Verify secret is stored ENCRYPTED at rest in database
+    db_session.expire_all()
+    user_db = db_session.get(User, user.id)
+    assert user_db is not None
+    assert user_db.totp_secret != totp_secret  # Ciphertext, NOT plaintext
+    assert decrypt_field(user_db.totp_secret) == totp_secret
+    assert user_db.totp_enabled is True
+
+    # Step 4: Subsequent login attempts prompt for TOTP code (enrolment already complete)
+    resp2 = login_flow(
+        session=db_session,
+        email="admin@csm.tech",
+        password="AdminSecret2026!",
+    )
+    assert resp2.mfa_required is True
+    assert resp2.mfa_enrolment_required is False
+
+    # Negative test: Submitting obsolete bypass code '123456' is strictly rejected
+    with pytest.raises(ValueError) as exc_invalid:
+        verify_mfa_challenge(db_session, resp2.mfa_ticket, "123456")
+    assert "Invalid multi-factor authentication code" in str(exc_invalid.value)
+
+    # Positive test: Genuine TOTP code succeeds
+    real_code2 = pyotp.TOTP(totp_secret).now()
+    tokens2 = verify_mfa_challenge(db_session, resp2.mfa_ticket, real_code2)
+    assert tokens2.access_token is not None
+    assert "LK_ADMIN" in tokens2.roles
+
+
+def test_login_rate_limiting_and_account_lockout(db_session: Session) -> None:
+    """Verify that 5 failed login attempts trigger account lockout and reject further attempts."""
+    rate_limiter.reset_for_testing()
+
+    org = Organisation(name="CSM Tech", code="CSM_LOCKOUT")
+    db_session.add(org)
+    db_session.flush()
+
+    user = User(
+        org_id=org.id,
+        email="lockout_victim@csm.tech",
+        password_hash=hash_password("CorrectPassword123!"),
+        full_name="Lockout Victim",
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    # Perform 4 consecutive failed login attempts
+    for _ in range(4):
+        with pytest.raises(ValueError) as exc:
+            login_flow(db_session, "lockout_victim@csm.tech", "WrongPassword!")
+        assert "Invalid email or password" in str(exc.value)
+
+    # 5th failed attempt triggers account lockout
+    with pytest.raises(ValueError):
+        login_flow(db_session, "lockout_victim@csm.tech", "WrongPassword!")
+
+    # 6th attempt (even with CORRECT password) is rejected with ACCOUNT_LOCKED
+    with pytest.raises(PermissionError) as lock_exc:
+        login_flow(db_session, "lockout_victim@csm.tech", "CorrectPassword123!")
+    assert "ACCOUNT_LOCKED" in str(lock_exc.value)
+
+    rate_limiter.reset_for_testing()
 
 
 def test_refresh_token_rotation_and_single_use(db_session: Session) -> None:

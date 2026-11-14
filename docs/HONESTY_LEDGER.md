@@ -2,7 +2,7 @@
 
 This document tracks verified, unverified, and unbuilt capabilities across all phases of TRELLIS for leadership review.
 
-Last Updated: 2026-11-13 (Phase 0 Review Conditions Met & Phase 1 Slices Reordered)
+Last Updated: 2026-11-14 (Checkpoint 1 Hardening: Immutability, Policy Negatives, Key Rotation, Axe Playwright, Transactional Audit, and MFA Bypass Removal)
 
 ---
 
@@ -44,8 +44,12 @@ Items configured or designed but unverified in live environments due to environm
 | ENV-001 | `docker compose config` execution | **Execution Unverified**: Docker CLI and Docker Desktop daemon are not installed on this local Windows host (`CommandNotFoundException`). | Compose YAML syntax and networking manually hardened: MySQL 8.4 deprecated authentication flag removed, ports 3306 & 6379 isolated from host exposure, all passwords sourced from `.env` without fallbacks. Documented in `docs/DEV_SETUP.md`. |
 | ENV-002 | Microsoft Entra SSO (Q4) | Assumed, not yet confirmed by CSM. | Architecture specifies OIDC client adapter; local Argon2id auth configured for dev/demo. |
 | ENV-003 | Scale Specifications (Q5) | Assumed (2,000 employees, 300 concurrent users), not yet confirmed by CSM. | Connection pool sizing and Redis caching configured for this assumed baseline. |
-| ENV-004 | Node Version Compatibility | Local host runs Node `v25.2.1`. Angular CLI 22.2.7 requires Node `^22.22.3 || ^24.15.0 || >=26.0.0`. | Node engine warnings observed during `npm install`; packages installed successfully. User instructions provided in `docs/DEV_SETUP.md` to switch to Node `24.15.0 LTS` via `nvm-windows`. |
+| ENV-004 | Node Version Compatibility | Local host runs Node `v25.2.1`. Angular CLI 22.2.7 requires Node `^22.22.3 \|\| ^24.15.0 \|\| >=26.0.0`. | Node engine warnings observed during `npm install`; packages installed successfully. User instructions provided in `docs/DEV_SETUP.md` to switch to Node `24.15.0 LTS` via `nvm-windows`. |
 | ENV-005 | Live MySQL 8.4 & Redis Integration Tests | **Unverified on Local Host**: Neither Docker Desktop nor native MySQL 8.4 is currently running on the local host machine. | Integration tests against live MySQL 8.4 and Redis 7.4 marked **Unverified** until Docker Desktop or native MySQL 8.4 is started. Fast in-memory unit tests, mock repositories, and cryptographic hashing tests run cleanly. |
+| ENV-006 | Database-Level Immutability | **Unverified until CI passes**: Explicit per-table grants (`scripts/init_db_users.sql` and `scripts/init_db_users.py`) and integration tests (`tests/test_mysql_immutability.py`) asserting MySQL error 1142 on UPDATE/DELETE are written. Live engine verification requires the GitHub Actions CI job with `mysql:8.4` service container. | Tests authored and wired into `.github/workflows/ci.yml`. Marked unverified until live CI execution. |
+| ENV-007 | Automated Axe-Core / WCAG 2.2 AA Audit | **Unverified until CI passes**: Real `@axe-core/playwright` browser test authored (`frontend/tests/a11y.spec.ts`, `frontend/playwright.config.ts`). Dummy scripts removed. Scans rules and reports exact pass/incomplete/violation counts. Requires CI headless Chromium execution against built frontend. | Pinned in `package.json`, configured in CI job `accessibility-audit`. Marked unverified until live CI execution. |
+| ENV-008 | Asymmetric Key Rotation | **Unverified until CI passes**: Multi-key JWKS registry, active key rotation, backwards-compatible token verification, and non-dev startup refusal authored in `app/core/security.py` and `tests/test_key_rotation.py`. | Tested locally with unit tests; marked unverified until live CI run confirms key rotation pipeline. |
+| ENV-009 | All Mutations Audited & Transactional Rollback | **Unverified until CI passes**: Transactional audit logging inside mutations, removal of `default_org`, removal of `except Exception: pass`, and rollback on audit write failure authored in `auth_service.py`, `AuditLogMiddleware`, and `tests/test_audit_transaction.py`. | Unit and transaction tests pass locally; marked unverified until end-to-end CI pipeline passes. |
 
 ---
 

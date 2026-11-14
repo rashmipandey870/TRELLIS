@@ -1,7 +1,7 @@
 """TRELLIS Centralized Policy Engine & ABAC Evaluator.
 
 Implements can(subject, action, resource, context) driven by docs/security/PERMISSION_MATRIX.json
-under strict Default-Deny.
+under strict Default-Deny with database-derived entity scope resolution.
 """
 
 import json
@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user_claims
+from app.api.deps import get_current_user_claims, get_db
+from app.models import EmploymentRecord, Skill, User
 
 
 def _resolve_matrix_path() -> Path:
@@ -21,27 +24,44 @@ def _resolve_matrix_path() -> Path:
         candidate = parent / "docs" / "security" / "PERMISSION_MATRIX.json"
         if candidate.exists():
             return candidate
-    # Fallback to standard scratch path
-    return Path("/docs/security/PERMISSION_MATRIX.json")
+    return Path("docs/security/PERMISSION_MATRIX.json")
 
 
 class PolicyMatrixRegistry:
-    """Singleton cache loading and indexing PERMISSION_MATRIX.json."""
+    """Singleton cache loading and indexing PERMISSION_MATRIX.json.
 
-    def __init__(self) -> None:
-        self.matrix_path = _resolve_matrix_path()
+    Invariant: Startup MUST fail if the matrix file cannot be loaded or is invalid.
+    """
+
+    def __init__(self, matrix_path: Path | None = None) -> None:
+        self.matrix_path = matrix_path or _resolve_matrix_path()
         self.rules: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}
         self.load()
 
     def load(self) -> None:
-        if not self.matrix_path.exists():
-            return
+        if not self.matrix_path or not self.matrix_path.exists():
+            raise RuntimeError(
+                f"FATAL: PERMISSION_MATRIX.json could not be loaded from '{self.matrix_path}'. "
+                "TRELLIS Policy Engine cannot initialize under Default-Deny."
+            )
 
-        with open(self.matrix_path, encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(self.matrix_path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as exc:
+            raise RuntimeError(
+                f"FATAL: Failed to parse PERMISSION_MATRIX.json from '{self.matrix_path}': {exc}"
+            ) from exc
+
+        rules = data.get("rules", [])
+        if not rules:
+            raise RuntimeError(
+                "FATAL: PERMISSION_MATRIX.json contains zero rules. Engine cannot start."
+            )
 
         # Index: self.rules[resource][action][role] = grant_details
-        for res_rule in data.get("rules", []):
+        self.rules.clear()
+        for res_rule in rules:
             resource = res_rule["resource"]
             self.rules[resource] = {}
             for action, role_map in res_rule.get("actions", {}).items():
@@ -62,6 +82,18 @@ class UserContext:
     reporting_line_id: str | None = None
     cohort_id: str | None = None
     attributes: dict[str, Any] = field(default_factory=dict)
+
+
+# Direct identifier keys strictly forbidden during blind grading or anonymized aggregate evaluation
+_CANDIDATE_PII_KEYS = {
+    "candidate_name",
+    "candidate_email",
+    "candidate_user_id",
+    "candidate_id",
+    "employee_code",
+    "user_id",
+    "target_user_id",
+}
 
 
 def can(
@@ -95,16 +127,17 @@ def can(
         # Invariant: Separation of Duties Checks
         # E.g. author != subject: creators cannot self-approve ideas or pathways
         condition = grant.get("condition", "")
-        if "author != subject" in condition and context.get("author_id") == subject.user_id:
-            return False
+        if "author != subject" in condition:
+            author_id = context.get("author_id")
+            if author_id and author_id == subject.user_id:
+                return False
 
         # Scope boundary checks
         scope = grant.get("scope", "NONE")
 
         if scope == "ORGANIZATION":
-            target_org = context.get("org_id", subject.org_id)
-            if target_org == subject.org_id:
-                return True
+            target_org = context.get("target_org_id") or context.get("org_id")
+            return bool(target_org and target_org == subject.org_id)
 
         elif scope == "OWN":
             target_user = context.get("target_user_id", subject.user_id)
@@ -112,30 +145,93 @@ def can(
                 return True
 
         elif scope == "TEAM_DIRECT":
-            # Manager viewing direct report
+            # Manager viewing direct report; derived server-side
             is_direct_report = context.get("is_direct_report", False)
-            if is_direct_report or context.get("target_user_id") == subject.user_id:
+            target_user = context.get("target_user_id")
+            if is_direct_report or target_user == subject.user_id:
                 return True
 
         elif scope == "COHORT":
             # Trainer or peer within assigned cohort
-            target_cohort = context.get("cohort_id", subject.cohort_id)
-            if target_cohort and target_cohort == subject.cohort_id:
+            target_cohort = context.get("cohort_id")
+            user_in_cohort = context.get("is_in_cohort", False)
+            if (target_cohort and target_cohort == subject.cohort_id) or user_in_cohort:
                 return True
 
-        elif scope in {"BLIND_GRADING", "ANONYMIZED_AGGREGATE"}:
-            return True
+        elif scope == "BLIND_GRADING":
+            # Real check: must be marked blind grading and MUST NOT expose candidate PII
+            is_blind = context.get("is_blind_grading") is True
+            is_anon = context.get("anonymized") is True
+            has_pii = any(context.get(k) for k in _CANDIDATE_PII_KEYS if k in context)
+            return bool(is_blind and is_anon and not has_pii)
+
+        elif scope == "ANONYMIZED_AGGREGATE":
+            # Real check: must be aggregate, anonymized, and meet k-anonymity (sample_size >= 5)
+            is_agg = context.get("is_aggregate") is True
+            is_anon = context.get("anonymized") is True
+            sample_size = context.get("sample_size", 0)
+            has_individual_id = any(context.get(k) for k in _CANDIDATE_PII_KEYS if k in context)
+            return bool(is_agg and is_anon and sample_size >= 5 and not has_individual_id)
 
     # Default-Deny fallback
     return False
 
 
+def resolve_server_side_context(
+    db: Session,
+    resource: str,
+    resource_id: str | None,
+    subject: UserContext,
+) -> dict[str, Any]:
+    """Derive entity attributes, separation-of-duties author, direct report line and cohort from DB."""
+    resolved: dict[str, Any] = {
+        "target_org_id": subject.org_id,
+        "author_id": None,
+        "is_direct_report": False,
+        "is_in_cohort": False,
+        "target_user_id": resource_id,
+    }
+
+    if not resource_id:
+        return resolved
+
+    if resource == "users":
+        target_user = db.get(User, resource_id)
+        if target_user:
+            resolved["target_org_id"] = target_user.org_id
+            resolved["target_user_id"] = target_user.id
+            # Check manager hierarchy in DB
+            emp = (
+                db.execute(
+                    select(EmploymentRecord).where(
+                        EmploymentRecord.user_id == target_user.id,
+                        EmploymentRecord.reporting_line_id == subject.user_id,
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if emp:
+                resolved["is_direct_report"] = True
+
+    elif resource == "organisations":
+        resolved["target_org_id"] = resource_id
+
+    elif resource == "skills":
+        skill = db.get(Skill, resource_id)
+        if skill:
+            resolved["target_org_id"] = skill.org_id
+
+    return resolved
+
+
 def require_permission(action: str, resource: str) -> Any:
-    """FastAPI route dependency enforcing permission check against current user context."""
+    """FastAPI route dependency enforcing permission check with server-side DB context."""
 
     def dependency(
         request: Request,
         claims: dict[str, Any] = Depends(get_current_user_claims),
+        db: Session = Depends(get_db),
     ) -> UserContext:
         user_ctx = UserContext(
             user_id=claims.get("sub", ""),
@@ -143,13 +239,10 @@ def require_permission(action: str, resource: str) -> Any:
             roles=claims.get("roles", ["EMPLOYEE"]),
         )
 
-        # Context extracted from request query or path params if present
-        context = {
-            "org_id": user_ctx.org_id,
-            "target_user_id": request.path_params.get("user_id", user_ctx.user_id),
-            "author_id": request.query_params.get("author_id"),
-            "cohort_id": request.query_params.get("cohort_id"),
-        }
+        resource_id = request.path_params.get("id") or request.path_params.get("user_id")
+
+        # Resolve context strictly from the database, never query parameters
+        context = resolve_server_side_context(db, resource, resource_id, user_ctx)
 
         if not can(user_ctx, action, resource, context):
             raise HTTPException(

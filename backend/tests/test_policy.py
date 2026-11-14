@@ -84,9 +84,202 @@ def test_separation_of_duties_author_self_approval_forbidden() -> None:
 
 
 def test_trainer_blind_grading_scope() -> None:
-    """Verify that TRAINER_MENTOR can grade responses under blind grading scope."""
+    """Verify that TRAINER_MENTOR can grade responses under strict blind grading scope without PII."""
     trainer = UserContext(user_id="tr_vikram", org_id="org_csm", roles=["TRAINER_MENTOR"])
-    assert can(trainer, "grade", "responses") is True
+
+    # Negative test 1: Missing blind grading context returns False
+    assert can(trainer, "grade", "responses", {}) is False
+
+    # Negative test 2: Identifying candidate name in context returns False (PII breach)
+    assert (
+        can(
+            trainer,
+            "grade",
+            "responses",
+            {
+                "is_blind_grading": True,
+                "anonymized": True,
+                "candidate_name": "Priya Sharma",
+            },
+        )
+        is False
+    )
+
+    # Negative test 3: Identifying employee code in context returns False
+    assert (
+        can(
+            trainer,
+            "grade",
+            "responses",
+            {
+                "is_blind_grading": True,
+                "anonymized": True,
+                "employee_code": "CSM-1029",
+            },
+        )
+        is False
+    )
+
+    # Positive test: Truly anonymized context with no PII keys returns True
+    assert (
+        can(
+            trainer,
+            "grade",
+            "responses",
+            {
+                "is_blind_grading": True,
+                "anonymized": True,
+            },
+        )
+        is True
+    )
+
+
+def test_anonymized_aggregate_scope_enforces_k_anonymity() -> None:
+    """Verify that aggregate reports enforce k-anonymity (k >= 5) and forbid individual user IDs."""
+    clo = UserContext(user_id="clo_deepak", org_id="org_csm", roles=["LK_HEAD_CLO"])
+
+    # Negative test 1: Small group size (sample_size < 5) is rejected
+    assert (
+        can(
+            clo,
+            "read",
+            "growth_ring",
+            {
+                "is_aggregate": True,
+                "anonymized": True,
+                "sample_size": 3,
+            },
+        )
+        is False
+    )
+
+    # Negative test 2: Sample size >= 5 but individual user identifier present is rejected
+    assert (
+        can(
+            clo,
+            "read",
+            "growth_ring",
+            {
+                "is_aggregate": True,
+                "anonymized": True,
+                "sample_size": 10,
+                "target_user_id": "emp_identified_01",
+            },
+        )
+        is False
+    )
+
+    # Positive test: Sample size >= 5, anonymized, and no PII passes
+    assert (
+        can(
+            clo,
+            "read",
+            "growth_ring",
+            {
+                "is_aggregate": True,
+                "anonymized": True,
+                "sample_size": 12,
+            },
+        )
+        is True
+    )
+
+
+def test_organization_scope_rejects_cross_tenant_access() -> None:
+    """Verify that ORGANIZATION scope strictly compares target entity org_id with subject org_id."""
+    emp = UserContext(user_id="emp_csm_01", org_id="org_csm", roles=["EMPLOYEE"])
+
+    # Negative test: Target resource belongs to another tenant organisation
+    assert (
+        can(
+            emp,
+            "read",
+            "skills",
+            {"target_org_id": "org_external_tenant"},
+        )
+        is False
+    )
+
+    # Positive test: Target resource matches subject tenant organisation
+    assert (
+        can(
+            emp,
+            "read",
+            "skills",
+            {"target_org_id": "org_csm"},
+        )
+        is True
+    )
+
+
+def test_server_side_db_entity_context_resolution(db_session: Session) -> None:
+    """Verify that entity context (org_id, direct report, author) is derived from the database."""
+    from app.core.policy import resolve_server_side_context
+    from app.models import EmploymentRecord, Organisation, Skill, User
+
+    # Create Org A and Org B
+    org_a = Organisation(name="CSM Org A", code="ORG_A_RES")
+    org_b = Organisation(name="External Org B", code="ORG_B_RES")
+    db_session.add_all([org_a, org_b])
+    db_session.flush()
+
+    manager = User(org_id=org_a.id, email="mgr@csm.tech", password_hash="h", full_name="Manager A")
+    report = User(org_id=org_a.id, email="report@csm.tech", password_hash="h", full_name="Report A")
+    external_user = User(
+        org_id=org_b.id, email="ext@other.com", password_hash="h", full_name="External User"
+    )
+    db_session.add_all([manager, report, external_user])
+    db_session.flush()
+
+    # Link direct report hierarchy in DB
+    emp_record = EmploymentRecord(
+        user_id=report.id,
+        org_id=org_a.id,
+        employee_code="EMP-REP-01",
+        department="Engineering",
+        designation="Associate Software Engineer",
+        reporting_line_id=manager.id,
+    )
+    db_session.add(emp_record)
+
+    # Create Skill in Org A
+    skill = Skill(
+        org_id=org_a.id, code="SKILL_PYTHON", name="Python Programming", category="TECHNICAL"
+    )
+    db_session.add(skill)
+    db_session.commit()
+
+    mgr_ctx = UserContext(user_id=manager.id, org_id=org_a.id, roles=["MANAGER"])
+
+    # 1. Resolve direct report user: is_direct_report MUST be True, target_org_id == org_a.id
+    resolved_report = resolve_server_side_context(db_session, "users", report.id, mgr_ctx)
+    assert resolved_report["is_direct_report"] is True
+    assert resolved_report["target_org_id"] == org_a.id
+
+    # 2. Resolve external user: target_org_id MUST be org_b.id, is_direct_report False
+    resolved_external = resolve_server_side_context(db_session, "users", external_user.id, mgr_ctx)
+    assert resolved_external["is_direct_report"] is False
+    assert resolved_external["target_org_id"] == org_b.id
+    # Assert policy engine denies access because target org does not match subject org
+    assert can(mgr_ctx, "read", "users", resolved_external) is False
+
+    # 3. Resolve skill org: target_org_id derived from DB record
+    resolved_skill = resolve_server_side_context(db_session, "skills", skill.id, mgr_ctx)
+    assert resolved_skill["target_org_id"] == org_a.id
+
+
+def test_policy_registry_fails_startup_when_matrix_missing() -> None:
+    """Verify that PolicyMatrixRegistry strictly raises RuntimeError if the matrix is missing or invalid."""
+    from pathlib import Path
+
+    from app.core.policy import PolicyMatrixRegistry
+
+    # Negative test: Non-existent matrix file fails startup
+    with pytest.raises(RuntimeError) as exc_info:
+        PolicyMatrixRegistry(matrix_path=Path("non_existent_matrix_file.json"))
+
+    assert "could not be loaded" in str(exc_info.value)
 
 
 def test_manager_team_direct_scope() -> None:

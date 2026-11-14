@@ -15,12 +15,12 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 
 # Configure Async Engine
+_db_url = settings.DATABASE_URL or "sqlite+aiosqlite:///:memory:"
 engine: AsyncEngine = create_async_engine(
-    settings.DATABASE_URL,
+    _db_url,
     echo=settings.LOG_LEVEL.upper() == "DEBUG",
     pool_pre_ping=True,
-    pool_size=10,
-    max_overflow=20,
+    **({"pool_size": 10, "max_overflow": 20} if "sqlite" not in _db_url else {}),
 )
 
 # Async Session Factory

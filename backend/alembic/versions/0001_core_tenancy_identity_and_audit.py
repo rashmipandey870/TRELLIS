@@ -181,6 +181,7 @@ def upgrade() -> None:
         sa.Column("ip_address", sa.String(45), nullable=True),
         sa.Column("user_agent", sa.String(512), nullable=True),
         sa.Column("approval_ref", sa.String(128), nullable=True),
+        sa.Column("request_id", sa.String(64), nullable=True),
         sa.Column("reason", sa.String(512), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     )

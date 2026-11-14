@@ -39,7 +39,7 @@ plugins = []
 
 [tool.pytest.ini_options]
 minversion = "9.0"
-addopts = "-v --strict-markers"
+addopts = "-v --strict-markers -p no:anyio"
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"

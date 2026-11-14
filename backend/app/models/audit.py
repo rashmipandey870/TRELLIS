@@ -40,6 +40,7 @@ class AuditLog(Base, ImmutableMixin):
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(512), nullable=True)
     approval_ref: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
     reason: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     __table_args__ = (

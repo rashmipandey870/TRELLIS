@@ -29,16 +29,25 @@ class LoginResponse(BaseModel):
     """Response returned upon login attempt, signaling MFA requirement if user holds admin roles."""
 
     mfa_required: bool = False
+    mfa_enrolment_required: bool = False
     mfa_ticket: str | None = None
     tokens: TokenResponse | None = None
     message: str | None = None
 
 
 class MfaChallengeRequest(BaseModel):
-    """Payload to solve MFA challenge using 6-digit TOTP code or recovery code."""
+    """Payload to solve MFA challenge using 6-digit TOTP code."""
 
     mfa_ticket: str
     totp_code: str = Field(..., min_length=6, max_length=12)
+
+
+class MfaEnrolmentRequest(BaseModel):
+    """Payload to complete forced admin MFA enrolment."""
+
+    mfa_ticket: str
+    totp_secret: str
+    totp_code: str = Field(..., min_length=6, max_length=6)
 
 
 class MfaSetupResponse(BaseModel):

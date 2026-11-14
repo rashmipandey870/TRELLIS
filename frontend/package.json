@@ -7,9 +7,7 @@
     "start": "ng serve",
     "build": "ng build --configuration=production",
     "watch": "ng build --watch --configuration=development",
-    "test": "node -e \"console.log('Frontend unit test suite verified')\"",
-    "test:axe": "node scripts/run-axe.js",
-    "lint": "echo \"Frontend lint complete\""
+    "test:axe": "playwright test tests/a11y.spec.ts"
   },
   "dependencies": {
     "@angular/cdk": "22.2.7",

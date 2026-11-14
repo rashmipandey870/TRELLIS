@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override URL with environment settings if available
-db_url = settings.DATABASE_MIGRATION_URL or settings.DATABASE_URL
+db_url = settings.DATABASE_MIGRATION_URL or settings.DATABASE_URL or "sqlite+aiosqlite:///:memory:"
 config.set_main_option("sqlalchemy.url", db_url)
 
 
