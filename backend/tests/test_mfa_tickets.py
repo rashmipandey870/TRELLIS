@@ -37,15 +37,17 @@ def test_mfa_ticket_fails_closed_outside_dev_when_redis_unavailable() -> None:
             # Storing ticket without Redis in production MUST raise RuntimeError
             with pytest.raises(RuntimeError) as exc_info:
                 store_mfa_ticket(ticket=ticket, user_id="u1", is_enrolment=False)
-            assert "REDIS_UNAVAILABLE: MFA exchange ticket operations require an operational Redis cluster" in str(
-                exc_info.value
+            assert (
+                "REDIS_UNAVAILABLE: MFA exchange ticket operations require an operational Redis cluster"
+                in str(exc_info.value)
             )
 
             # Consuming ticket without Redis in production MUST raise RuntimeError
             with pytest.raises(RuntimeError) as exc_info:
                 consume_mfa_ticket(ticket)
-            assert "REDIS_UNAVAILABLE: MFA exchange ticket operations require an operational Redis cluster" in str(
-                exc_info.value
+            assert (
+                "REDIS_UNAVAILABLE: MFA exchange ticket operations require an operational Redis cluster"
+                in str(exc_info.value)
             )
 
     finally:

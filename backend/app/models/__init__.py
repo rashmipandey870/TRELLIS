@@ -3,6 +3,7 @@
 from app.models.audit import AccessReceipt, AuditLog
 from app.models.auth import RefreshToken
 from app.models.base import Base
+from app.models.curriculum import Batch, Cohort, Course, Enrolment, Module, Pathway
 from app.models.ledger import EvidenceLedger, EvidenceRecord, LedgerCheckpoint
 from app.models.skill import RoleRequirement, Skill, SkillEdge, SkillLevel
 from app.models.tenancy import Organisation
@@ -26,4 +27,10 @@ __all__ = [
     "EvidenceLedger",
     "EvidenceRecord",
     "LedgerCheckpoint",
+    "Pathway",
+    "Course",
+    "Module",
+    "Cohort",
+    "Batch",
+    "Enrolment",
 ]

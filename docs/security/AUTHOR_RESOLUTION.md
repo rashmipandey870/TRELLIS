@@ -12,6 +12,8 @@ Furthermore, if an author **cannot be determined from the database** for an `app
 |---|---|---|---|---|
 | `users` | `User` | `User.id` (self) | `User.org_id` | **Active & Resolved** |
 | `evidence_records` | `EvidenceRecord` | `EvidenceRecord.user_id` | `EvidenceRecord.org_id` | **Active & Resolved** |
+| `pathways` | `Pathway` | `Pathway.author_id` | `Pathway.org_id` | **Active & Resolved** (Slice 1.6) |
+| `enrolments` | `Enrolment` | `Enrolment.user_id` | `Enrolment.org_id` | **Active & Resolved** (Slice 1.6) |
 | `consents` | `Consent` | `Consent.user_id` | `Consent.org_id` | **Active & Resolved** |
 | `grants` | `Grant` | `Grant.granted_by_id` or `user_id` | `Grant.org_id` | **Active & Resolved** |
 | `employment_records` | `EmploymentRecord` | `EmploymentRecord.user_id` | `EmploymentRecord.org_id` | **Active & Resolved** |
@@ -26,11 +28,10 @@ Furthermore, if an author **cannot be determined from the database** for an `app
 ---
 
 ## 3. Resource Types Lacking Author Resolution in Phase 1
-The following resources are specified in `docs/security/PERMISSION_MATRIX.json` for later phases and have no ORM models in Slices 1.1–1.5:
+The following resources are specified in `docs/security/PERMISSION_MATRIX.json` for later phases and have no ORM models in Slices 1.1–1.6:
 
 | Resource Type | Target Phase / Slice | Reason Lacking Author Resolution | Policy Engine Behavior |
 |---|---|---|---|
-| `pathways` | Slice 1.6 | ORM model scheduled for Slice 1.6 (`0003_pathways_and_courses.py`) | **`publish` stays DENIED** (author unresolved) |
 | `assessments` | Phase 2 | Assessment engine scheduled for Phase 2 | **`publish` stays DENIED** (author unresolved) |
 | `items` | Phase 2 | Question bank scheduled for Phase 2 | Unresolved author |
 | `attempts` | Phase 2 | Assessment attempts scheduled for Phase 2 | Unresolved author |

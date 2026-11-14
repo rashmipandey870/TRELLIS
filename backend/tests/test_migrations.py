@@ -32,3 +32,12 @@ def test_migration_0002_definition() -> None:
     assert mod.down_revision == "0001"
     assert hasattr(mod, "upgrade")
     assert hasattr(mod, "downgrade")
+
+
+def test_migration_0003_definition() -> None:
+    """Verify Migration 0003 covers pathways, courses, modules, cohorts, enrolments, and links to 0002."""
+    mod = load_migration_module("0003_pathways_and_courses.py")
+    assert mod.revision == "0003"
+    assert mod.down_revision == "0002"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")

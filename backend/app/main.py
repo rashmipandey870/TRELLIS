@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.pathways import router as pathways_router
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.config import settings
 
@@ -47,6 +48,7 @@ app.add_middleware(AuditLogMiddleware)
 
 # Authentication & Identity Router
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(pathways_router, prefix=settings.API_V1_STR)
 
 
 @app.get(f"{settings.API_V1_STR}/health", tags=["Health"], status_code=status.HTTP_200_OK)

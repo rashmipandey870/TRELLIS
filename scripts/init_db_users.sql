@@ -42,6 +42,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`skill_levels` TO 'trellis_
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`skill_edges` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`role_requirements` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`evidence_records` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`pathways` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`courses` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`modules` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`cohorts` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`batches` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`enrolments` TO 'trellis_app'@'%';
 
 -- 4. Explicit Per-Table Grants on IMMUTABLE Tables (ONLY SELECT and INSERT; NEVER UPDATE/DELETE)
 GRANT SELECT, INSERT ON `trellis_db`.`audit_log` TO 'trellis_app'@'%';

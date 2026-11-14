@@ -259,6 +259,23 @@ def resolve_server_side_context(
         if skill:
             resolved["target_org_id"] = skill.org_id
 
+    elif resource == "pathways":
+        from app.models.curriculum import Pathway
+
+        pathway = db.get(Pathway, resource_id)
+        if pathway:
+            resolved["author_id"] = pathway.author_id
+            resolved["target_org_id"] = pathway.org_id
+
+    elif resource == "enrolments":
+        from app.models.curriculum import Enrolment
+
+        enrolment = db.get(Enrolment, resource_id)
+        if enrolment:
+            resolved["author_id"] = enrolment.user_id
+            resolved["target_org_id"] = enrolment.org_id
+            resolved["target_user_id"] = enrolment.user_id
+
     elif resource == "organisations":
         resolved["target_org_id"] = resource_id
 

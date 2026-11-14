@@ -430,15 +430,11 @@ def test_signed_checkpoints_and_verification(db_session: Session) -> None:
     db_session.commit()
 
     # Append evidence across multiple users
-    append_evidence(
-        db_session, org.id, user_a.id, skill.id, "EXAM", {"exam": "A1", "score": 90}
-    )
+    append_evidence(db_session, org.id, user_a.id, skill.id, "EXAM", {"exam": "A1", "score": 90})
     append_evidence(
         db_session, org.id, user_a.id, skill.id, "PROJECT", {"project": "Alpha", "score": 95}
     )
-    append_evidence(
-        db_session, org.id, user_b.id, skill.id, "EXAM", {"exam": "B1", "score": 88}
-    )
+    append_evidence(db_session, org.id, user_b.id, skill.id, "EXAM", {"exam": "B1", "score": 88})
 
     # Generate an asymmetric RSA signing keypair for KMS simulation
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -537,11 +533,7 @@ def test_dpdp_crypto_shredding_preserves_ledger_integrity(db_session: Session) -
     assert rec2.is_shredded is True
 
     # CRITICAL INVARIANT: The EvidenceLedger table row was NOT modified or deleted
-    ledger2 = (
-        db_session.query(EvidenceLedger)
-        .filter(EvidenceLedger.id == entry2.id)
-        .one()
-    )
+    ledger2 = db_session.query(EvidenceLedger).filter(EvidenceLedger.id == entry2.id).one()
     assert ledger2.seq_num == 2
     assert ledger2.data_hash == entry2.data_hash  # Hash remains intact
     assert ledger2.block_hash == entry2.block_hash  # Block hash remains intact

@@ -12,7 +12,8 @@ def test_db_grants_script_passes_cleanly() -> None:
     assert res.returncode == 0, (
         f"check_db_grants failed:\nSTDOUT: {res.stdout}\nSTDERR: {res.stderr}"
     )
-    assert "All 16 ORM model tables are perfectly reconciled" in res.stdout
+    assert "ORM model tables are perfectly reconciled" in res.stdout
+    assert "All 22 ORM model tables are perfectly reconciled" in res.stdout
 
 
 def test_db_grants_invariants() -> None:

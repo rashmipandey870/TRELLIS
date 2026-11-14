@@ -81,7 +81,7 @@ def check_grants() -> None:
 
     print(
         f"SUCCESS: All {len(model_tables)} ORM model tables are perfectly reconciled with "
-        f"scripts/init_db_users.sql (12 mutable tables, 4 immutable tables verified)."
+        f"scripts/init_db_users.sql ({len(model_tables) - 4} mutable tables, 4 immutable tables verified)."
     )
 
 
