@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from app.core.security import hash_password
 from app.models import AuditLog, Base, Organisation, RefreshToken, User
@@ -15,8 +16,12 @@ from app.services.auth_service import issue_tokens_for_user, login_flow
 
 @pytest.fixture
 def db_session() -> Generator[Session, None, None]:
-    """Fixture providing an ephemeral SQLite database session."""
-    engine = create_engine("sqlite:///:memory:")
+    """Fixture providing an ephemeral SQLite database session with StaticPool for cross-thread access."""
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     session = Session(engine)
     try:
@@ -181,6 +186,8 @@ def test_http_mutating_endpoint_aborts_when_audit_fails(db_session: Session) -> 
     """HTTP-level test: verify that a failing audit write returns error and leaves DB uncommitted."""
     import sys
 
+    # On Windows Python 3.14 (pre-release), AnyIO background portal deadlocks on threadpools
+    # On Linux (CI, Python 3.11/3.12) this test runs and passes natively
     if sys.platform == "win32" and sys.version_info >= (3, 14):
         pytest.skip(
             "TestClient AnyIO portal threadlock on Windows Python 3.14 host (verified in Linux CI)"
@@ -191,7 +198,16 @@ def test_http_mutating_endpoint_aborts_when_audit_fails(db_session: Session) -> 
     from app.api.deps import get_db
     from app.main import app
 
-    app.dependency_overrides[get_db] = lambda: db_session
+    engine = db_session.get_bind()
+
+    def override_get_db() -> Generator[Session, None, None]:
+        session = Session(engine)
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
 
     try:
         org = Organisation(name="CSM HTTP Test", code="CSM_HTTP_AUDIT")

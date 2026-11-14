@@ -1,5 +1,6 @@
 """TRELLIS Authentication & Token Lifecycle Service."""
 
+import json
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -25,10 +26,78 @@ from app.schemas.auth import (
     SessionInfoResponse,
     TokenResponse,
 )
-from app.services.rate_limiter import rate_limiter
+from app.services.rate_limiter import _get_redis_client, rate_limiter
 
-# In-memory temporary MFA exchange tickets: {ticket: (user_id, expires_at, is_enrolment)}
-_MFA_TICKETS: dict[str, tuple[str, datetime, bool]] = {}
+# In-memory temporary MFA exchange tickets fallback strictly for TRELLIS_ENV=dev
+_IN_MEMORY_MFA_TICKETS: dict[str, tuple[str, datetime, bool]] = {}
+
+
+def store_mfa_ticket(
+    ticket: str,
+    user_id: str,
+    is_enrolment: bool,
+    ttl_seconds: int = 300,
+) -> None:
+    """Store MFA exchange ticket with TTL in Redis; fail closed outside dev."""
+    client = _get_redis_client()
+    key = f"trellis:mfa_ticket:{ticket}"
+    payload = json.dumps({"user_id": user_id, "is_enrolment": is_enrolment})
+
+    if not client and settings.ENVIRONMENT != "dev":
+        raise RuntimeError(
+            "REDIS_UNAVAILABLE: MFA exchange ticket operations require an operational Redis cluster. "
+            "In-memory ticket storage is forbidden outside TRELLIS_ENV=dev."
+        )
+
+    if client:
+        try:
+            client.setex(key, ttl_seconds, payload)
+            return
+        except Exception as exc:
+            if settings.ENVIRONMENT != "dev":
+                raise RuntimeError(
+                    f"REDIS_ERROR: Failed storing MFA ticket in Redis: {exc}"
+                ) from exc
+
+    # In-memory fallback (TRELLIS_ENV=dev only)
+    expires_at = datetime.now(UTC) + timedelta(seconds=ttl_seconds)
+    _IN_MEMORY_MFA_TICKETS[ticket] = (user_id, expires_at, is_enrolment)
+
+
+def consume_mfa_ticket(ticket: str) -> tuple[str, bool] | None:
+    """Atomically consume single-use MFA ticket; returns (user_id, is_enrolment) or None."""
+    client = _get_redis_client()
+    key = f"trellis:mfa_ticket:{ticket}"
+
+    if not client and settings.ENVIRONMENT != "dev":
+        raise RuntimeError(
+            "REDIS_UNAVAILABLE: MFA exchange ticket operations require an operational Redis cluster. "
+            "In-memory ticket storage is forbidden outside TRELLIS_ENV=dev."
+        )
+
+    if client:
+        try:
+            raw_data = client.getdel(key)
+            if not raw_data:
+                return None
+            data = json.loads(raw_data)
+            return data["user_id"], data["is_enrolment"]
+        except Exception as exc:
+            if settings.ENVIRONMENT != "dev":
+                raise RuntimeError(
+                    f"REDIS_ERROR: Failed consuming MFA ticket from Redis: {exc}"
+                ) from exc
+
+    # In-memory fallback (TRELLIS_ENV=dev only)
+    ticket_data = _IN_MEMORY_MFA_TICKETS.pop(ticket, None)
+    if not ticket_data:
+        return None
+
+    user_id, expires_at, is_enrolment = ticket_data
+    if datetime.now(UTC) > expires_at:
+        return None
+
+    return user_id, is_enrolment
 
 
 def get_active_user_roles(user: User, as_of: datetime | None = None) -> list[str]:
@@ -105,8 +174,8 @@ def login_flow(
 
         # Generate single-use MFA exchange ticket valid for 5 minutes
         mfa_ticket = f"mfa_ticket_{generate_secure_token()}"
-        expires_at = datetime.now(UTC) + timedelta(minutes=5)
-        _MFA_TICKETS[mfa_ticket] = (user.id, expires_at, is_enrolment_required)
+        # Store single-use MFA exchange ticket in Redis with 5-minute TTL
+        store_mfa_ticket(mfa_ticket, user.id, is_enrolment_required, ttl_seconds=300)
 
         # Log MFA challenge event in immutable audit log within the transaction
         audit = AuditLog(
@@ -205,12 +274,8 @@ def issue_tokens_for_user(
         request_id=request_id,
     )
     try:
-        try:
-            session.add(audit)
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
+        session.add(audit)
+        session.commit()
     except Exception:
         session.rollback()
         raise
@@ -233,14 +298,11 @@ def verify_mfa_challenge(
     request_id: str | None = None,
 ) -> TokenResponse:
     """Validate 6-digit TOTP code against registered secret; bypass codes are strictly forbidden."""
-    ticket_data = _MFA_TICKETS.get(mfa_ticket)
+    ticket_data = consume_mfa_ticket(mfa_ticket)
     if not ticket_data:
         raise ValueError("Invalid or expired MFA exchange ticket.")
 
-    user_id, expires_at, is_enrolment = ticket_data
-    if datetime.now(UTC) > expires_at:
-        del _MFA_TICKETS[mfa_ticket]
-        raise ValueError("MFA exchange ticket has expired.")
+    user_id, is_enrolment = ticket_data
 
     user = session.get(User, user_id)
     if not user:
@@ -278,9 +340,6 @@ def verify_mfa_challenge(
             raise
         raise ValueError("Invalid multi-factor authentication code.")
 
-    # Consume ticket
-    del _MFA_TICKETS[mfa_ticket]
-
     role_codes = get_active_user_roles(user)
     return issue_tokens_for_user(
         session, user, role_codes, device_info, ip_address, request_id=request_id
@@ -297,14 +356,11 @@ def complete_admin_mfa_enrolment(
     request_id: str | None = None,
 ) -> TokenResponse:
     """Complete forced TOTP enrolment for an admin and issue tokens upon verified code."""
-    ticket_data = _MFA_TICKETS.get(mfa_ticket)
+    ticket_data = consume_mfa_ticket(mfa_ticket)
     if not ticket_data:
         raise ValueError("Invalid or expired MFA exchange ticket.")
 
-    user_id, expires_at, _ = ticket_data
-    if datetime.now(UTC) > expires_at:
-        del _MFA_TICKETS[mfa_ticket]
-        raise ValueError("MFA exchange ticket has expired.")
+    user_id, _ = ticket_data
 
     user = session.get(User, user_id)
     if not user:
@@ -335,18 +391,11 @@ def complete_admin_mfa_enrolment(
         request_id=request_id,
     )
     try:
-        try:
-            session.add(audit)
-            session.commit()
-        except Exception:
-            session.rollback()
-            raise
+        session.add(audit)
+        session.commit()
     except Exception:
         session.rollback()
         raise
-
-    # Consume ticket
-    del _MFA_TICKETS[mfa_ticket]
 
     role_codes = get_active_user_roles(user)
     return issue_tokens_for_user(

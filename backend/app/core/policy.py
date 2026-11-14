@@ -23,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user_claims, get_db
+from app.models.auth import RefreshToken
 from app.models.ledger import EvidenceRecord
 from app.models.skill import Skill
 from app.models.user import Consent, EmploymentRecord, Grant, User
@@ -199,7 +200,7 @@ def resolve_server_side_context(
     if not resource_id:
         return resolved
 
-    if resource in {"evidence_records", "evidence", "pathways", "greenhouse_ideas", "assessments"}:
+    if resource in {"evidence_records", "evidence", "evidence_ledger"}:
         rec = db.get(EvidenceRecord, resource_id)
         if rec:
             resolved["author_id"] = rec.user_id
@@ -239,7 +240,21 @@ def resolve_server_side_context(
             resolved["author_id"] = grant.granted_by_id or grant.user_id
             resolved["target_org_id"] = grant.org_id
 
-    elif resource in {"skills", "skill_edges", "skill_levels"}:
+    elif resource == "employment_records":
+        emp_rec = db.get(EmploymentRecord, resource_id)
+        if emp_rec:
+            resolved["author_id"] = emp_rec.user_id
+            resolved["target_org_id"] = emp_rec.org_id
+            resolved["target_user_id"] = emp_rec.user_id
+
+    elif resource == "refresh_tokens":
+        token = db.get(RefreshToken, resource_id)
+        if token:
+            resolved["author_id"] = token.user_id
+            resolved["target_org_id"] = token.org_id
+            resolved["target_user_id"] = token.user_id
+
+    elif resource in {"skills", "skill_edges", "skill_levels", "role_requirements"}:
         skill = db.get(Skill, resource_id)
         if skill:
             resolved["target_org_id"] = skill.org_id

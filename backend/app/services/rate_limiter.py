@@ -19,7 +19,7 @@ _IN_MEMORY_ATTEMPTS: dict[str, tuple[int, datetime]] = {}
 _IN_MEMORY_LOCKOUTS: dict[str, datetime] = {}
 
 
-def _get_redis_client() -> redis.Redis | None:
+def _get_redis_client() -> redis.Redis[str] | None:
     """Attempt connection to configured Redis instance."""
     try:
         client = redis.Redis.from_url(

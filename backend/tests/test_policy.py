@@ -477,31 +477,49 @@ def test_require_permission_with_real_database_row_no_hand_supplied_author(
     }
     request = Request(scope)
 
-    # 1. Author attempting self-approval via require_permission: MUST raise 403 Forbidden
-    author_claims = {"sub": author.id, "org_id": org.id, "roles": ["TRAINER_MENTOR"]}
-    author_dep = require_permission("publish", "pathways")
+    author_claims = {"sub": author.id, "org_id": org.id, "roles": ["EMPLOYEE"]}
+    reviewer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["EMPLOYEE"]}
 
+    # Author attempting to approve own evidence record: Denied by require_permission (Separation of duties)
+    approve_dep = require_permission("approve", "evidence_records")
     with pytest.raises(HTTPException) as exc_info:
-        author_dep(request=request, claims=author_claims, db=db_session)
+        approve_dep(request=request, claims=author_claims, db=db_session)
     assert exc_info.value.status_code == 403
 
-    # 2. Reviewer calling require_permission: Succeeds because author != subject
-    reviewer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["TRAINER_MENTOR"]}
-    reviewer_dep = require_permission("publish", "pathways")
-    res_ctx = reviewer_dep(request=request, claims=reviewer_claims, db=db_session)
-    assert res_ctx.user_id == reviewer.id
-
-    # 3. Non-existent ID: Author cannot be determined -> MUST raise 403 Forbidden
-    non_existent_scope = {
+    # Test 1: require_permission on users (OWN scope resolved from real DB row)
+    scope_own = {
         "type": "http",
-        "method": "POST",
-        "path": "/api/v1/evidence/missing_id/approve",
-        "path_params": {"id": "missing_id"},
+        "method": "DELETE",
+        "path": f"/api/v1/users/{author.id}",
+        "path_params": {"id": author.id},
         "headers": [],
     }
-    missing_req = Request(non_existent_scope)
+    req_own = Request(scope_own)
+
+    # Author deleting own account: Allowed by require_permission
+    own_dep = require_permission("delete", "users")
+    res_ctx = own_dep(request=req_own, claims=author_claims, db=db_session)
+    assert res_ctx.user_id == author.id
+
+    # Reviewer attempting to delete Author's account: Denied (OWN scope boundary)
     with pytest.raises(HTTPException) as exc_info:
-        reviewer_dep(request=missing_req, claims=reviewer_claims, db=db_session)
+        own_dep(request=req_own, claims=reviewer_claims, db=db_session)
+    assert exc_info.value.status_code == 403
+
+    # Test 2: Invariant: Approve/Publish stay strictly denied for resources lacking author resolution
+    unmodeled_scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/v1/pathways/pathway_999/publish",
+        "path_params": {"id": "pathway_999"},
+        "headers": [],
+    }
+    req_unmodeled = Request(unmodeled_scope)
+    trainer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["TRAINER_MENTOR"]}
+    publish_dep = require_permission("publish", "pathways")
+
+    with pytest.raises(HTTPException) as exc_info:
+        publish_dep(request=req_unmodeled, claims=trainer_claims, db=db_session)
     assert exc_info.value.status_code == 403
 
 

@@ -148,21 +148,32 @@ def test_admin_role_requires_totp_mfa(db_session: Session) -> None:
     assert resp.tokens is None
 
     # Step 2: Proving bypass codes (123456 / 000000) are REJECTED and cannot yield access tokens
+    # Note: Tickets are single-use (consumed atomically), so each challenge attempt requires a fresh ticket
     with pytest.raises(PermissionError) as exc_bypass1:
         verify_mfa_challenge(db_session, resp.mfa_ticket, "123456")
     assert "MFA_ENROLMENT_REQUIRED" in str(exc_bypass1.value)
 
+    resp_bypass2 = login_flow(
+        session=db_session,
+        email="admin@csm.tech",
+        password="AdminSecret2026!",
+    )
     with pytest.raises(PermissionError) as exc_bypass2:
-        verify_mfa_challenge(db_session, resp.mfa_ticket, "000000")
+        verify_mfa_challenge(db_session, resp_bypass2.mfa_ticket, "000000")
     assert "MFA_ENROLMENT_REQUIRED" in str(exc_bypass2.value)
 
     # Step 3: Admin completes forced TOTP enrolment
+    resp_enrol = login_flow(
+        session=db_session,
+        email="admin@csm.tech",
+        password="AdminSecret2026!",
+    )
     totp_secret = generate_totp_secret()
     valid_code = pyotp.TOTP(totp_secret).now()
 
     tokens = complete_admin_mfa_enrolment(
         session=db_session,
-        mfa_ticket=resp.mfa_ticket,
+        mfa_ticket=resp_enrol.mfa_ticket,
         totp_secret=totp_secret,
         totp_code=valid_code,
     )
@@ -191,9 +202,14 @@ def test_admin_role_requires_totp_mfa(db_session: Session) -> None:
         verify_mfa_challenge(db_session, resp2.mfa_ticket, "123456")
     assert "Invalid multi-factor authentication code" in str(exc_invalid.value)
 
-    # Positive test: Genuine TOTP code succeeds
+    # Positive test: Fresh login attempt yields a valid ticket; genuine TOTP code succeeds
+    resp_positive = login_flow(
+        session=db_session,
+        email="admin@csm.tech",
+        password="AdminSecret2026!",
+    )
     real_code2 = pyotp.TOTP(totp_secret).now()
-    tokens2 = verify_mfa_challenge(db_session, resp2.mfa_ticket, real_code2)
+    tokens2 = verify_mfa_challenge(db_session, resp_positive.mfa_ticket, real_code2)
     assert tokens2.access_token is not None
     assert "LK_ADMIN" in tokens2.roles
 
