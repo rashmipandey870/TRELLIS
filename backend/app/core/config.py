@@ -49,6 +49,8 @@ class Settings(BaseSettings):
 
     # Field-level Encryption (AES-256 / Fernet key for sensitive columns e.g. totp_secret at rest)
     FIELD_ENCRYPTION_KEY: str = "gAAAAABnhX-dummy-fernet-key-32bytes-base64-dev-only="
+    LEDGER_SALT_KEY: str = "trellis-ledger-pseudonym-salt-2026"
+    SECRET_KEY: str = "trellis-secret-key-salt-2026"
 
     # Argon2id Parameters
     ARGON2_TIME_COST: int = 3
