@@ -47,6 +47,8 @@ dmypy.json
 node_modules/
 dist/
 .angular/
+test-results/
+playwright-report/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

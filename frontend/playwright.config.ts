@@ -2,25 +2,25 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: 0,
+  workers: 1,
   reporter: 'list',
   use: {
     baseURL: 'http://127.0.0.1:4200',
-    trace: 'on-first-retry',
+    headless: true,
   },
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
   ],
   webServer: {
-    command: 'npx http-server dist/trellis-frontend/browser -p 4200 -s',
+    command: 'node ./node_modules/http-server/bin/http-server dist/frontend/browser -a 127.0.0.1 -p 4200 -c-1',
     url: 'http://127.0.0.1:4200',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 30000,
   },
 });
