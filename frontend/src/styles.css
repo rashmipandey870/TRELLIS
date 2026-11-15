@@ -1,6 +1,11 @@
 /* TRELLIS Design Tokens & Base Styles */
 @import "tailwindcss";
 
+/* Tell @tailwindcss/postcss to scan Angular inline templates in .ts files */
+@source "../src/**/*.ts";
+@source "../src/**/*.html";
+
+
 :root {
   --color-bg-base: #0B0D12;
   --color-brand-cyan: #1294C4;
