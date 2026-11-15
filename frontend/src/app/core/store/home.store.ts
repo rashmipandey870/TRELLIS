@@ -1,251 +1,256 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import {
   AccessibilityPreferences,
   AssignedSession,
   ClimbingStreak,
   EnrolmentProgress,
   GreenhouseIdea,
+  HomeDashboardDto,
   LearnerProfile,
   SkillGap,
 } from '../models/home.models';
-
-const INITIAL_PROFILE: LearnerProfile = {
-  id: 'usr-priya-sharma',
-  name: 'Priya Sharma',
-  role: 'Associate Platform Engineer',
-  avatarUrl: '',
-  orgId: 'org-csm-tech',
-  email: 'priya.sharma@csmtech.internal',
-};
-
-const INITIAL_ENROLMENT: EnrolmentProgress = {
-  enrolmentId: 'enr-7701',
-  pathwayId: 'pw-dist-sys-foundations',
-  pathwayTitle: 'Distributed Systems & Cloud Architecture (First 90 Days)',
-  pathwayCode: 'PATH-CSM-DIST-01',
-  targetRoleCode: 'PLATFORM_ENG_L2',
-  progressPct: 68,
-  currentModuleName: 'Module 3: Raft Consensus & Byzantine Fault Tolerance',
-  currentCourseTitle: 'Distributed Systems Foundations',
-  estimatedMinutesRemaining: 45,
-  lastActivityAt: '2 hours ago',
-  totalModules: 12,
-  completedModules: 8,
-};
-
-const INITIAL_SKILL_GAPS: SkillGap[] = [
-  {
-    skillId: 'sk-dist-sys',
-    skillCode: 'SKILL_DIST_SYSTEMS',
-    skillName: 'Distributed Consensus & Replication',
-    category: 'Architecture',
-    currentLevel: 2,
-    requiredLevel: 4,
-    isCritical: true,
-  },
-  {
-    skillId: 'sk-k8s',
-    skillCode: 'SKILL_KUBERNETES_OPS',
-    skillName: 'Kubernetes Cluster Operations',
-    category: 'Cloud Infrastructure',
-    currentLevel: 3,
-    requiredLevel: 4,
-    isCritical: true,
-  },
-  {
-    skillId: 'sk-sec-mtls',
-    skillCode: 'SKILL_ZERO_TRUST_MTLS',
-    skillName: 'Zero Trust Network Architecture (mTLS)',
-    category: 'Security',
-    currentLevel: 1,
-    requiredLevel: 3,
-    isCritical: false,
-  },
-  {
-    skillId: 'sk-kafka',
-    skillCode: 'SKILL_EVENT_STREAMING',
-    skillName: 'High-Throughput Event Streaming (Kafka)',
-    category: 'Data Platform',
-    currentLevel: 2,
-    requiredLevel: 3,
-    isCritical: false,
-  },
-];
-
-const INITIAL_STREAK: ClimbingStreak = {
-  currentStreakDays: 14,
-  longestStreakDays: 21,
-  freezesRemaining: 2,
-  hasActivityToday: true,
-  weeklyHistory: [
-    { dayLabel: 'Mon', dateStr: '2026-11-09', completed: true, isToday: false },
-    { dayLabel: 'Tue', dateStr: '2026-11-10', completed: true, isToday: false },
-    { dayLabel: 'Wed', dateStr: '2026-11-11', completed: true, isToday: false },
-    { dayLabel: 'Thu', dateStr: '2026-11-12', completed: true, isToday: false },
-    { dayLabel: 'Fri', dateStr: '2026-11-13', completed: true, isToday: false },
-    { dayLabel: 'Sat', dateStr: '2026-11-14', completed: true, isToday: false },
-    { dayLabel: 'Sun', dateStr: '2026-11-15', completed: true, isToday: true },
-  ],
-};
-
-const INITIAL_SESSIONS: AssignedSession[] = [
-  {
-    id: 'ses-401',
-    title: 'Fault Injection Lab: Chaos Engineering with Litmus',
-    cohortName: 'Cohort Nova (Nov 2026)',
-    trainerName: 'Anand Kumar (Principal Architect)',
-    startsAt: '2026-11-16T14:30:00Z',
-    durationMinutes: 90,
-    meetingLink: 'https://meet.csmtech.internal/cohort-nova-lab',
-    sessionType: 'LAB',
-  },
-  {
-    id: 'ses-402',
-    title: '1-on-1 Mentorship & Growth Ring Review',
-    cohortName: 'Cohort Nova (Nov 2026)',
-    trainerName: 'Devika Ray (Lead SRE)',
-    startsAt: '2026-11-18T10:00:00Z',
-    durationMinutes: 45,
-    meetingLink: 'https://meet.csmtech.internal/priya-devika-sync',
-    sessionType: 'MENTOR_1ON1',
-  },
-];
-
-const INITIAL_GREENHOUSE_IDEA: GreenhouseIdea = {
-  id: 'idea-green-88',
-  title: 'Automated Canary Rollouts with eBPF Latency Telemetry',
-  summary:
-    'Proposing a dynamic service mesh filter that correlates Prometheus p99 latency spikes during canary deployment stages and automatically halts promotion before customer impact.',
-  authorName: 'Rohan Verma',
-  authorRole: 'Senior SRE, Infrastructure Team',
-  upvotesCount: 42,
-  userHasUpvoted: false,
-  createdAt: '2026-11-08',
-  tags: ['eBPF', 'Canary', 'SRE', 'Observability'],
-};
+import { HomeService } from '../services/home.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class HomeStore {
-  // State Signals
-  readonly profile = signal<LearnerProfile | null>(INITIAL_PROFILE);
-  readonly enrolment = signal<EnrolmentProgress | null>(INITIAL_ENROLMENT);
-  readonly skillGaps = signal<SkillGap[]>(INITIAL_SKILL_GAPS);
-  readonly streak = signal<ClimbingStreak>(INITIAL_STREAK);
-  readonly sessions = signal<AssignedSession[]>(INITIAL_SESSIONS);
-  readonly greenhouseIdea = signal<GreenhouseIdea | null>(INITIAL_GREENHOUSE_IDEA);
+  private readonly homeService = inject(HomeService);
 
-  readonly preferences = signal<AccessibilityPreferences>({
-    dyslexiaFont: false,
-    calmMode: false,
-    highContrast: false,
-  });
+  // State signals initialized empty - driven strictly by real backend responses
+  readonly profile = signal<LearnerProfile | null>(null);
+  readonly enrolment = signal<EnrolmentProgress | null>(null);
+  readonly skillGaps = signal<SkillGap[]>([]);
+  readonly streak = signal<ClimbingStreak | null>(null);
+  readonly sessions = signal<AssignedSession[]>([]);
+  readonly greenhouseIdea = signal<GreenhouseIdea | null>(null);
 
-  readonly loading = signal<boolean>(false);
+  // Status flags
+  readonly loading = signal<boolean>(true);
   readonly error = signal<string | null>(null);
-  readonly isDemoEnv = signal<boolean>(true);
-  readonly resumeNotification = signal<string | null>(null);
+  readonly permissionDenied = signal<boolean>(false);
+  readonly streakFreezeLoading = signal<boolean>(false);
+  readonly streakFreezeMessage = signal<string | null>(null);
 
-  // Computed Signals
-  readonly hasActiveEnrolment = computed(() => this.enrolment() !== null);
+  // Accessibility settings persisted in localStorage
+  readonly preferences = signal<AccessibilityPreferences>(this.loadPreferences());
 
-  readonly criticalGaps = computed(() =>
-    this.skillGaps().filter((gap) => gap.isCritical)
+  // Computed metrics
+  readonly criticalSkillGapsCount = computed(
+    () => this.skillGaps().filter((g) => g.isCritical).length
   );
 
-  readonly streakSummary = computed(() => {
-    const s = this.streak();
-    if (s.currentStreakDays >= 14) {
-      return `${s.currentStreakDays}-day climbing streak! Superb momentum.`;
-    }
-    return `${s.currentStreakDays}-day streak. Keep climbing today!`;
-  });
+  readonly hasActiveEnrolment = computed(() => this.enrolment() !== null);
 
-  readonly progressRingCircumference = 2 * Math.PI * 42; // r = 42 -> 263.89
+  readonly hasUpcomingSessions = computed(() => this.sessions().length > 0);
 
-  readonly progressStrokeDashoffset = computed(() => {
-    const enr = this.enrolment();
-    if (!enr) return this.progressRingCircumference;
-    const pct = Math.min(100, Math.max(0, enr.progressPct));
-    return this.progressRingCircumference - (pct / 100) * this.progressRingCircumference;
-  });
-
-  // Action Methods
-  resumeCurrentModule(): void {
-    const current = this.enrolment();
-    if (!current) return;
-    this.resumeNotification.set(
-      `Resuming "${current.currentModuleName}" in ${current.currentCourseTitle}...`
-    );
-    setTimeout(() => {
-      this.resumeNotification.set(null);
-    }, 4000);
-  }
-
-  useStreakFreeze(): void {
-    this.streak.update((s) => {
-      if (s.freezesRemaining <= 0) return s;
-      return {
-        ...s,
-        freezesRemaining: s.freezesRemaining - 1,
-      };
-    });
-  }
-
-  toggleUpvoteIdea(): void {
-    this.greenhouseIdea.update((idea) => {
-      if (!idea) return null;
-      const willUpvote = !idea.userHasUpvoted;
-      return {
-        ...idea,
-        userHasUpvoted: willUpvote,
-        upvotesCount: willUpvote ? idea.upvotesCount + 1 : idea.upvotesCount - 1,
-      };
-    });
-  }
-
-  toggleDyslexiaFont(): void {
-    this.preferences.update((p) => ({
-      ...p,
-      dyslexiaFont: !p.dyslexiaFont,
-    }));
-  }
-
-  toggleCalmMode(): void {
-    this.preferences.update((p) => ({
-      ...p,
-      calmMode: !p.calmMode,
-    }));
-  }
-
-  toggleHighContrast(): void {
-    this.preferences.update((p) => ({
-      ...p,
-      highContrast: !p.highContrast,
-    }));
-  }
-
-  setLoading(isLoading: boolean): void {
-    this.loading.set(isLoading);
-  }
-
-  triggerEmptyState(): void {
-    this.enrolment.set(null);
-    this.sessions.set([]);
-  }
-
-  triggerErrorState(): void {
-    this.error.set(
-      'Network timeout: Unable to synchronize real-time Growth Ring telemetry with the Evidence Ledger. Please verify connectivity.'
-    );
-  }
-
-  retry(): void {
+  /**
+   * Fetch live dashboard telemetry from the real database.
+   */
+  loadHomeData(): void {
+    this.loading.set(true);
     this.error.set(null);
-    this.enrolment.set(INITIAL_ENROLMENT);
-    this.sessions.set(INITIAL_SESSIONS);
-    this.skillGaps.set(INITIAL_SKILL_GAPS);
-    this.loading.set(false);
+    this.permissionDenied.set(false);
+
+    this.homeService.getHomeDashboard().subscribe({
+      next: (dto: HomeDashboardDto) => {
+        // 1. Profile
+        this.profile.set({
+          id: dto.profile.id,
+          name: dto.profile.name,
+          role: dto.profile.role,
+          avatarUrl: dto.profile.avatar_url,
+          orgId: dto.profile.org_id,
+          email: dto.profile.email,
+          roleCode: dto.profile.role_code,
+        });
+
+        // 2. Enrolment
+        if (dto.enrolment) {
+          this.enrolment.set({
+            enrolmentId: dto.enrolment.enrolment_id,
+            pathwayId: dto.enrolment.pathway_id,
+            pathwayTitle: dto.enrolment.pathway_title,
+            pathwayCode: dto.enrolment.pathway_code,
+            targetRoleCode: dto.enrolment.target_role_code,
+            progressPct: dto.enrolment.progress_pct,
+            currentModuleId: dto.enrolment.current_module_id,
+            currentModuleName: dto.enrolment.current_module_name,
+            currentCourseId: dto.enrolment.current_course_id,
+            currentCourseTitle: dto.enrolment.current_course_title,
+            estimatedMinutesRemaining: dto.enrolment.estimated_minutes_remaining,
+            totalModules: dto.enrolment.total_modules,
+            completedModules: dto.enrolment.completed_modules,
+          });
+        } else {
+          this.enrolment.set(null);
+        }
+
+        // 3. Skill Gaps with Evidence Confidence Tiers
+        this.skillGaps.set(
+          dto.skill_gaps.map((sg) => ({
+            skillId: sg.skill_id,
+            skillCode: sg.skill_code,
+            skillName: sg.skill_name,
+            category: sg.category,
+            currentLevel: sg.current_level,
+            requiredLevel: sg.required_level,
+            gapMagnitude: sg.gap_magnitude,
+            isCritical: sg.is_critical,
+            sampleSize: sg.sample_size,
+            evidenceLabel: sg.evidence_label,
+            whyThis: sg.why_this,
+          }))
+        );
+
+        // 4. Climbing Streak
+        this.streak.set({
+          currentStreakDays: dto.streak.current_streak_days,
+          longestStreakDays: dto.streak.longest_streak_days,
+          freezesRemaining: dto.streak.freezes_remaining,
+          hasActivityToday: dto.streak.has_activity_today,
+          weeklyHistory: dto.streak.weekly_history.map((wh) => ({
+            dayLabel: wh.day_label,
+            dateStr: wh.date_str,
+            completed: wh.completed,
+            isToday: wh.is_today,
+          })),
+        });
+
+        // 5. Assigned Sessions
+        this.sessions.set(
+          dto.sessions.map((s) => ({
+            id: s.id,
+            title: s.title,
+            cohortName: s.cohort_name,
+            trainerName: s.trainer_name,
+            startsAt: s.starts_at,
+            durationMinutes: s.duration_minutes,
+            meetingLink: s.meeting_link,
+            sessionType: s.session_type as AssignedSession['sessionType'],
+          }))
+        );
+
+        // 6. Greenhouse Idea Spotlight (Phase 3 Upcoming)
+        this.greenhouseIdea.set({
+          id: dto.greenhouse_idea.id,
+          title: dto.greenhouse_idea.title,
+          summary: dto.greenhouse_idea.summary,
+          authorName: dto.greenhouse_idea.author_name,
+          authorRole: dto.greenhouse_idea.author_role,
+          upvotesCount: dto.greenhouse_idea.upvotes_count,
+          status: dto.greenhouse_idea.status,
+          tags: dto.greenhouse_idea.tags,
+        });
+
+        this.loading.set(false);
+      },
+      error: (err: HttpErrorResponse) => {
+        this.loading.set(false);
+        if (err.status === 403) {
+          this.permissionDenied.set(true);
+        } else {
+          this.error.set(
+            err.error?.detail || err.message || 'Failed to load telemetry from the TRELLIS database.'
+          );
+        }
+      },
+    });
+  }
+
+  /**
+   * Retry loading dashboard telemetry.
+   */
+  retry(): void {
+    this.loadHomeData();
+  }
+
+  /**
+   * Consume a streak freeze via real audited backend mutation.
+   */
+  freezeStreak(): void {
+    const current = this.streak();
+    if (!current || current.freezesRemaining <= 0 || this.streakFreezeLoading()) {
+      return;
+    }
+
+    this.streakFreezeLoading.set(true);
+    this.streakFreezeMessage.set(null);
+
+    this.homeService.freezeStreak().subscribe({
+      next: (res) => {
+        this.streak.set({
+          ...current,
+          freezesRemaining: res.streak_freezes_remaining,
+          currentStreakDays: res.current_streak_days,
+        });
+        this.streakFreezeLoading.set(false);
+        this.streakFreezeMessage.set('Streak freeze successfully consumed and audited.');
+      },
+      error: (err: HttpErrorResponse) => {
+        this.streakFreezeLoading.set(false);
+        this.streakFreezeMessage.set(
+          err.error?.detail || 'Failed to consume streak freeze. Please try again.'
+        );
+      },
+    });
+  }
+
+  /**
+   * Toggle Dyslexia-friendly font face and spacing.
+   */
+  toggleDyslexiaFont(): void {
+    this.preferences.update((p) => {
+      const next = { ...p, dyslexiaFont: !p.dyslexiaFont };
+      this.persistPreferences(next);
+      return next;
+    });
+  }
+
+  /**
+   * Toggle Calm Mode: subdued palette, zero animations, reduced cognitive load.
+   */
+  toggleCalmMode(): void {
+    this.preferences.update((p) => {
+      const next = { ...p, calmMode: !p.calmMode };
+      this.persistPreferences(next);
+      return next;
+    });
+  }
+
+  /**
+   * Toggle WCAG 2.2 AAA High Contrast mode (7:1 text, 4.5:1 UI components).
+   */
+  toggleHighContrast(): void {
+    this.preferences.update((p) => {
+      const next = { ...p, highContrast: !p.highContrast };
+      this.persistPreferences(next);
+      return next;
+    });
+  }
+
+  private loadPreferences(): AccessibilityPreferences {
+    try {
+      const saved = localStorage.getItem('trellis_a11y_prefs');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch {
+      // Fallback for non-browser / restricted environments
+    }
+    return {
+      dyslexiaFont: false,
+      calmMode: false,
+      highContrast: false,
+    };
+  }
+
+  private persistPreferences(prefs: AccessibilityPreferences): void {
+    try {
+      localStorage.setItem('trellis_a11y_prefs', JSON.stringify(prefs));
+    } catch {
+      // Ignore in restricted environments
+    }
   }
 }

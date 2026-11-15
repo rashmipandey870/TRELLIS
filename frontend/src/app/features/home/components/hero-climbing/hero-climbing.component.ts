@@ -33,30 +33,16 @@ import { HomeStore } from '../../../../core/store/home.store';
               </span>
             </p>
 
-            <!-- Notification Banner for Resumed Module -->
-            @if (store.resumeNotification(); as notif) {
-              <div 
-                role="status" 
-                aria-live="polite"
-                class="inline-flex items-center gap-2 p-3 rounded-lg bg-emerald-950/80 border border-emerald-600/50 text-emerald-200 text-xs font-medium animate-fadeIn">
-                <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{{ notif }}</span>
-              </div>
-            }
-
             <div class="pt-2 flex flex-wrap items-center gap-4">
-              <button
-                type="button"
-                (click)="store.resumeCurrentModule()"
-                class="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-900/40 transition transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900"
+              <a
+                [href]="'#pathways/' + enr.pathwayId + '/modules/' + enr.currentModuleId"
+                class="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-900/40 transition transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:ring-offset-2 focus:ring-offset-slate-900"
                 [attr.aria-label]="'Resume learning: ' + enr.currentModuleName">
                 <svg class="w-5 h-5 text-slate-950 fill-current" viewBox="0 0 24 24" aria-hidden="true">
                   <path d="M8 5v14l11-7z" />
                 </svg>
                 <span>Resume Learning</span>
-              </button>
+              </a>
 
               <div class="text-xs text-slate-400 flex items-center gap-2">
                 <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -97,7 +83,7 @@ import { HomeStore } from '../../../../core/store/home.store';
                   class="stroke-cyan-500 transition-all duration-700 ease-out"
                   fill="transparent"
                   stroke-dasharray="263.89"
-                  [attr.stroke-dashoffset]="store.progressStrokeDashoffset()"
+                  [attr.stroke-dashoffset]="getStrokeDashoffset(enr.progressPct)"
                 />
               </svg>
 
@@ -113,7 +99,7 @@ import { HomeStore } from '../../../../core/store/home.store';
             </div>
 
             <p class="mt-2 text-xs text-slate-400 text-center">
-              Target Role: <strong class="text-slate-200">{{ enr.targetRoleCode }}</strong>
+              Target Role: <strong class="text-slate-200">{{ enr.targetRoleCode || 'PLATFORM_ENG_L2' }}</strong>
             </p>
           </div>
         </div>
@@ -130,13 +116,13 @@ import { HomeStore } from '../../../../core/store/home.store';
         </div>
         <h2 id="empty-climbing-heading" class="text-xl font-bold text-white mb-2">No Active Pathway Enrolment</h2>
         <p class="text-sm text-slate-400 max-w-md mx-auto mb-6">
-          You are not currently enrolled in a learning pathway. Explore the curriculum catalog or enrol in your role's onboarding pathway.
+          You are not currently enrolled in an active learning pathway. Explore the curriculum catalog or contact your trainer to start your onboarding pathway.
         </p>
         <button
           type="button"
           (click)="store.retry()"
-          class="px-5 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-sm shadow-md transition focus:outline-none focus:ring-2 focus:ring-cyan-300">
-          Restore Pathway Enrolment
+          class="px-5 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm shadow-md transition focus:outline-none focus:ring-2 focus:ring-cyan-300">
+          Synchronise Enrolment Status
         </button>
       </article>
     }
@@ -144,4 +130,9 @@ import { HomeStore } from '../../../../core/store/home.store';
 })
 export class HeroClimbingComponent {
   readonly store = inject(HomeStore);
+
+  getStrokeDashoffset(progressPct: number): number {
+    const circumference = 263.89;
+    return circumference * (1 - progressPct / 100);
+  }
 }

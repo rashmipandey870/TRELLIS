@@ -14,13 +14,16 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+      // Use the Playwright-bundled Chromium (no system Chrome required)
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
   webServer: {
-    command: 'node ./node_modules/http-server/bin/http-server dist/frontend/browser -a 127.0.0.1 -p 4200 -c-1',
+    // Run ng serve so the Angular dev server is always available
+    command: 'npx ng serve --port 4200 --host 127.0.0.1 --no-open',
     url: 'http://127.0.0.1:4200',
-    reuseExistingServer: false,
-    timeout: 30000,
+    // Reuse the already-running ng serve instance (avoids dual-server conflicts)
+    reuseExistingServer: true,
+    timeout: 120000,
   },
 });

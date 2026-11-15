@@ -38,6 +38,7 @@ from app.services.ledger_service import (
     GENESIS_PREV_HASH,
     append_evidence,
     create_signed_checkpoint,
+    crypto_shred_employee,
     derive_pseudonym,
     shred_evidence_record,
     verify_checkpoint,
@@ -132,12 +133,13 @@ def test_evidence_ledger_hash_chaining_genesis_and_subsequent(db_session: Sessio
         email="chain_user@csm.tech",
         password_hash="dummy_hash",
         full_name="Chain Verifier",
+        pseudonym_salt="salt_chain_user_01",
     )
     skill = Skill(org_id=org.id, code="SK_SEC_ARCH", name="Security Arch", category="TECHNICAL")
     db_session.add_all([user, skill])
     db_session.flush()
 
-    pseudonym = derive_pseudonym(user.id, org.id)
+    pseudonym = derive_pseudonym(user.id, user.pseudonym_salt)
 
     # Block 1 (Genesis)
     payload_1 = {"task": "Module 1 Assessment", "score": 85}
@@ -234,12 +236,13 @@ def test_tamper_detection_flags_payload_and_chain_alterations(db_session: Sessio
         email="tamper_test@csm.tech",
         password_hash="pwd",
         full_name="Tamper Subject",
+        pseudonym_salt="salt_tamper_user_02",
     )
     skill = Skill(org_id=org.id, code="SK_TAMPER", name="Integrity Test", category="DOMAIN")
     db_session.add_all([user, skill])
     db_session.flush()
 
-    pseudonym = derive_pseudonym(user.id, org.id)
+    pseudonym = derive_pseudonym(user.id, user.pseudonym_salt)
 
     # Create 4 consecutive blocks
     for i in range(1, 5):
@@ -357,6 +360,7 @@ def test_per_employee_sequence_numbers_under_concurrent_writes(
         email="concurrent_writer@csm.tech",
         password_hash="pwd",
         full_name="Concurrent Writer",
+        pseudonym_salt="salt_concurrent_writer",
     )
     skill = Skill(org_id=org.id, code="SK_CONCURR", name="Concurrency Skill", category="TECHNICAL")
     db_session.add_all([user, skill])
@@ -365,7 +369,7 @@ def test_per_employee_sequence_numbers_under_concurrent_writes(
     org_id_str = str(org.id)
     user_id_str = str(user.id)
     skill_id_str = str(skill.id)
-    pseudonym = derive_pseudonym(user_id_str, org_id_str)
+    pseudonym = derive_pseudonym(user_id_str, "salt_concurrent_writer")
     concurrency_count = 8
 
     def submit_evidence(thread_idx: int) -> dict[str, Any]:
@@ -423,8 +427,20 @@ def test_signed_checkpoints_and_verification(db_session: Session) -> None:
     db_session.add(org)
     db_session.flush()
 
-    user_a = User(org_id=org.id, email="alice@csm.tech", password_hash="h", full_name="Alice")
-    user_b = User(org_id=org.id, email="bob@csm.tech", password_hash="h", full_name="Bob")
+    user_a = User(
+        org_id=org.id,
+        email="alice@csm.tech",
+        password_hash="h",
+        full_name="Alice",
+        pseudonym_salt="salt_alice_123",
+    )
+    user_b = User(
+        org_id=org.id,
+        email="bob@csm.tech",
+        password_hash="h",
+        full_name="Bob",
+        pseudonym_salt="salt_bob_456",
+    )
     skill = Skill(org_id=org.id, code="SK_CKPT", name="Checkpoint Skill", category="DOMAIN")
     db_session.add_all([user_a, user_b, skill])
     db_session.commit()
@@ -495,12 +511,13 @@ def test_dpdp_crypto_shredding_preserves_ledger_integrity(db_session: Session) -
         email="erasure_candidate@csm.tech",
         password_hash="pwd",
         full_name="Erasure Candidate",
+        pseudonym_salt="salt_erasure_candidate_789",
     )
     skill = Skill(org_id=org.id, code="SK_SHRED", name="Shred Skill", category="TECHNICAL")
     db_session.add_all([user, skill])
     db_session.flush()
 
-    pseudonym = derive_pseudonym(user.id, org.id)
+    pseudonym = derive_pseudonym(user.id, user.pseudonym_salt)
 
     # Append 3 evidence records
     append_evidence(
@@ -542,3 +559,120 @@ def test_dpdp_crypto_shredding_preserves_ledger_integrity(db_session: Session) -
     chain_post_shred = verify_employee_chain(db_session, org.id, pseudonym)
     assert chain_post_shred.is_valid is True
     assert chain_post_shred.total_blocks == 3
+
+
+def test_derive_pseudonym_refuses_empty_salt_and_forbids_secret_key_fallback() -> None:
+    """Verify that derive_pseudonym strictly enforces mandatory per-employee salt and forbids system fallback."""
+    user_id = "usr-test-strict-salt-01"
+
+    # 1. None salt strictly forbidden
+    with pytest.raises(ValueError) as exc_none:
+        derive_pseudonym(user_id, "")
+    assert "MANDATORY_EMPLOYEE_SALT" in str(exc_none.value)
+    assert "fallback to system SECRET_KEY is strictly prohibited" in str(exc_none.value)
+
+    # 2. Whitespace-only salt strictly forbidden
+    with pytest.raises(ValueError) as exc_space:
+        derive_pseudonym(user_id, "   ")
+    assert "MANDATORY_EMPLOYEE_SALT" in str(exc_space.value)
+
+    # 3. Legitimate per-employee salt succeeds and produces deterministic 64-char hex
+    valid_salt = "emp-cryptographic-salt-9999"
+    pseudo_1 = derive_pseudonym(user_id, valid_salt)
+    pseudo_2 = derive_pseudonym(user_id, valid_salt)
+    assert pseudo_1 == pseudo_2
+    assert len(pseudo_1) == 64
+    assert all(c in "0123456789abcdef" for c in pseudo_1)
+
+
+def test_crypto_shredding_salt_makes_pseudonym_and_ledger_unlinkable(
+    db_session: Session,
+) -> None:
+    """Verify that destroying the per-employee salt renders historical ledger blocks mathematically unlinkable.
+
+    DPDP Act Statutory Erasure Invariants:
+    1. The employee's personal salt is destroyed permanently from the database.
+    2. Attempting to derive the pseudonym for the shredded employee strictly fails.
+    3. An adversary possessing user_id cannot recompute the pseudonym or link it to historical ledger rows.
+    4. The immutable hash chain in EvidenceLedger remains mathematically sound and internally intact.
+    """
+    org = Organisation(name="CSM Tech", code="CSM_SALT_SHRED")
+    db_session.add(org)
+    db_session.flush()
+
+    employee_salt = "secure_personal_salt_employee_x77"
+    user = User(
+        org_id=org.id,
+        email="unlinkable_employee@csm.tech",
+        password_hash="pwd",
+        full_name="Unlinkable Employee",
+        pseudonym_salt=employee_salt,
+    )
+    skill = Skill(org_id=org.id, code="SK_UNLINK", name="Unlinkable Skill", category="SECURITY")
+    db_session.add_all([user, skill])
+    db_session.flush()
+
+    user_id = user.id
+    pseudonym_pre_shred = derive_pseudonym(user_id, employee_salt)
+
+    # Append 2 blocks for this user
+    append_evidence(
+        session=db_session,
+        org_id=org.id,
+        user_id=user_id,
+        skill_id=skill.id,
+        evidence_type="ASSESSMENT",
+        payload={"topic": "Privacy By Design", "score": 98},
+    )
+    append_evidence(
+        session=db_session,
+        org_id=org.id,
+        user_id=user_id,
+        skill_id=skill.id,
+        evidence_type="LAB",
+        payload={"topic": "Zero Trust Gateway", "score": 95},
+    )
+
+    # Prior to shredding: Chain is valid and linked
+    chain_before = verify_employee_chain(db_session, org.id, pseudonym_pre_shred)
+    assert chain_before.is_valid is True
+    assert chain_before.total_blocks == 2
+
+    # Execute complete employee crypto-shredding (shreds records AND destroys salt)
+    shred_info = crypto_shred_employee(
+        session=db_session,
+        org_id=org.id,
+        user_id=user_id,
+        reason="DPDP_RIGHT_TO_ERASURE_UNLINKABILITY_TEST",
+    )
+    assert shred_info["pseudonym_salt_destroyed"] is True
+    assert shred_info["shredded_records"] == 2
+
+    # Verify database state after shredding
+    db_session.expire_all()
+    user_post_shred = db_session.get(User, user_id)
+    assert user_post_shred is not None
+    assert user_post_shred.pseudonym_salt is None
+
+    # CRITICAL INVARIANT: With salt destroyed, deriving pseudonym for user_id FAILS
+    with pytest.raises(ValueError) as exc:
+        derive_pseudonym(user_id, str(user_post_shred.pseudonym_salt or ""))
+    assert "MANDATORY_EMPLOYEE_SALT" in str(exc.value)
+
+    # Append evidence without salt fails closed
+    with pytest.raises(ValueError) as exc_append:
+        append_evidence(
+            session=db_session,
+            org_id=org.id,
+            user_id=user_id,
+            skill_id=skill.id,
+            evidence_type="NEW_TASK",
+            payload={"fail": True},
+        )
+    assert "No cryptographic pseudonym salt registered" in str(exc_append.value)
+
+    # CRITICAL INVARIANT: The historical ledger blocks remain mathematically valid on-chain
+    chain_after = verify_employee_chain(db_session, org.id, pseudonym_pre_shred)
+    assert chain_after.is_valid is True
+    assert chain_after.total_blocks == 2
+

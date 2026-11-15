@@ -1,13 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { AuthService } from './core/services/auth.service';
 import { HomeStore } from './core/store/home.store';
 import { DemoBannerComponent } from './features/home/components/demo-banner/demo-banner.component';
-import { HomeComponent } from './features/home/home.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, DemoBannerComponent, HomeComponent],
+  imports: [CommonModule, RouterOutlet, DemoBannerComponent],
   template: `
     <!-- Skip Link for Keyboard Accessibility (WCAG 2.4.1) -->
     <a href="#main-content" class="skip-link">Skip to main content</a>
@@ -32,23 +33,29 @@ import { HomeComponent } from './features/home/home.component';
         </div>
 
         <nav aria-label="Primary Navigation" class="flex items-center gap-4 text-sm font-medium text-slate-300">
-          <a href="#home" class="text-cyan-400 font-bold border-b-2 border-cyan-400 py-1 px-2">Home</a>
-          <a href="#pathways" class="hover:text-white py-1 px-2 rounded transition">Pathways</a>
-          <a href="#growth-ring" class="hover:text-white py-1 px-2 rounded transition">Growth Ring</a>
-          <a href="#greenhouse" class="hover:text-white py-1 px-2 rounded transition">Greenhouse</a>
+          @if (auth.isAuthenticated()) {
+            <a href="#home" class="text-cyan-400 font-bold border-b-2 border-cyan-400 py-1 px-2">Home</a>
+            <a href="#pathways" class="hover:text-white py-1 px-2 rounded transition">Pathways</a>
+            <a href="#growth-ring" class="hover:text-white py-1 px-2 rounded transition">Growth Ring</a>
+            <a href="#greenhouse" class="hover:text-white py-1 px-2 rounded transition">Greenhouse</a>
 
-          <div class="h-4 w-px bg-slate-700 hidden sm:block" aria-hidden="true"></div>
+            <div class="h-4 w-px bg-slate-700 hidden sm:block" aria-hidden="true"></div>
 
-          <!-- Command Bar Trigger Button (Ctrl/Cmd+K) -->
-          <button 
-            type="button" 
-            class="text-xs px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 text-slate-300 hover:border-slate-500 flex items-center gap-2 transition focus:outline-none focus:ring-2 focus:ring-cyan-400">
-            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span class="hidden md:inline">Command Bar</span>
-            <kbd class="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-[10px] font-mono text-slate-400">Ctrl+K</kbd>
-          </button>
+            <!-- User Badge & Sign Out -->
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-300 font-medium hidden md:inline">
+                {{ auth.currentUser()?.email }}
+              </span>
+              <button 
+                type="button" 
+                (click)="auth.logout()"
+                class="text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800/80 text-rose-300 hover:text-rose-200 hover:border-rose-700 transition focus:outline-none focus:ring-1 focus:ring-rose-400">
+                Sign Out
+              </button>
+            </div>
+          } @else {
+            <span class="text-xs text-slate-400 font-medium">Sign In to access platform</span>
+          }
         </nav>
       </div>
     </header>
@@ -61,7 +68,7 @@ import { HomeComponent } from './features/home/home.component';
       [class.high-contrast]="store.preferences().highContrast"
       [class.calm-mode]="store.preferences().calmMode">
       
-      <app-home />
+      <router-outlet />
 
     </main>
 
@@ -76,4 +83,5 @@ import { HomeComponent } from './features/home/home.component';
 })
 export class AppComponent {
   readonly store = inject(HomeStore);
+  readonly auth = inject(AuthService);
 }

@@ -41,3 +41,13 @@ def test_migration_0003_definition() -> None:
     assert mod.down_revision == "0002"
     assert hasattr(mod, "upgrade")
     assert hasattr(mod, "downgrade")
+
+
+def test_migration_0004_definition() -> None:
+    """Verify Migration 0004 covers user pseudonym salt, climbing streaks, and links to 0003."""
+    mod = load_migration_module("0004_user_pseudonym_salt_and_streak.py")
+    assert mod.revision == "0004"
+    assert mod.down_revision == "0003"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+

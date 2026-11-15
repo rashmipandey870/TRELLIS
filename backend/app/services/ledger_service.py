@@ -28,9 +28,8 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.jcs import compute_block_hash, compute_data_hash, rfc8785_canonicalize
-from app.models import AuditLog, EvidenceLedger, EvidenceRecord, LedgerCheckpoint
+from app.models import AuditLog, EvidenceLedger, EvidenceRecord, LedgerCheckpoint, User
 
 # Invariant: Genesis block prev_hash is exactly 64 zero hex characters
 GENESIS_PREV_HASH = "0" * 64
@@ -46,14 +45,19 @@ class VerificationResult:
     reason: str | None = None
 
 
-def derive_pseudonym(user_id: str, salt: str | None = None) -> str:
+def derive_pseudonym(user_id: str, salt: str) -> str:
     """Derive deterministic pseudonymous identifier for an employee.
 
-    Formula: HMAC-SHA256(user_id, salt_or_secret_key)
+    Formula: HMAC-SHA256(user_id, salt)
     Zero plain-text PII is persisted in the immutable evidence ledger.
+    Per-employee salt is strictly mandatory; fallback to system SECRET_KEY is prohibited.
     """
-    key_material = (salt or settings.SECRET_KEY).encode("utf-8")
-    return hmac.new(key_material, user_id.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not salt or not salt.strip():
+        raise ValueError(
+            "MANDATORY_EMPLOYEE_SALT: derive_pseudonym requires an explicit, non-empty "
+            "per-employee salt; fallback to system SECRET_KEY is strictly prohibited"
+        )
+    return hmac.new(salt.encode("utf-8"), user_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def append_evidence(
@@ -63,6 +67,7 @@ def append_evidence(
     skill_id: str,
     evidence_type: str,
     payload: dict[str, Any],
+    salt: str | None = None,
     weight: float = 1.0,
     key_id: str | None = None,
     max_retries: int = 10,
@@ -72,7 +77,19 @@ def append_evidence(
     Ensures strictly consecutive sequence numbers (1, 2, ..., N) under high concurrency
     via optimistic concurrency control and retry with exponential jitter.
     """
-    pseudonym = derive_pseudonym(user_id, org_id)
+    effective_salt = salt
+    if not effective_salt:
+        user = session.get(User, user_id)
+        if user is not None and user.pseudonym_salt:
+            effective_salt = user.pseudonym_salt
+
+    if not effective_salt:
+        raise ValueError(
+            f"MANDATORY_EMPLOYEE_SALT: No cryptographic pseudonym salt registered for user '{user_id}'. "
+            "Fallback to system key is prohibited."
+        )
+
+    pseudonym = derive_pseudonym(user_id, effective_salt)
     data_hash = compute_data_hash(payload)
 
     # Concurrency-safe sequence number and hash calculation with retry
@@ -391,3 +408,57 @@ def shred_evidence_record(
     session.add(audit)
     session.commit()
     return True
+
+
+def crypto_shred_employee(
+    session: Session,
+    org_id: str,
+    user_id: str,
+    reason: str = "DPDP_RIGHT_TO_ERASURE",
+    actor_id: str | None = None,
+) -> dict[str, Any]:
+    """Execute complete crypto-shredding for an employee under statutory DPDP Right to Erasure.
+
+    1. Shreds all EvidenceRecord payloads and encryption keys belonging to user_id.
+    2. Permanently destroys user.pseudonym_salt, making it mathematically impossible
+       to re-derive the pseudonym or link historical EvidenceLedger blocks to the natural person.
+    3. Records statutory audit log entry.
+    """
+    user = session.get(User, user_id)
+    if user is None:
+        raise ValueError(f"User '{user_id}' not found for crypto-shredding.")
+
+    # 1. Shred all off-chain evidence records
+    user_records = (
+        session.query(EvidenceRecord)
+        .filter(EvidenceRecord.user_id == user_id, EvidenceRecord.org_id == org_id)
+        .all()
+    )
+    for rec in user_records:
+        rec.raw_payload_json = None
+        rec.key_id = None
+        rec.is_shredded = True
+
+    # 2. Shred the per-employee salt
+    had_salt = user.pseudonym_salt is not None
+    user.pseudonym_salt = None
+
+    # 3. Transactional statutory audit
+    audit = AuditLog(
+        org_id=org_id,
+        actor_id=actor_id or "system_dpdp_handler",
+        action="crypto_shred_employee_salt",
+        resource="users",
+        resource_id=user_id,
+        reason=reason,
+        before_state_json={"had_pseudonym_salt": had_salt, "records_count": len(user_records)},
+        after_state_json={"pseudonym_salt_shredded": True, "shredded_records_count": len(user_records)},
+    )
+    session.add(audit)
+    session.commit()
+    return {
+        "user_id": user_id,
+        "shredded_records": len(user_records),
+        "pseudonym_salt_destroyed": True,
+    }
+

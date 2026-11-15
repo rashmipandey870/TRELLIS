@@ -3,7 +3,7 @@
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, utc_now
@@ -26,6 +26,14 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Per-employee cryptographic salt for Evidence Ledger pseudonymisation (DPDP Crypto-Shredding)
+    pseudonym_salt: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # Climbing streak tracking
+    streak_days: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    streak_freezes_remaining: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Preferences & Accessibility (Dyslexia font, theme, calm mode)
     preferences_json: Mapped[dict[str, Any] | None] = mapped_column(

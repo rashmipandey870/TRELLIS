@@ -7,11 +7,35 @@ import { HomeStore } from '../../../../core/store/home.store';
   standalone: true,
   imports: [CommonModule],
   template: `
+    @if (store.permissionDenied()) {
+      <div 
+        role="alert" 
+        aria-live="assertive"
+        class="rounded-2xl border border-amber-700/60 bg-amber-950/40 p-6 md:p-8 shadow-2xl mb-6">
+        <div class="flex items-start gap-4">
+          <div class="w-10 h-10 rounded-xl bg-amber-900/60 border border-amber-600/60 flex items-center justify-center text-amber-300 shrink-0" aria-hidden="true">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+
+          <div class="flex-1 space-y-2">
+            <h3 class="text-lg font-bold text-amber-100">
+              Access Permission Denied (HTTP 403)
+            </h3>
+            <p class="text-sm text-amber-200/90 leading-relaxed">
+              Your active session lacks the required role grant to read employee enrolment telemetry. Under Default-Deny RBAC, explicit grant approval is required.
+            </p>
+          </div>
+        </div>
+      </div>
+    }
+
     @if (store.error(); as err) {
       <div 
         role="alert" 
         aria-live="assertive"
-        class="rounded-2xl border border-rose-700/60 bg-rose-950/40 p-6 md:p-8 shadow-2xl">
+        class="rounded-2xl border border-rose-700/60 bg-rose-950/40 p-6 md:p-8 shadow-2xl mb-6">
         <div class="flex items-start gap-4">
           <div class="w-10 h-10 rounded-xl bg-rose-900/60 border border-rose-600/60 flex items-center justify-center text-rose-300 shrink-0" aria-hidden="true">
             <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
