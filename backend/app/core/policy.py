@@ -119,7 +119,18 @@ def can(
 
     has_explicit_allow = False
 
-    for role in subject.roles:
+    expanded_roles: list[str] = []
+    for r in subject.roles:
+        if r not in expanded_roles:
+            expanded_roles.append(r)
+        if r == "LEARNER" and "EMPLOYEE" not in expanded_roles:
+            expanded_roles.append("EMPLOYEE")
+        elif r == "MENTOR" and "TRAINER_MENTOR" not in expanded_roles:
+            expanded_roles.append("TRAINER_MENTOR")
+        elif r == "ADMIN" and "LK_ADMIN" not in expanded_roles:
+            expanded_roles.append("LK_ADMIN")
+
+    for role in expanded_roles:
         grant = action_rules.get(role)
         if not grant:
             continue
@@ -194,7 +205,7 @@ def resolve_server_side_context(
         "author_id": None,
         "is_direct_report": False,
         "is_in_cohort": False,
-        "target_user_id": resource_id,
+        "target_user_id": resource_id or subject.user_id,
     }
 
     if not resource_id:

@@ -23,16 +23,25 @@ def get_sync_engine() -> Any:
     """Return synchronous database engine."""
     global _sync_engine
     if _sync_engine is None:
-        db_url = settings.DATABASE_URL.replace("mysql+asyncmy://", "mysql+pymysql://")
+        import os
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        local_db_path = os.path.join(base_dir, "trellis.db").replace("\\", "/")
+        db_url = settings.DATABASE_URL.replace("mysql+asyncmy://", "mysql+pymysql://") if settings.DATABASE_URL else ""
         if db_url.startswith("sqlite+aiosqlite://"):
             db_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
-        if not db_url:
-            db_url = "sqlite:///:memory:"
-        try:
-            _sync_engine = create_engine(db_url, pool_pre_ping=True)
-            Base.metadata.create_all(_sync_engine)
-        except Exception:
-            _sync_engine = create_engine("sqlite:///:memory:")
+        if not db_url or "mysql" in db_url:
+            try:
+                if db_url and "mysql" in db_url:
+                    _sync_engine = create_engine(db_url, pool_pre_ping=True)
+                    Base.metadata.create_all(_sync_engine)
+                else:
+                    _sync_engine = create_engine(f"sqlite:///{local_db_path}")
+                    Base.metadata.create_all(_sync_engine)
+            except Exception:
+                _sync_engine = create_engine(f"sqlite:///{local_db_path}")
+                Base.metadata.create_all(_sync_engine)
+        else:
+            _sync_engine = create_engine(db_url)
             Base.metadata.create_all(_sync_engine)
     return _sync_engine
 
