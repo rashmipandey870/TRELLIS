@@ -48,6 +48,28 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`modules` TO 'trellis_app'@
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`cohorts` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`batches` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`enrolments` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`mentor_learner_assignments` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`meetings` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`meeting_audience` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`meeting_attendance` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`question_bank` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`mcq_options` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`coding_problems` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`test_cases` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessments` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessment_questions` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessment_attempts` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`answers` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`submissions` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`mentor_remarks` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`practice_sessions` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`practice_questions` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`practice_attempts` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`practice_scores` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`talent_alerts` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`alert_actions` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`notifications` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`system_settings` TO 'trellis_app'@'%';
 
 -- 4. Explicit Per-Table Grants on IMMUTABLE Tables (ONLY SELECT and INSERT; NEVER UPDATE/DELETE)
 GRANT SELECT, INSERT ON `trellis_db`.`audit_log` TO 'trellis_app'@'%';

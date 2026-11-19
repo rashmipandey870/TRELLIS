@@ -87,4 +87,5 @@ class UserMeResponse(BaseModel):
     full_name: str
     avatar_url: str | None = None
     roles: list[str]
+    role: str = "LEARNER"
     preferences_json: dict[str, Any] | None = None

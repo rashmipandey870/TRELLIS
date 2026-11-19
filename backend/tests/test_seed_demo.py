@@ -8,7 +8,12 @@ Tests:
 
 from __future__ import annotations
 
+import os
+import sys
 from collections.abc import Generator
+
+# Ensure repo root is on sys.path so scripts can be imported
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 import pytest
 from scripts.seed_demo_data import seed_demo_data, verify_demo_environment

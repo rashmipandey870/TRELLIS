@@ -1,15 +1,34 @@
 services:
+  # Primary Database Option: SQL Server (Enterprise Standard for CSM Technology)
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: trellis-mssql
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${SA_PASSWORD:-CSMTrellis2026!}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    networks:
+      - trellis-internal
+    volumes:
+      - mssql_data:/var/opt/mssql
+    profiles: ["mssql"]
+
+  # Alternate Database Option: MySQL 8.4+
   mysql:
     image: mysql:8.4
     container_name: trellis-mysql
     restart: unless-stopped
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-    # Security: Database port 3306 is isolated to the internal docker network and not exposed to the host
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-CSMTrellis2026!}
+      MYSQL_DATABASE: ${DB_NAME:-trellis}
+      MYSQL_USER: ${DB_USER:-trellis_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-CSMTrellis2026!}
+    ports:
+      - "3306:3306"
     networks:
       - trellis-internal
     volumes:
@@ -19,8 +38,9 @@ services:
     image: redis:7.4-alpine
     container_name: trellis-redis
     restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD}
-    # Security: Redis port 6379 is isolated to the internal docker network and not exposed to the host
+    command: redis-server --requirepass ${REDIS_PASSWORD:-CSMTrellis2026!}
+    ports:
+      - "6379:6379"
     networks:
       - trellis-internal
     volumes:
@@ -33,15 +53,16 @@ services:
     container_name: trellis-backend
     restart: unless-stopped
     environment:
-      - TRELLIS_ENV=${TRELLIS_ENV}
+      - TRELLIS_ENV=${TRELLIS_ENV:-development}
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
-      - SECRET_KEY=${SECRET_KEY}
-      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY}
+      - DB_NAME=${DB_NAME:-trellis}
+      - DB_USER=${DB_USER:-trellis_user}
+      - DB_PASSWORD=${DB_PASSWORD:-CSMTrellis2026!}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-CSMTrellis2026!}@redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-default_32_byte_hex_secret_key_change_in_prod}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-qW7GZ9X_8K4jL2mN5pQ8rT1vX3zB6dF9hJ0lP2sU4wY=}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     ports:
       - "8000:8000"
     networks:
@@ -58,13 +79,13 @@ services:
     restart: unless-stopped
     command: celery -A app.core.celery_app worker --loglevel=info
     environment:
-      - TRELLIS_ENV=${TRELLIS_ENV}
+      - TRELLIS_ENV=${TRELLIS_ENV:-development}
       - DB_HOST=mysql
       - DB_PORT=3306
-      - DB_NAME=${DB_NAME}
-      - DB_USER=${DB_USER}
-      - DB_PASSWORD=${DB_PASSWORD}
-      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
+      - DB_NAME=${DB_NAME:-trellis}
+      - DB_USER=${DB_USER:-trellis_user}
+      - DB_PASSWORD=${DB_PASSWORD:-CSMTrellis2026!}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-CSMTrellis2026!}@redis:6379/0
     networks:
       - trellis-internal
     depends_on:
@@ -90,4 +111,5 @@ networks:
 
 volumes:
   mysql_data:
+  mssql_data:
   redis_data:

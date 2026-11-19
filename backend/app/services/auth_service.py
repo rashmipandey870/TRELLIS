@@ -101,10 +101,19 @@ def consume_mfa_ticket(ticket: str) -> tuple[str, bool] | None:
 
 
 def get_active_user_roles(user: User, as_of: datetime | None = None) -> list[str]:
-    """Derive active role codes, strictly excluding expired time-limited grants."""
-    now = as_of or datetime.now(UTC)
+    """Derive active role codes, guaranteeing ADMIN, MENTOR, LEARNER plus legacy compatibility."""
     active_roles: list[str] = []
-    for g in user.grants:
+    if getattr(user, "role", None):
+        r = user.role.upper()
+        if r in {"ADMIN", "MENTOR", "LEARNER"}:
+            active_roles.append(r)
+            if r == "LEARNER":
+                active_roles.append("EMPLOYEE")
+            elif r == "MENTOR":
+                active_roles.append("TRAINER")
+
+    now = as_of or datetime.now(UTC)
+    for g in getattr(user, "grants", []):
         if not g.role or not g.role.code:
             continue
         if getattr(g, "status", "GRANTED") != "GRANTED":
@@ -115,8 +124,21 @@ def get_active_user_roles(user: User, as_of: datetime | None = None) -> list[str
                 exp = exp.replace(tzinfo=UTC)
             if exp <= now:
                 continue
-        active_roles.append(g.role.code)
-    return active_roles or ["EMPLOYEE"]
+        code = g.role.code.upper()
+        active_roles.append(code)
+        if code in {"SUPER_ADMIN", "LK_ADMIN", "ADMIN"}:
+            if "ADMIN" not in active_roles:
+                active_roles.append("ADMIN")
+        elif code in {"TRAINER", "TRAINER_MENTOR", "MENTOR"}:
+            if "MENTOR" not in active_roles:
+                active_roles.append("MENTOR")
+        elif code in {"EMPLOYEE", "LEARNER"}:
+            if "LEARNER" not in active_roles:
+                active_roles.append("LEARNER")
+
+    if not active_roles:
+        active_roles = ["EMPLOYEE", "LEARNER"]
+    return list(dict.fromkeys(active_roles))
 
 
 def authenticate_user(

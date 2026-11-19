@@ -148,7 +148,7 @@ def can(
             role_allowed = bool(target_org and target_org == subject.org_id)
 
         elif scope == "OWN":
-            target_user = context.get("target_user_id", subject.user_id)
+            target_user = context.get("target_user_id") or subject.user_id
             role_allowed = bool(target_user == subject.user_id)
 
         elif scope == "TEAM_DIRECT":

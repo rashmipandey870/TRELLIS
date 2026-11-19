@@ -8,9 +8,15 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.coding import router as coding_router
 from app.api.v1.home import router as home_router
+from app.api.v1.learner import router as learner_router
+from app.api.v1.mentor import router as mentor_router
+from app.api.v1.notifications import router as notifications_router
 from app.api.v1.pathways import router as pathways_router
+from app.api.v1.practice import router as practice_router
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.config import settings
 
@@ -47,8 +53,14 @@ app.add_middleware(
 # Immutable Audit Logging Middleware
 app.add_middleware(AuditLogMiddleware)
 
-# Authentication & Identity Router
+# Authentication & Domain Routers
 app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(admin_router, prefix=settings.API_V1_STR)
+app.include_router(mentor_router, prefix=settings.API_V1_STR)
+app.include_router(learner_router, prefix=settings.API_V1_STR)
+app.include_router(coding_router, prefix=settings.API_V1_STR)
+app.include_router(practice_router, prefix=settings.API_V1_STR)
+app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(home_router, prefix=settings.API_V1_STR)
 app.include_router(pathways_router, prefix=settings.API_V1_STR)
 

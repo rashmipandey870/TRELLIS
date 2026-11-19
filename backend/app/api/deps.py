@@ -24,7 +24,9 @@ def get_sync_engine() -> Any:
     global _sync_engine
     if _sync_engine is None:
         db_url = settings.DATABASE_URL.replace("mysql+asyncmy://", "mysql+pymysql://")
-        if "mysql" not in db_url:
+        if db_url.startswith("sqlite+aiosqlite://"):
+            db_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+        if not db_url:
             db_url = "sqlite:///:memory:"
         try:
             _sync_engine = create_engine(db_url, pool_pre_ping=True)
@@ -108,3 +110,62 @@ def get_current_user(
         )
 
     return user
+
+
+def require_role(*roles: str) -> Any:
+    """Enforce that the authenticated user possesses one of the allowed roles (ADMIN, MENTOR, LEARNER)."""
+
+    def dependency(
+        current_user: User = Depends(get_current_user),
+        claims: dict[str, Any] = Depends(get_current_user_claims),
+    ) -> User:
+        user_roles = set()
+        if current_user.role:
+            user_roles.add(current_user.role.upper())
+        for r in claims.get("roles", []):
+            user_roles.add(str(r).upper())
+        if hasattr(current_user, "grants") and current_user.grants:
+            for g in current_user.grants:
+                if g.role and g.role.code:
+                    user_roles.add(g.role.code.upper())
+
+        # Map legacy role names if present
+        if "SUPER_ADMIN" in user_roles or "LK_ADMIN" in user_roles:
+            user_roles.add("ADMIN")
+        if "TRAINER" in user_roles or "TRAINER_MENTOR" in user_roles:
+            user_roles.add("MENTOR")
+        if "EMPLOYEE" in user_roles:
+            user_roles.add("LEARNER")
+
+        allowed = {r.upper() for r in roles}
+        if not user_roles.intersection(allowed):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied: Action requires one of {allowed} role(s).",
+            )
+        return current_user
+
+    return dependency
+
+
+require_admin = require_role("ADMIN")
+require_mentor = require_role("MENTOR")
+require_learner = require_role("LEARNER")
+require_mentor_or_admin = require_role("MENTOR", "ADMIN")
+
+
+def verify_mentor_learner_access(mentor: User, learner_id: str, db: Session) -> bool:
+    """Verify that a mentor is assigned to the learner, or allow if user is an ADMIN."""
+    if (mentor.role or "").upper() == "ADMIN":
+        return True
+    from app.models.batches import MentorLearnerAssignment
+
+    from sqlalchemy import select
+    assignment = db.execute(
+        select(MentorLearnerAssignment).where(
+            MentorLearnerAssignment.mentor_id == mentor.id,
+            MentorLearnerAssignment.learner_id == learner_id,
+        )
+    ).scalar_one_or_none()
+    return assignment is not None
+

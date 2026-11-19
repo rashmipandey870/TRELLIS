@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 
 if TYPE_CHECKING:
+    from app.models.batches import Batch
     from app.models.user import User
 
 
@@ -143,25 +144,6 @@ class Cohort(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     enrolments: Mapped[list[Enrolment]] = relationship("Enrolment", back_populates="cohort")
 
     __table_args__ = (UniqueConstraint("org_id", "code", name="uq_cohorts_org_code"),)
-
-
-class Batch(Base, UUIDPrimaryKeyMixin, TimestampMixin):
-    """Sub-cohort grouping for practical workshops and labs."""
-
-    __tablename__ = "batches"
-
-    org_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("organisations.id", ondelete="RESTRICT"), index=True, nullable=False
-    )
-    cohort_id: Mapped[str] = mapped_column(
-        String(36), ForeignKey("cohorts.id", ondelete="CASCADE"), index=True, nullable=False
-    )
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    max_learners: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
-
-    # Relationships
-    cohort: Mapped[Cohort] = relationship("Cohort", back_populates="batches")
-    enrolments: Mapped[list[Enrolment]] = relationship("Enrolment", back_populates="batch")
 
 
 class Enrolment(Base, UUIDPrimaryKeyMixin, TimestampMixin):

@@ -140,7 +140,8 @@ def get_me(
     claims: dict[str, Any] = Depends(get_current_user_claims),
 ) -> UserMeResponse:
     """Retrieve profile and assigned roles for currently authenticated user."""
-    roles = claims.get("roles", ["EMPLOYEE"])
+    roles = claims.get("roles", [current_user.role or "LEARNER"])
+    primary_role = (current_user.role or (roles[0] if roles else "LEARNER")).upper()
     return UserMeResponse(
         id=current_user.id,
         org_id=current_user.org_id,
@@ -148,6 +149,7 @@ def get_me(
         full_name=current_user.full_name,
         avatar_url=current_user.avatar_url,
         roles=roles,
+        role=primary_role,
         preferences_json=current_user.preferences_json,
     )
 
