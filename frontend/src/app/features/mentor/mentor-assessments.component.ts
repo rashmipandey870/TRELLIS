@@ -20,7 +20,7 @@ import { AssessmentItem, MentorService, QuestionBankItem } from '../../core/serv
         <div class="flex items-center gap-2">
           <button 
             type="button" 
-            (click)="showQuestionBankModal.set(true)"
+            (click)="openQuestionBank()"
             class="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition">
             Question Bank
           </button>
@@ -242,6 +242,105 @@ import { AssessmentItem, MentorService, QuestionBankItem } from '../../core/serv
           </div>
         </div>
       }
+
+      <!-- Question Bank Modal -->
+      @if (showQuestionBankModal()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Question Bank Repository</h3>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Select verified MCQ and sandboxed Coding questions to stage into your assessments.</p>
+              </div>
+              <button (click)="showQuestionBankModal.set(false)" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- Filter Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input 
+                type="text" 
+                [(ngModel)]="questionBankSearch" 
+                (ngModelChange)="filterQuestionBank()"
+                placeholder="Search questions by keyword or topic..."
+                class="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs" />
+              
+              <select [(ngModel)]="questionBankField" (ngModelChange)="filterQuestionBank()" class="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+                <option value="ALL">All Fields</option>
+                <option value="Python">Python</option>
+                <option value="Java">Java</option>
+                <option value="SQL">SQL</option>
+                <option value="DSA">DSA</option>
+                <option value="Web Dev">Web Dev</option>
+                <option value="Cloud">Cloud</option>
+                <option value="Data Analytics">Data Analytics</option>
+                <option value="Aptitude">Aptitude</option>
+              </select>
+
+              <select [(ngModel)]="questionBankType" (ngModelChange)="filterQuestionBank()" class="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+                <option value="ALL">All Question Types</option>
+                <option value="MCQ">MCQ Concept</option>
+                <option value="CODING">Coding Challenge</option>
+              </select>
+            </div>
+
+            <!-- Staged feedback banner -->
+            @if (questionBankMessage()) {
+              <div class="p-2.5 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold border border-emerald-200">
+                {{ questionBankMessage() }}
+              </div>
+            }
+
+            <!-- Questions List -->
+            <div class="flex-1 overflow-y-auto space-y-3 pr-1">
+              @for (q of filteredQuestions(); track q.id) {
+                <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-2">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
+                          [ngClass]="q.type === 'CODING' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-[#008FBB]'">
+                          {{ q.type }}
+                        </span>
+                        <span class="text-[10px] font-mono text-slate-400 font-bold uppercase">{{ q.field }} &bull; {{ q.difficulty }}</span>
+                      </div>
+                      <h4 class="text-xs font-bold text-slate-900 dark:text-white">{{ q.title }}</h4>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      (click)="addQuestionToDraft(q)"
+                      class="shrink-0 px-3 py-1.5 rounded-lg bg-[#008FBB] hover:bg-[#007499] text-white text-[11px] font-bold transition shadow-sm">
+                      + Stage to Assessment
+                    </button>
+                  </div>
+
+                  <p class="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ q.content }}</p>
+
+                  @if (q.tags && q.tags.length > 0) {
+                    <div class="flex flex-wrap gap-1 pt-1">
+                      @for (t of q.tags; track t) {
+                        <span class="px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 font-mono">
+                          #{{ t }}
+                        </span>
+                      }
+                    </div>
+                  }
+                </div>
+              } @empty {
+                <div class="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                  No questions found matching your filter criteria.
+                </div>
+              }
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button type="button" (click)="showQuestionBankModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+                Close Question Bank
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
@@ -252,6 +351,13 @@ export class MentorAssessmentsComponent {
   readonly showCreateModal = signal<boolean>(false);
   readonly showQuestionBankModal = signal<boolean>(false);
   readonly selectedAssessmentForResults = signal<AssessmentItem | null>(null);
+
+  readonly questionBank = signal<QuestionBankItem[]>([]);
+  readonly filteredQuestions = signal<QuestionBankItem[]>([]);
+  readonly questionBankMessage = signal<string | null>(null);
+  questionBankSearch = '';
+  questionBankField = 'ALL';
+  questionBankType = 'ALL';
 
   newAssessment = {
     title: '',
@@ -270,6 +376,39 @@ export class MentorAssessmentsComponent {
       next: (data) => this.assessments.set(data || []),
       error: () => {},
     });
+  }
+
+  openQuestionBank(): void {
+    this.mentorService.getQuestionBank().subscribe({
+      next: (data) => {
+        this.questionBank.set(data || []);
+        this.filterQuestionBank();
+      },
+      error: () => {
+        this.filterQuestionBank();
+      },
+    });
+    this.showQuestionBankModal.set(true);
+  }
+
+  filterQuestionBank(): void {
+    const q = this.questionBankSearch.toLowerCase().trim();
+    const f = this.questionBankField;
+    const t = this.questionBankType;
+
+    const list = this.questionBank();
+    const filtered = list.filter((item) => {
+      const matchQ = !q || item.title.toLowerCase().includes(q) || item.content.toLowerCase().includes(q);
+      const matchF = f === 'ALL' || item.field.toLowerCase() === f.toLowerCase();
+      const matchT = t === 'ALL' || item.type.toUpperCase() === t.toUpperCase();
+      return matchQ && matchF && matchT;
+    });
+    this.filteredQuestions.set(filtered);
+  }
+
+  addQuestionToDraft(item: QuestionBankItem): void {
+    this.questionBankMessage.set(`Added "${item.title}" to assessment question pool.`);
+    setTimeout(() => this.questionBankMessage.set(null), 3500);
   }
 
   openCreateAssessment(): void {

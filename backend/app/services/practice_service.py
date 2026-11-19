@@ -177,6 +177,160 @@ VERIFIED_TEMPLATES: dict[str, dict[str, list[dict[str, Any]]]] = {
             }
         ],
     },
+    "Java": {
+        "MCQ": [
+            {
+                "title": "JVM Memory Generations",
+                "question": "In the HotSpot JVM architecture, which memory generation stores newly allocated object instances before they are promoted?",
+                "options": ["Metaspace", "Eden Space in Young Generation", "Tenured (Old) Generation", "JVM Stack Frame"],
+                "correct_answer": "Eden Space in Young Generation",
+                "explanation": "New objects are initially allocated in the Eden space of the Young Generation and promoted to Survivor and Tenured after surviving GC cycles.",
+                "difficulty": "EASY",
+                "topic": "JVM Architecture",
+            }
+        ],
+        "CODING": [
+            {
+                "title": "Palindrome String Validator",
+                "statement": "Given a string s, output 'true' if it is a palindrome (reads same forwards and backwards ignoring case), otherwise 'false'.\nInput: A single line string.",
+                "constraints": "1 <= s.length <= 10^4",
+                "examples": [{"input": "racecar", "output": "true"}, {"input": "hello", "output": "false"}],
+                "starter_code": {
+                    "python": "import sys\n\ndef solve():\n    s = sys.stdin.read().strip().lower()\n    print('true' if s == s[::-1] else 'false')\n\nif __name__ == '__main__':\n    solve()",
+                },
+                "reference_solution": "import sys\n\ndef solve():\n    s = sys.stdin.read().strip().lower()\n    print('true' if s == s[::-1] else 'false')\n\nif __name__ == '__main__':\n    solve()",
+                "test_cases": [
+                    {"input_data": "racecar", "expected_output": "true", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "hello", "expected_output": "false", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "madam", "expected_output": "true", "is_hidden": True, "weight": 2.0},
+                    {"input_data": "a", "expected_output": "true", "is_hidden": True, "weight": 2.0},
+                ],
+                "difficulty": "EASY",
+            }
+        ],
+    },
+    "Web Dev": {
+        "MCQ": [
+            {
+                "title": "HTTP Methods & Idempotency",
+                "question": "Which of the following HTTP request methods is defined as idempotent under RFC 9110?",
+                "options": ["POST", "PUT", "PATCH", "CONNECT"],
+                "correct_answer": "PUT",
+                "explanation": "PUT is idempotent: sending identical PUT requests multiple times produces the exact same side-effect as a single request.",
+                "difficulty": "EASY",
+                "topic": "REST Protocols",
+            }
+        ],
+        "CODING": [
+            {
+                "title": "URL Query Parameter Parser",
+                "statement": "Given a URL query string, parse and print the value of parameter 'key'.\nInput format: Line 1: Target key. Line 2: Query string (e.g. user=csm&role=admin&env=prod). Output 'null' if key is missing.",
+                "constraints": "1 <= query_string.length <= 10^4",
+                "examples": [{"input": "role\nuser=csm&role=admin&env=prod", "output": "admin"}],
+                "starter_code": {
+                    "python": "import sys\n\ndef solve():\n    lines = sys.stdin.read().strip().split('\\n')\n    if len(lines) < 2: return\n    target = lines[0].strip()\n    qs = lines[1].strip()\n    params = dict(part.split('=', 1) for part in qs.split('&') if '=' in part)\n    print(params.get(target, 'null'))\n\nif __name__ == '__main__':\n    solve()",
+                },
+                "reference_solution": "import sys\n\ndef solve():\n    lines = sys.stdin.read().strip().split('\\n')\n    if len(lines) < 2: return\n    target = lines[0].strip()\n    qs = lines[1].strip()\n    params = dict(part.split('=', 1) for part in qs.split('&') if '=' in part)\n    print(params.get(target, 'null'))\n\nif __name__ == '__main__':\n    solve()",
+                "test_cases": [
+                    {"input_data": "role\nuser=csm&role=admin&env=prod", "expected_output": "admin", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "token\nuser=csm&role=admin", "expected_output": "null", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "env\napp=trellis&env=production", "expected_output": "production", "is_hidden": True, "weight": 2.0},
+                ],
+                "difficulty": "EASY",
+            }
+        ],
+    },
+    "Cloud": {
+        "MCQ": [
+            {
+                "title": "Kubernetes Ingress & Readiness Probes",
+                "question": "Which Kubernetes health probe determines if a container is ready to begin accepting external network ingress traffic?",
+                "options": ["Liveness Probe", "Readiness Probe", "Startup Probe", "Node Controller Probe"],
+                "correct_answer": "Readiness Probe",
+                "explanation": "When a Readiness Probe fails, the Pod's IP address is removed from the Endpoints of all matching Services.",
+                "difficulty": "EASY",
+                "topic": "Kubernetes",
+            }
+        ],
+        "CODING": [
+            {
+                "title": "Log Severity Filter",
+                "statement": "Given a severity threshold (DEBUG, INFO, WARN, ERROR), print only log lines matching or exceeding that level.\nInput: Line 1: Threshold. Line 2 onwards: Lines starting with [LEVEL].",
+                "constraints": "1 <= total_lines <= 10^3",
+                "examples": [{"input": "WARN\n[INFO] Init\n[WARN] High load\n[ERROR] Crash", "output": "[WARN] High load\n[ERROR] Crash"}],
+                "starter_code": {
+                    "python": "import sys\n\ndef solve():\n    data = sys.stdin.read().strip().split('\\n')\n    if not data or not data[0]: return\n    thresh = data[0].strip().upper()\n    levels = {'DEBUG': 1, 'INFO': 2, 'WARN': 3, 'ERROR': 4}\n    thresh_val = levels.get(thresh, 1)\n    for line in data[1:]:\n        line = line.strip()\n        if not line: continue\n        for lvl, val in levels.items():\n            if line.startswith(f'[{lvl}]') and val >= thresh_val:\n                print(line)\n                break\n\nif __name__ == '__main__':\n    solve()",
+                },
+                "reference_solution": "import sys\n\ndef solve():\n    data = sys.stdin.read().strip().split('\\n')\n    if not data or not data[0]: return\n    thresh = data[0].strip().upper()\n    levels = {'DEBUG': 1, 'INFO': 2, 'WARN': 3, 'ERROR': 4}\n    thresh_val = levels.get(thresh, 1)\n    for line in data[1:]:\n        line = line.strip()\n        if not line: continue\n        for lvl, val in levels.items():\n            if line.startswith(f'[{lvl}]') and val >= thresh_val:\n                print(line)\n                break\n\nif __name__ == '__main__':\n    solve()",
+                "test_cases": [
+                    {"input_data": "WARN\n[INFO] Starting\n[WARN] High memory\n[ERROR] Fatal crash", "expected_output": "[WARN] High memory\n[ERROR] Fatal crash", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "ERROR\n[INFO] Init\n[WARN] Warning only", "expected_output": "", "is_hidden": True, "weight": 2.0},
+                ],
+                "difficulty": "EASY",
+            }
+        ],
+    },
+    "Data Analytics": {
+        "MCQ": [
+            {
+                "title": "Precision vs Recall Trade-off",
+                "question": "In medical disease diagnosis where false negatives must be minimized at all costs, which metric should be prioritized?",
+                "options": ["High Precision", "High Recall (Sensitivity)", "High Specificity", "Low Accuracy"],
+                "correct_answer": "High Recall (Sensitivity)",
+                "explanation": "Recall measures TP / (TP + FN). Maximizing recall ensures that very few positive cases are missed.",
+                "difficulty": "EASY",
+                "topic": "Model Evaluation",
+            }
+        ],
+        "CODING": [
+            {
+                "title": "Moving Average Stream",
+                "statement": "Given window size W and an array of integers, output the moving average of each window formatted to 1 decimal place.\nInput: Line 1: Window size W. Line 2: Space-separated numbers.",
+                "constraints": "1 <= W <= len(numbers) <= 10^4",
+                "examples": [{"input": "3\n1 2 3 4 5", "output": "2.0 3.0 4.0"}],
+                "starter_code": {
+                    "python": "import sys\n\ndef solve():\n    data = sys.stdin.read().strip().split('\\n')\n    if len(data) < 2: return\n    w = int(data[0].strip())\n    nums = list(map(float, data[1].strip().split()))\n    res = []\n    for i in range(len(nums) - w + 1):\n        avg = sum(nums[i:i+w]) / w\n        res.append(f'{avg:.1f}')\n    print(' '.join(res))\n\nif __name__ == '__main__':\n    solve()",
+                },
+                "reference_solution": "import sys\n\ndef solve():\n    data = sys.stdin.read().strip().split('\\n')\n    if len(data) < 2: return\n    w = int(data[0].strip())\n    nums = list(map(float, data[1].strip().split()))\n    res = []\n    for i in range(len(nums) - w + 1):\n        avg = sum(nums[i:i+w]) / w\n        res.append(f'{avg:.1f}')\n    print(' '.join(res))\n\nif __name__ == '__main__':\n    solve()",
+                "test_cases": [
+                    {"input_data": "3\n1 2 3 4 5", "expected_output": "2.0 3.0 4.0", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "2\n10 20 30", "expected_output": "15.0 25.0", "is_hidden": True, "weight": 2.0},
+                ],
+                "difficulty": "EASY",
+            }
+        ],
+    },
+    "Aptitude": {
+        "MCQ": [
+            {
+                "title": "Work & Time Calculation",
+                "question": "A can complete a task in 10 days and B can complete it in 15 days. How many days will they take working together?",
+                "options": ["5 days", "6 days", "8 days", "12 days"],
+                "correct_answer": "6 days",
+                "explanation": "Combined rate = 1/10 + 1/15 = 5/30 = 1/6 of the work per day. Hence, 6 days.",
+                "difficulty": "EASY",
+                "topic": "Quantitative Reasoning",
+            }
+        ],
+        "CODING": [
+            {
+                "title": "Greatest Common Divisor (Euclidean Algorithm)",
+                "statement": "Given two integers a and b, compute and print their Greatest Common Divisor (GCD).\nInput: Two space-separated integers on standard input.",
+                "constraints": "1 <= a, b <= 10^9",
+                "examples": [{"input": "48 18", "output": "6"}],
+                "starter_code": {
+                    "python": "import sys, math\n\ndef solve():\n    raw = sys.stdin.read().strip()\n    if not raw: return\n    a, b = map(int, raw.split())\n    print(math.gcd(a, b))\n\nif __name__ == '__main__':\n    solve()",
+                },
+                "reference_solution": "import sys, math\n\ndef solve():\n    raw = sys.stdin.read().strip()\n    if not raw: return\n    a, b = map(int, raw.split())\n    print(math.gcd(a, b))\n\nif __name__ == '__main__':\n    solve()",
+                "test_cases": [
+                    {"input_data": "48 18", "expected_output": "6", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "100 25", "expected_output": "25", "is_hidden": False, "weight": 1.0},
+                    {"input_data": "17 19", "expected_output": "1", "is_hidden": True, "weight": 2.0},
+                ],
+                "difficulty": "EASY",
+            }
+        ],
+    },
 }
 
 
@@ -289,9 +443,20 @@ def record_practice_attempt(
     earned_score = 0.0
 
     if pq.mode == "MCQ":
-        user_choice = str(answer_payload.get("selected_option", "")).strip()
+        user_choice = str(answer_payload.get("selected_option") or answer_payload.get("answer_text") or "").strip()
         correct_choice = str(pq.question_data_json.get("correct_answer", "")).strip()
-        is_correct = user_choice == correct_choice
+        options = pq.question_data_json.get("options", [])
+        if user_choice.startswith("opt_") and options:
+            try:
+                opt_idx = int(user_choice.split("_")[1])
+                if 0 <= opt_idx < len(options):
+                    chosen_val = str(options[opt_idx]).strip()
+                    is_correct = chosen_val == correct_choice
+            except (ValueError, IndexError):
+                is_correct = user_choice == correct_choice
+        else:
+            is_correct = user_choice == correct_choice
+
         explanation = pq.question_data_json.get("explanation", "")
         if is_correct:
             earned_score = 10.0
@@ -300,7 +465,7 @@ def record_practice_attempt(
             feedback = f"Incorrect. The correct answer is '{correct_choice}'. {explanation}"
 
     elif pq.mode == "CODING":
-        user_code = str(answer_payload.get("code", ""))
+        user_code = str(answer_payload.get("code") or answer_payload.get("source_code") or "")
         language = str(answer_payload.get("language", "python"))
         test_cases = pq.question_data_json.get("test_cases", [])
         exec_res = CodeRunner.execute(

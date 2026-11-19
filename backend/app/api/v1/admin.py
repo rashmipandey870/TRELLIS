@@ -181,6 +181,23 @@ def toggle_user_active(
     return {"id": target.id, "is_active": target.is_active}
 
 
+@router.delete("/users/{user_id}", summary="Deactivate user by ID")
+def deactivate_user_by_delete(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    if user_id == admin.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Admins cannot deactivate themselves.")
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    target.is_active = False
+    db.commit()
+    return {"status": "deactivated", "id": target.id}
+
+
 @router.post("/users/bulk-import", summary="Bulk import users via CSV content")
 def bulk_import_users(
     payload: BulkImportRequest,
@@ -330,6 +347,58 @@ def assign_batch_members(
 
     db.commit()
     return {"message": "Assignments updated successfully.", "assignments_count": assignments_created}
+
+
+class AssignMentorRequest(BaseModel):
+    mentor_id: str
+
+
+@router.post("/batches/{batch_id}/assign-mentor", summary="Assign dedicated mentor to batch")
+def assign_mentor_to_batch(
+    batch_id: str,
+    payload: AssignMentorRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    batch = db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found.")
+
+    assignment = MentorLearnerAssignment(
+        mentor_id=payload.mentor_id,
+        learner_id=None,
+        batch_id=batch.id,
+    )
+    db.add(assignment)
+    db.commit()
+    return {"message": "Mentor assigned to batch successfully."}
+
+
+class AssignLearnerRequest(BaseModel):
+    learner_id: str
+
+
+@router.post("/batches/{batch_id}/assign-learner", summary="Assign learner to batch")
+def assign_learner_to_batch(
+    batch_id: str,
+    payload: AssignLearnerRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    batch = db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found.")
+
+    assignment = MentorLearnerAssignment(
+        mentor_id=None,
+        learner_id=payload.learner_id,
+        batch_id=batch.id,
+    )
+    db.add(assignment)
+    db.commit()
+    return {"message": "Learner assigned to batch successfully."}
 
 
 # --- Learner Directory & Detail Endpoints ---
@@ -631,3 +700,47 @@ def update_system_setting(
 
     db.commit()
     return {"message": "Setting saved.", "key": setting.key, "value": setting.value_json}
+
+
+@router.get("/settings", summary="List system settings")
+def list_system_settings(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[dict[str, Any]]:
+    settings = db.execute(select(SystemSetting)).scalars().all()
+    if not settings:
+        return [
+            {"key": "TALENT_SPOTLIGHT_ACTIVE_DAYS", "value": "10"},
+            {"key": "TALENT_SPOTLIGHT_ACCURACY", "value": "70"},
+            {"key": "TALENT_SPOTLIGHT_PROBLEMS", "value": "15"},
+            {"key": "ALERT_COOLDOWN_DAYS", "value": "7"},
+        ]
+    return [{"key": s.key, "value": s.value_json} for s in settings]
+
+
+class SettingUpdatePayload(BaseModel):
+    value: Any
+
+
+@router.put("/settings/{key}", summary="Update system setting by key")
+def update_setting_by_key(
+    key: str,
+    payload: SettingUpdatePayload,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    setting = db.execute(select(SystemSetting).where(SystemSetting.key == key)).scalar_one_or_none()
+    if not setting:
+        setting = SystemSetting(
+            key=key,
+            value_json=payload.value,
+            updated_by_id=admin.id,
+        )
+        db.add(setting)
+    else:
+        setting.value_json = payload.value
+        setting.updated_by_id = admin.id
+
+    db.commit()
+    return {"message": "Setting updated.", "key": key, "value": payload.value}
