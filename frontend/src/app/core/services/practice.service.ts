@@ -15,11 +15,13 @@ export interface GeneratedPracticeQuestion {
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   question_type: 'MCQ' | 'CODING';
   mode?: 'MCQ' | 'CODING';
+  source?: 'llm' | 'template' | string;
   title: string;
   content: string;
   options?: Array<{ id: string; option_text: string }>;
   hints?: string[];
   explanation?: string;
+  correct_answer?: string;
   starter_code?: Record<string, string>;
   constraints?: string;
   sample_cases?: Array<{ input: string; output: string }>;

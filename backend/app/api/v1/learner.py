@@ -22,6 +22,7 @@ from app.models.assessments import (
     Answer,
     Assessment,
     AssessmentAttempt,
+    AssessmentAudience,
     AssessmentQuestion,
     CodingProblem,
     McqOption,
@@ -228,6 +229,153 @@ END:VCALENDAR"""
     )
 
 
+def verify_learner_assessment_access(
+    db: Session,
+    learner: User,
+    assessment: Assessment | None,
+    check_window: bool = True,
+) -> None:
+    if not assessment or assessment.status != "PUBLISHED":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not available.")
+
+    if check_window:
+        now = datetime.now(UTC)
+        if assessment.start_window:
+            start_win = assessment.start_window if assessment.start_window.tzinfo else assessment.start_window.replace(tzinfo=UTC)
+            if now < start_win:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assessment window has not opened yet.")
+        if assessment.end_window:
+            end_win = assessment.end_window if assessment.end_window.tzinfo else assessment.end_window.replace(tzinfo=UTC)
+            if now > end_win:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assessment window has closed.")
+
+    # Audience check:
+    # 1. explicit learner audience
+    is_in_audience = db.execute(
+        select(AssessmentAudience.id).where(
+            AssessmentAudience.assessment_id == assessment.id,
+            AssessmentAudience.learner_id == learner.id,
+        )
+    ).first() is not None
+    if is_in_audience:
+        return
+
+    # 2. batch assignment
+    if assessment.batch_id:
+        is_in_batch = db.execute(
+            select(MentorLearnerAssignment.id).where(
+                MentorLearnerAssignment.learner_id == learner.id,
+                MentorLearnerAssignment.batch_id == assessment.batch_id,
+            )
+        ).first() is not None
+        if is_in_batch:
+            return
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not assigned to you.")
+
+    # 3. no batch_id: if any explicit audience was assigned to this assessment, reject other learners
+    has_explicit_audience = db.execute(
+        select(AssessmentAudience.id).where(AssessmentAudience.assessment_id == assessment.id)
+    ).first() is not None
+    if has_explicit_audience:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not assigned to you.")
+
+
+def check_attempt_timer(db: Session, attempt: AssessmentAttempt, assessment: Assessment) -> None:
+    start_time = attempt.start_time
+    if not start_time.tzinfo:
+        start_time = start_time.replace(tzinfo=UTC)
+    time_limit = start_time + timedelta(minutes=assessment.duration_minutes, seconds=60)
+    now = datetime.now(UTC)
+    if now > time_limit:
+        attempt.status = "EXPIRED"
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assessment time limit has expired. Submission rejected.",
+        )
+
+
+def _execute_assessment_submit(
+    attempt: AssessmentAttempt,
+    answers: dict[str, Any],
+    tab_switches: int,
+    db: Session,
+    learner: User,
+) -> dict[str, Any]:
+    if attempt.status == "SUBMITTED":
+        return {"message": "Already submitted.", "score": attempt.score, "passed": attempt.passed}
+
+    assessment = attempt.assessment
+    verify_learner_assessment_access(db, learner, assessment, check_window=False)
+    check_attempt_timer(db, attempt, assessment)
+
+    earned_score = 0.0
+
+    for aq in assessment.questions:
+        bq = aq.question
+        user_ans = answers.get(bq.id) or answers.get(str(bq.id)) or {}
+
+        if bq.question_type == "MCQ":
+            selected_ids = user_ans.get("selected_options", [])
+            correct_opts = [o.id for o in bq.options if o.is_correct]
+            is_correct = bool(selected_ids) and set(selected_ids) == set(correct_opts)
+            q_score = aq.marks if is_correct else 0.0
+            earned_score += q_score
+
+            ans = Answer(
+                attempt_id=attempt.id,
+                bank_question_id=bq.id,
+                selected_option_ids_json=selected_ids,
+                score_awarded=q_score,
+            )
+            db.add(ans)
+
+        elif bq.question_type == "CODING" and bq.coding_problem:
+            cp = bq.coding_problem
+            best_sub = (
+                db.execute(
+                    select(Submission)
+                    .where(
+                        Submission.attempt_id == attempt.id,
+                        Submission.coding_problem_id == cp.id,
+                    )
+                    .order_by(Submission.score.desc())
+                )
+                .scalars()
+                .first()
+            )
+            q_score = 0.0
+            if best_sub and best_sub.score is not None:
+                # best_sub.score is percentage 0.0-100.0
+                q_score = (best_sub.score / 100.0) * aq.marks
+            earned_score += q_score
+
+            ans = Answer(
+                attempt_id=attempt.id,
+                bank_question_id=bq.id,
+                score_awarded=q_score,
+            )
+            db.add(ans)
+
+    total_marks = attempt.total_marks or sum(q.marks for q in assessment.questions) or 100.0
+    percentage = (earned_score / total_marks) * 100.0 if total_marks > 0 else 0.0
+
+    attempt.score = earned_score
+    attempt.passed = percentage >= assessment.passing_score
+    attempt.status = "SUBMITTED"
+    attempt.submit_time = datetime.now(UTC)
+    attempt.tab_switch_count = tab_switches
+    db.commit()
+
+    return {
+        "attempt_id": attempt.id,
+        "score": attempt.score,
+        "total_marks": attempt.total_marks,
+        "passed": attempt.passed,
+        "status": attempt.status,
+    }
+
+
 # --- My Assessments: Timed, Autosaved, Tab-Switch Monitored ---
 @router.get("/assessments", summary="List assessments assigned to learner")
 def list_learner_assessments(
@@ -242,26 +390,31 @@ def list_learner_assessments(
         .scalars()
         .first()
     )
-    batch_id = batch_assignment.batch_id if batch_assignment else None
+    learner_batch_id = batch_assignment.batch_id if batch_assignment else None
 
-    query = select(Assessment).where(Assessment.status == "PUBLISHED")
-    if batch_id:
-        query = query.where((Assessment.batch_id == batch_id) | (Assessment.batch_id.is_(None)))
+    # Explicit audience assessment ids
+    audience_assessment_ids = set(
+        db.execute(
+            select(AssessmentAudience.assessment_id).where(AssessmentAudience.learner_id == learner.id)
+        ).scalars().all()
+    )
 
-    assessments = db.execute(query).scalars().all()
-    if not assessments:
-        # Provide pre-seeded assessment if none published
-        return [
-            {
-                "id": "a1",
-                "title": "Full-Stack Foundation Assessment",
-                "field": "Python & Web Architecture",
-                "duration_minutes": 60,
-                "passing_score": 75,
-                "instructions": "Proctored timed assessment. Auto-submit will trigger when timer expires.",
-                "questions_count": 4,
-            }
-        ]
+    published = db.execute(
+        select(Assessment).where(Assessment.status == "PUBLISHED")
+    ).scalars().all()
+
+    assigned_assessments = []
+    for a in published:
+        if a.id in audience_assessment_ids:
+            assigned_assessments.append(a)
+        elif a.batch_id and a.batch_id == learner_batch_id:
+            assigned_assessments.append(a)
+        elif not a.batch_id:
+            has_audience = db.execute(
+                select(AssessmentAudience.id).where(AssessmentAudience.assessment_id == a.id)
+            ).first() is not None
+            if not has_audience:
+                assigned_assessments.append(a)
 
     return [
         {
@@ -273,7 +426,7 @@ def list_learner_assessments(
             "instructions": a.instructions,
             "questions_count": len(a.questions),
         }
-        for a in assessments
+        for a in assigned_assessments
     ]
 
 
@@ -285,8 +438,7 @@ def start_assessment(
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     assessment = db.get(Assessment, assessment_id)
-    if not assessment or assessment.status != "PUBLISHED":
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not available.")
+    verify_learner_assessment_access(db, learner, assessment, check_window=True)
 
     # Find or initialize attempt
     attempt = (
@@ -300,8 +452,12 @@ def start_assessment(
         .first()
     )
 
-    if attempt and attempt.status == "SUBMITTED":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this assessment.")
+    if attempt:
+        if attempt.status == "SUBMITTED":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have already submitted this assessment.")
+        if attempt.status == "EXPIRED":
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Assessment time limit has expired.")
+        check_attempt_timer(db, attempt, assessment)
 
     if not attempt:
         # Calculate total marks
@@ -319,7 +475,8 @@ def start_assessment(
         db.refresh(attempt)
 
     # Calculate remaining seconds
-    elapsed = (datetime.now(UTC) - attempt.start_time.replace(tzinfo=UTC)).total_seconds()
+    start_dt = attempt.start_time if attempt.start_time.tzinfo else attempt.start_time.replace(tzinfo=UTC)
+    elapsed = (datetime.now(UTC) - start_dt).total_seconds()
     total_allowed = assessment.duration_minutes * 60
     remaining_seconds = max(0, int(total_allowed - elapsed))
 
@@ -379,6 +536,9 @@ def autosave_assessment(
     learner: User = Depends(require_learner),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    verify_learner_assessment_access(db, learner, assessment, check_window=False)
+
     attempt = (
         db.execute(
             select(AssessmentAttempt).where(
@@ -392,6 +552,8 @@ def autosave_assessment(
     )
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active attempt found.")
+
+    check_attempt_timer(db, attempt, assessment)
 
     attempt.autosave_state_json = payload.answers
     attempt.tab_switch_count = payload.tab_switches
@@ -420,49 +582,13 @@ def submit_assessment(
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
 
-    if attempt.status == "SUBMITTED":
-        return {"message": "Already submitted.", "score": attempt.score, "passed": attempt.passed}
-
-    assessment = attempt.assessment
-    earned_score = 0.0
-
-    # Grade MCQ answers
-    for aq in assessment.questions:
-        bq = aq.question
-        user_ans = payload.answers.get(bq.id)
-        if not user_ans:
-            continue
-
-        if bq.question_type == "MCQ":
-            selected_ids = user_ans.get("selected_options", [])
-            # Find correct option IDs
-            correct_opts = [o.id for o in bq.options if o.is_correct]
-            is_correct = set(selected_ids) == set(correct_opts)
-            q_score = aq.marks if is_correct else 0.0
-            earned_score += q_score
-
-            ans = Answer(
-                attempt_id=attempt.id,
-                bank_question_id=bq.id,
-                selected_option_ids_json=selected_ids,
-                score_awarded=q_score,
-            )
-            db.add(ans)
-
-    attempt.score = earned_score
-    attempt.passed = earned_score >= assessment.passing_score
-    attempt.status = "SUBMITTED"
-    attempt.submit_time = datetime.now(UTC)
-    attempt.tab_switch_count = payload.tab_switches
-    db.commit()
-
-    return {
-        "attempt_id": attempt.id,
-        "score": attempt.score,
-        "total_marks": attempt.total_marks,
-        "passed": attempt.passed,
-        "status": attempt.status,
-    }
+    return _execute_assessment_submit(
+        attempt=attempt,
+        answers=payload.answers,
+        tab_switches=payload.tab_switches,
+        db=db,
+        learner=learner,
+    )
 
 
 # --- My Results Review ---
@@ -472,6 +598,9 @@ def get_assessment_result(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    verify_learner_assessment_access(db, learner, assessment, check_window=False)
+
     attempt = (
         db.execute(
             select(AssessmentAttempt).where(
@@ -485,8 +614,6 @@ def get_assessment_result(
     )
     if not attempt:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No completed attempt found.")
-
-    assessment = attempt.assessment
 
     # Compute batch average
     batch_avg = (
@@ -555,6 +682,12 @@ def save_attempt_answer(
     if not attempt or attempt.learner_id != learner.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
 
+    if attempt.status != "IN_PROGRESS":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Attempt is not in progress.")
+
+    verify_learner_assessment_access(db, learner, attempt.assessment, check_window=False)
+    check_attempt_timer(db, attempt, attempt.assessment)
+
     answers = dict(attempt.autosave_state_json or {})
     answers[payload.question_id] = payload.answer_data
     attempt.autosave_state_json = answers
@@ -578,9 +711,10 @@ def submit_attempt_by_id(
     if not attempt or attempt.learner_id != learner.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
 
-    return submit_assessment(
-        assessment_id=attempt.assessment_id,
-        payload=SubmitAssessmentRequest(answers=attempt.autosave_state_json or {}, tab_switches=payload.tab_switches),
+    return _execute_assessment_submit(
+        attempt=attempt,
+        answers=attempt.autosave_state_json or {},
+        tab_switches=payload.tab_switches,
         db=db,
         learner=learner,
     )
@@ -602,46 +736,7 @@ def list_learner_results(
     )
 
     if not attempts:
-        # Pre-seed realistic result so Results page has rich feedback
-        return [
-            {
-                "id": "res1",
-                "assessment_id": "a1",
-                "assessment_title": "Full-Stack Foundation Assessment",
-                "field": "Python & Web Architecture",
-                "score": 94,
-                "batch_avg": 81,
-                "passing_score": 75,
-                "passed": true,
-                "submitted_at": "2026-11-16T10:30:00Z",
-                "questions": [
-                    {
-                        "id": "q1",
-                        "title": "Q1: FastAPI Concurrency Paradigms",
-                        "correct": True,
-                        "earned_marks": 10,
-                        "max_marks": 10,
-                        "explanation": "Offloading compute-bound operations to process pools prevents event loop starvation in asynchronous frameworks.",
-                    },
-                    {
-                        "id": "q2",
-                        "title": "Q2: Two Sum Hash Map",
-                        "correct": True,
-                        "earned_marks": 20,
-                        "max_marks": 20,
-                        "explanation": "Hash map single-pass lookup achieves optimal O(N) time and O(N) space complexity.",
-                    },
-                    {
-                        "id": "q3",
-                        "title": "Q3: SQL Composite Indexing",
-                        "correct": True,
-                        "earned_marks": 10,
-                        "max_marks": 10,
-                        "explanation": "Placing equality filter columns first enables B-Tree prefix search efficiency.",
-                    },
-                ],
-            }
-        ]
+        return []
 
     results = []
     for a in attempts:

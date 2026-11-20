@@ -119,18 +119,7 @@ def can(
 
     has_explicit_allow = False
 
-    expanded_roles: list[str] = []
-    for r in subject.roles:
-        if r not in expanded_roles:
-            expanded_roles.append(r)
-        if r == "LEARNER" and "EMPLOYEE" not in expanded_roles:
-            expanded_roles.append("EMPLOYEE")
-        elif r == "MENTOR" and "TRAINER_MENTOR" not in expanded_roles:
-            expanded_roles.append("TRAINER_MENTOR")
-        elif r == "ADMIN" and "LK_ADMIN" not in expanded_roles:
-            expanded_roles.append("LK_ADMIN")
-
-    for role in expanded_roles:
+    for role in subject.roles:
         grant = action_rules.get(role)
         if not grant:
             continue
@@ -304,7 +293,7 @@ def require_permission(action: str, resource: str) -> Any:
         user_ctx = UserContext(
             user_id=claims.get("sub", ""),
             org_id=claims.get("org_id", ""),
-            roles=claims.get("roles", ["EMPLOYEE"]),
+            roles=claims.get("roles", ["LEARNER"]),
         )
 
         resource_id = request.path_params.get("id") or request.path_params.get("user_id")

@@ -4,6 +4,7 @@ from app.models.assessments import (
     Answer,
     Assessment,
     AssessmentAttempt,
+    AssessmentAudience,
     AssessmentQuestion,
     CodingProblem,
     McqOption,

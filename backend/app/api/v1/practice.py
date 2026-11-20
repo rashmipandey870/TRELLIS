@@ -1,15 +1,18 @@
-"""TRELLIS AI Practice & Role-Guarded LLM Assistant API Router (Step 6).
+"""TRELLIS AI Practice & Role-Guarded LLM Assistant API Router (Step 6 / Phase 4).
 
 Provides:
 - GET /fields: List supported practice fields
-- POST /generate: Adaptive AI practice problem generation (sandbox-verified)
-- POST /submit & POST /attempt: Practice attempt evaluation & dedication score updating
-- GET /scores & GET /dedication: Dedication scores and streak stats across fields
-- POST /assistant: Real LLM assistant with role awareness and data guardrails
+- POST /generate: Adaptive AI practice problem generation (sandbox-verified, rate limited 20/hr, source tagged, no answer leak)
+- POST /submit & POST /attempt: Practice attempt evaluation, explanation return, & dedication score updating
+- GET /scores & GET /dedication: Dedication scores and streak stats across fields (empty list if no attempts, no fake data)
+- POST /assistant: Real LLM assistant with role awareness and data guardrails (rate limited 30/hr, server-side context)
 """
 
 from __future__ import annotations
 
+import threading
+import time
+from collections import defaultdict
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,11 +21,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_db, get_uow
+from app.core.config import settings
 from app.models.assessments import Assessment, AssessmentAttempt
 from app.models.batches import MentorLearnerAssignment
-from app.models.meetings import Meeting
-from app.models.practice import PracticeAttempt, PracticeQuestion, PracticeScore
+from app.models.meetings import Meeting, MeetingAudience
+from app.models.practice import PracticeAttempt, PracticeQuestion, PracticeScore, TalentAlert
 from app.models.user import User
+from app.services.ai_question_generator import call_llm_text
 from app.services.practice_service import (
     SUPPORTED_FIELDS,
     generate_practice_question,
@@ -30,6 +35,29 @@ from app.services.practice_service import (
 )
 
 router = APIRouter(prefix="/practice", tags=["AI Practice"])
+
+# Rate limiting sliding windows
+_GENERATE_LIMIT = 20  # per hour
+_ASSISTANT_LIMIT = 30  # per hour
+_WINDOW_SECONDS = 3600
+
+_rate_limit_lock = threading.Lock()
+_user_generate_timestamps: dict[str, list[float]] = defaultdict(list)
+_user_assistant_timestamps: dict[str, list[float]] = defaultdict(list)
+
+
+def _check_rate_limit(user_id: str, bucket: dict[str, list[float]], max_requests: int) -> None:
+    now = time.time()
+    with _rate_limit_lock:
+        window_start = now - _WINDOW_SECONDS
+        timestamps = [t for t in bucket[user_id] if t > window_start]
+        if len(timestamps) >= max_requests:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded. Maximum {max_requests} requests per hour allowed.",
+            )
+        timestamps.append(now)
+        bucket[user_id] = timestamps
 
 
 class GenerateQuestionRequest(BaseModel):
@@ -67,6 +95,7 @@ def generate_question(
     user: User = Depends(get_current_user),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    _check_rate_limit(user.id, _user_generate_timestamps, _GENERATE_LIMIT)
     try:
         chosen_mode = (payload.mode or payload.question_type or "MCQ").upper()
         if chosen_mode not in {"MCQ", "CODING"}:
@@ -103,6 +132,9 @@ def generate_question(
             else None
         )
 
+        source_label = data.get("source", "template")
+
+        # Explicitly omit 'explanation' and 'correct_answer' from generation response
         return {
             "id": pq.id,
             "question_id": pq.id,
@@ -112,6 +144,7 @@ def generate_question(
             "question_type": pq.mode,
             "title": pq.title,
             "content": data.get("question") or data.get("statement") or "",
+            "source": source_label,
             "hints": data.get(
                 "hints",
                 [
@@ -119,7 +152,6 @@ def generate_question(
                     "Verify behavior on boundary values and empty collections.",
                 ],
             ),
-            "explanation": data.get("explanation"),
             "options": formatted_options,
             "constraints": data.get("constraints"),
             "examples": data.get("examples"),
@@ -127,13 +159,16 @@ def generate_question(
             "sample_cases": sample_cases,
             "question_data": {
                 "question": data.get("question") or data.get("statement"),
-                "options": data.get("options") if pq.mode == "MCQ" else None,
+                "options": formatted_options if pq.mode == "MCQ" else None,
                 "constraints": data.get("constraints"),
                 "examples": data.get("examples"),
                 "starter_code": data.get("starter_code"),
                 "sample_cases": sample_cases,
+                "source": source_label,
             },
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)) from e
 
@@ -159,6 +194,12 @@ def _handle_submission(
             answer_payload=ans_dict,
             hints_used=payload.hints_used,
         )
+
+        pq = db.get(PracticeQuestion, payload.question_id)
+        pq_data = pq.question_data_json if pq else {}
+        correct_answer = pq_data.get("correct_answer")
+        explanation = pq_data.get("explanation") or attempt.ai_feedback
+
         return {
             "attempt_id": attempt.id,
             "is_correct": attempt.is_correct,
@@ -166,7 +207,8 @@ def _handle_submission(
             "score": attempt.score,
             "score_delta": attempt.score,
             "feedback": attempt.ai_feedback,
-            "explanation": attempt.ai_feedback,
+            "explanation": explanation,
+            "correct_answer": correct_answer,
             "complexity_feedback": "Time complexity: O(N) amortized. Space complexity: O(1). Passes all enterprise verification checks.",
             "dedication_score": p_score.dedication_score,
             "current_streak": p_score.streak_days,
@@ -202,24 +244,7 @@ def attempt_practice(
 def _serialize_scores(db: Session, user: User) -> list[dict[str, Any]]:
     scores = db.execute(select(PracticeScore).where(PracticeScore.learner_id == user.id)).scalars().all()
     if not scores:
-        # Provide default score row so UI displays active tracking immediately
-        return [
-            {
-                "field": f,
-                "dedication_score": 85 if f == "Python" else (80 if f == "SQL" else 70),
-                "active_days": 14 if f == "Python" else (10 if f == "SQL" else 5),
-                "active_days_30d": 14 if f == "Python" else (10 if f == "SQL" else 5),
-                "streak_days": user.streak_days or 14,
-                "problems_attempted": 18 if f == "Python" else (12 if f == "SQL" else 6),
-                "problems_solved": 16 if f == "Python" else (10 if f == "SQL" else 5),
-                "acceptance_rate": 88.0,
-                "weighted_accuracy": 88.0 if f == "Python" else 80.0,
-                "trend": "UP",
-                "talent_spotlight_qualified": f == "Python",
-                "last_practiced_at": None,
-            }
-            for f in ["Python", "SQL", "DSA"]
-        ]
+        return []
 
     return [
         {
@@ -264,6 +289,7 @@ def chat_with_assistant(
     user: User = Depends(get_current_user),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    _check_rate_limit(user.id, _user_assistant_timestamps, _ASSISTANT_LIMIT)
     role = (user.role or "LEARNER").upper()
     query_raw = payload.query or payload.message or "Help"
     query_text = query_raw.lower().strip()
@@ -271,7 +297,16 @@ def chat_with_assistant(
     # Guardrails enforcement based on user role
     if role == "LEARNER":
         # Block unauthorized queries trying to inspect other learners or admin records
-        prohibited_terms = ["all users", "all learners", "department stats", "other learners", "admin settings", "salary"]
+        prohibited_terms = [
+            "all users",
+            "all learners",
+            "department stats",
+            "other learners",
+            "other students",
+            "admin settings",
+            "salary",
+            "financials",
+        ]
         if any(term in query_text for term in prohibited_terms):
             msg = "Access Restricted: As a Learner, you may only query your own schedule, scores, weak topics, and practice metrics."
             return {
@@ -281,23 +316,53 @@ def chat_with_assistant(
                 "scope": "OWN_DATA_ONLY",
             }
 
-        # Query user-specific data
+        # Query user-specific data from real DB (no fake data)
         attempts = db.execute(select(AssessmentAttempt).where(AssessmentAttempt.learner_id == user.id)).scalars().all()
         avg_score = (sum(a.score for a in attempts) / len(attempts)) if attempts else 0.0
         scores = db.execute(select(PracticeScore).where(PracticeScore.learner_id == user.id)).scalars().all()
-        best_field = max(scores, key=lambda s: s.dedication_score).field if scores else "Python"
-
-        content = (
-            f"Hello {user.full_name}! Here is a summary of your learning progress:\n\n"
-            f"- Assessments completed: {len(attempts)} (Average score: {round(avg_score, 1)}%)\n"
-            f"- Strongest practice field: {best_field}\n"
-            f"- Practice streak: {user.streak_days or 14} days\n\n"
-            "Tip: Consistent daily practice sessions in the AI Practice Lab maintain your streak and trigger Talent Spotlight qualification!"
+        best_field = max(scores, key=lambda s: s.dedication_score).field if scores else "None"
+        upcoming_meetings = (
+            db.execute(
+                select(func.count(Meeting.id))
+                .join(MeetingAudience, Meeting.id == MeetingAudience.meeting_id)
+                .where(MeetingAudience.learner_id == user.id, Meeting.status == "SCHEDULED")
+            ).scalar()
+            or 0
         )
+
+        context_summary = (
+            f"User: {user.full_name} (Role: Learner)\n"
+            f"Assessments completed: {len(attempts)}\n"
+            f"Average score across attempts: {round(avg_score, 1)}%\n"
+            f"Active practice fields: {len(scores)}\n"
+            f"Top practice field: {best_field}\n"
+            f"Practice streak: {user.streak_days or 0} days\n"
+            f"Upcoming mentoring sessions: {upcoming_meetings}"
+        )
+
+        llm_prompt = (
+            "You are TRELLIS AI, an assistant for an enterprise learning platform.\n"
+            f"Context about the current learner (ONLY answer based on this context and learning advice):\n"
+            f"{context_summary}\n\n"
+            f"Learner question: {query_raw}\n"
+            "Provide a helpful, encouraging, and accurate response based strictly on their progress."
+        )
+
+        llm_reply = call_llm_text(llm_prompt)
+        if not llm_reply:
+            llm_reply = (
+                f"Hello {user.full_name}! Here is your current progress summary:\n\n"
+                f"- Assessments completed: {len(attempts)} (Average score: {round(avg_score, 1)}%)\n"
+                f"- Strongest practice field: {best_field}\n"
+                f"- Current streak: {user.streak_days or 0} days\n"
+                f"- Upcoming mentoring sessions: {upcoming_meetings}\n\n"
+                "Tip: Consistent daily practice sessions in the AI Practice Lab maintain your streak and trigger Talent Spotlight qualification!"
+            )
+
         return {
             "role": "assistant",
-            "reply": content,
-            "content": content,
+            "reply": llm_reply,
+            "content": llm_reply,
             "suggested_actions": [
                 {"label": "My Assessments", "action": "NAVIGATE", "target": "/learner/assessments"},
                 {"label": "AI Practice Lab", "action": "NAVIGATE", "target": "/learner/practice"},
@@ -306,7 +371,7 @@ def chat_with_assistant(
         }
 
     elif role == "MENTOR":
-        prohibited_terms = ["create user", "delete user", "all mentors", "super admin", "financials"]
+        prohibited_terms = ["create user", "delete user", "all mentors", "super admin", "financials", "salary"]
         if any(term in query_text for term in prohibited_terms):
             msg = "Access Restricted: Mentors may query their assigned learners, meetings, and assessments only."
             return {
@@ -332,17 +397,44 @@ def chat_with_assistant(
             ).scalar()
             or 0
         )
-
-        content = (
-            f"Welcome Mentor {user.full_name}!\n\n"
-            f"- Assigned learners: {assigned_count or 3} in your cohorts\n"
-            f"- Upcoming scheduled mentoring sessions: {meetings_count or 1}\n\n"
-            "You can manage sessions in Meeting Scheduler, author MCQ & Coding tests in Assessment Studio, and act on Talent Spotlight alerts."
+        pending_alerts = (
+            db.execute(
+                select(func.count(TalentAlert.id))
+                .join(MentorLearnerAssignment, TalentAlert.learner_id == MentorLearnerAssignment.learner_id)
+                .where(MentorLearnerAssignment.mentor_id == user.id, TalentAlert.status == "PENDING")
+            ).scalar()
+            or 0
         )
+
+        context_summary = (
+            f"User: {user.full_name} (Role: Mentor)\n"
+            f"Assigned learners in cohort: {assigned_count}\n"
+            f"Upcoming scheduled mentoring sessions: {meetings_count}\n"
+            f"Pending Talent Spotlight alerts: {pending_alerts}"
+        )
+
+        llm_prompt = (
+            "You are TRELLIS AI, an assistant for an enterprise learning platform.\n"
+            f"Context about the mentor's cohorts (ONLY answer based on this context and mentoring guidance):\n"
+            f"{context_summary}\n\n"
+            f"Mentor question: {query_raw}\n"
+            "Provide a concise, professional response to assist the mentor."
+        )
+
+        llm_reply = call_llm_text(llm_prompt)
+        if not llm_reply:
+            llm_reply = (
+                f"Welcome Mentor {user.full_name}!\n\n"
+                f"- Assigned learners: {assigned_count} in your cohorts\n"
+                f"- Upcoming scheduled mentoring sessions: {meetings_count}\n"
+                f"- Pending Talent Spotlight alerts: {pending_alerts}\n\n"
+                "You can manage sessions in Meeting Scheduler, author MCQ & Coding tests in Assessment Studio, and act on Talent Spotlight alerts."
+            )
+
         return {
             "role": "assistant",
-            "reply": content,
-            "content": content,
+            "reply": llm_reply,
+            "content": llm_reply,
             "suggested_actions": [
                 {"label": "Schedule Meeting", "action": "NAVIGATE", "target": "/mentor/meetings"},
                 {"label": "Review Talent Alerts", "action": "NAVIGATE", "target": "/mentor/spotlight"},
@@ -353,18 +445,37 @@ def chat_with_assistant(
     elif role == "ADMIN":
         total_learners = db.execute(select(func.count(User.id)).where(User.role == "LEARNER")).scalar() or 0
         total_mentors = db.execute(select(func.count(User.id)).where(User.role == "MENTOR")).scalar() or 0
+        total_assessments = db.execute(select(func.count(Assessment.id))).scalar() or 0
 
-        content = (
-            f"Administrator Governance Overview for {user.full_name}:\n\n"
-            f"- Total registered learners: {total_learners or 6}\n"
-            f"- Active mentors: {total_mentors or 2}\n"
-            "- Cohorts: Batch Alpha & Batch Beta\n\n"
-            "You have platform-wide governance access: user provisioning, batch allocation, global threshold configuration, and Talent Spotlight oversight."
+        context_summary = (
+            f"User: {user.full_name} (Role: Administrator)\n"
+            f"Total registered learners: {total_learners}\n"
+            f"Active mentors: {total_mentors}\n"
+            f"Total assessments in system: {total_assessments}"
         )
+
+        llm_prompt = (
+            "You are TRELLIS AI, an assistant for an enterprise learning platform.\n"
+            f"Context for the platform administrator:\n"
+            f"{context_summary}\n\n"
+            f"Admin question: {query_raw}\n"
+            "Provide a concise, executive-level summary and response."
+        )
+
+        llm_reply = call_llm_text(llm_prompt)
+        if not llm_reply:
+            llm_reply = (
+                f"Administrator Governance Overview for {user.full_name}:\n\n"
+                f"- Total registered learners: {total_learners}\n"
+                f"- Active mentors: {total_mentors}\n"
+                f"- Total assessments in system: {total_assessments}\n\n"
+                "You have platform-wide governance access: user provisioning, batch allocation, global threshold configuration, and Talent Spotlight oversight."
+            )
+
         return {
             "role": "assistant",
-            "reply": content,
-            "content": content,
+            "reply": llm_reply,
+            "content": llm_reply,
             "suggested_actions": [
                 {"label": "Department Dashboard", "action": "NAVIGATE", "target": "/admin/dashboard"},
                 {"label": "User Management", "action": "NAVIGATE", "target": "/admin/users"},
@@ -372,4 +483,8 @@ def chat_with_assistant(
             "scope": "ORGANIZATION",
         }
 
-    return {"role": "assistant", "reply": "I am here to help you navigate TRELLIS.", "content": "I am here to help you navigate TRELLIS."}
+    return {
+        "role": "assistant",
+        "reply": "I am here to help you navigate TRELLIS.",
+        "content": "I am here to help you navigate TRELLIS.",
+    }

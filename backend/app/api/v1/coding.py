@@ -1,27 +1,140 @@
-"""TRELLIS LeetCode-style Coding Environment Endpoints (Step 5).
+"""TRELLIS LeetCode-style Coding Environment Endpoints (Step 5 & Security Hardening).
 
-Provides:
-- GET /problems/{problem_id}: Problem statement, constraints, starter codes, visible test cases
-- POST /run: Executes sample cases and custom input box inside CodeRunner sandbox
-- POST /submit: Executes all test cases (sample + hidden), records Submission, computes runtime percentile
-- GET /submissions/{problem_id}: Historical submissions and analysis
+Enforces:
+1. Role-guarded access: require_learner for run/submit, require_role for problem views.
+2. Learner boundary enforcement: only problems in caller's active assessment attempt
+   or caller's generated practice sessions may be opened, executed, or submitted.
+3. Validate attempt_id: must belong to the caller and be IN_PROGRESS.
+4. Custom input: reports program output without a pass/fail verdict.
+5. Runtime percentile: computed only for ACCEPTED submissions; returns null if no history.
+6. Per-user execution rate limits and global concurrency limit with queue.
 """
 
 from __future__ import annotations
 
+import threading
+import time
+from collections import defaultdict
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_db, get_uow
-from app.models.assessments import CodingProblem, Submission, TestCase
+from app.api.deps import get_db, get_uow, require_learner, require_role
+from app.models.assessments import (
+    AssessmentAttempt,
+    AssessmentQuestion,
+    CodingProblem,
+    Submission,
+    TestCase,
+)
+from app.models.practice import PracticeQuestion, PracticeSession
 from app.models.user import User
 from app.services.code_runner import CodeRunner
 
 router = APIRouter(prefix="/coding", tags=["Coding Environment"])
+
+# Per-user execution rate limiter: max 30 runs/submits per minute per learner
+_USER_EXECUTION_TIMESTAMPS: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT_LOCK = threading.Lock()
+
+# Global concurrency limiter: max 5 concurrent executions with queue
+_GLOBAL_CONCURRENCY_LIMIT = 5
+_EXECUTION_SEMAPHORE = threading.Semaphore(_GLOBAL_CONCURRENCY_LIMIT)
+
+
+def check_execution_rate_limit(user_id: str, max_requests: int = 30, window_seconds: float = 60.0) -> None:
+    now = time.time()
+    with _RATE_LIMIT_LOCK:
+        timestamps = _USER_EXECUTION_TIMESTAMPS[user_id]
+        cutoff = now - window_seconds
+        valid_ts = [t for t in timestamps if t > cutoff]
+        if len(valid_ts) >= max_requests:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded: Max {max_requests} executions per minute.",
+            )
+        valid_ts.append(now)
+        _USER_EXECUTION_TIMESTAMPS[user_id] = valid_ts
+
+
+def verify_problem_access(
+    db: Session,
+    user: User,
+    problem_id: str,
+    attempt_id: str | None = None,
+) -> CodingProblem:
+    """Validate that the problem exists and the learner is authorized to access it."""
+    problem = db.get(CodingProblem, problem_id)
+    if not problem:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coding problem not found.")
+
+    # Mentors and Admins have platform-wide authoring/preview access
+    if (user.role or "").upper() in {"ADMIN", "MENTOR"}:
+        return problem
+
+    # If attempt_id is provided, validate it strictly
+    if attempt_id:
+        attempt = db.get(AssessmentAttempt, attempt_id)
+        if not attempt:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment attempt not found.")
+        if attempt.learner_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Assessment attempt does not belong to the authenticated learner.",
+            )
+        if attempt.status != "IN_PROGRESS":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Assessment attempt is not IN_PROGRESS.",
+            )
+        # Check problem is in the assessment
+        bank_ids = db.execute(
+            select(AssessmentQuestion.bank_question_id).where(
+                AssessmentQuestion.assessment_id == attempt.assessment_id
+            )
+        ).scalars().all()
+        if problem.bank_id not in bank_ids and problem.id not in bank_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Coding problem is not part of this assessment attempt.",
+            )
+        return problem
+
+    # If no attempt_id, check if problem is part of any active IN_PROGRESS attempt for this learner
+    active_assessment_ids = db.execute(
+        select(AssessmentAttempt.assessment_id).where(
+            AssessmentAttempt.learner_id == user.id,
+            AssessmentAttempt.status == "IN_PROGRESS",
+        )
+    ).scalars().all()
+    if active_assessment_ids:
+        bank_ids = db.execute(
+            select(AssessmentQuestion.bank_question_id).where(
+                AssessmentQuestion.assessment_id.in_(active_assessment_ids)
+            )
+        ).scalars().all()
+        if problem.bank_id in bank_ids or problem.id in bank_ids:
+            return problem
+
+    # Check if problem is part of an active PracticeSession generated for this learner
+    practice_count = db.execute(
+        select(func.count(PracticeQuestion.id))
+        .join(PracticeSession, PracticeQuestion.session_id == PracticeSession.id)
+        .where(
+            PracticeSession.learner_id == user.id,
+            (PracticeQuestion.id == problem.id) | (PracticeQuestion.title == problem.title),
+        )
+    ).scalar() or 0
+    if practice_count > 0:
+        return problem
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Access denied: Problem is neither part of your active assessment attempt nor your practice sessions.",
+    )
 
 
 class RunCodeRequest(BaseModel):
@@ -29,6 +142,7 @@ class RunCodeRequest(BaseModel):
     code: str = Field(..., min_length=1)
     language: str = Field("python", pattern="^(python|javascript|java|cpp|c)$")
     custom_input: str | None = None
+    attempt_id: str | None = None
 
 
 class SubmitCodeRequest(BaseModel):
@@ -38,15 +152,71 @@ class SubmitCodeRequest(BaseModel):
     attempt_id: str | None = None
 
 
+@router.get("/problems", summary="List coding problems accessible to the user")
+def list_coding_problems(
+    category: str | None = None,
+    difficulty: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role("LEARNER", "MENTOR", "ADMIN")),
+) -> list[dict[str, Any]]:
+    """List accessible coding problems; returns empty list if none exist, never mock data."""
+    query = select(CodingProblem)
+    if difficulty:
+        query = query.where(CodingProblem.difficulty == difficulty.upper())
+    if category:
+        query = query.where(CodingProblem.field == category)
+
+    problems = db.execute(query).scalars().all()
+    # Filter for learners: only problems in their active attempts or practice sessions
+    if (user.role or "").upper() == "LEARNER":
+        active_assessment_ids = db.execute(
+            select(AssessmentAttempt.assessment_id).where(
+                AssessmentAttempt.learner_id == user.id,
+                AssessmentAttempt.status == "IN_PROGRESS",
+            )
+        ).scalars().all()
+        bank_ids = set()
+        if active_assessment_ids:
+            bank_ids = set(
+                db.execute(
+                    select(AssessmentQuestion.bank_question_id).where(
+                        AssessmentQuestion.assessment_id.in_(active_assessment_ids)
+                    )
+                ).scalars().all()
+            )
+        practice_titles = set(
+            db.execute(
+                select(PracticeQuestion.title)
+                .join(PracticeSession, PracticeQuestion.session_id == PracticeSession.id)
+                .where(PracticeSession.learner_id == user.id)
+            ).scalars().all()
+        )
+        problems = [
+            p for p in problems
+            if (p.bank_id and p.bank_id in bank_ids) or (p.id in bank_ids) or (p.title in practice_titles)
+        ]
+
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "slug": p.title.lower().replace(" ", "-"),
+            "difficulty": p.difficulty,
+            "category": p.field,
+            "tags": [p.field, p.difficulty],
+        }
+        for p in problems
+    ]
+
+
 @router.get("/problems/{problem_id}", summary="Get coding problem details and starter code")
 def get_coding_problem(
     problem_id: str,
+    attempt_id: str | None = Query(None),
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(require_role("LEARNER", "MENTOR", "ADMIN")),
 ) -> dict[str, Any]:
-    problem = db.get(CodingProblem, problem_id)
-    if not problem:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coding problem not found.")
+    problem = verify_problem_access(db, user, problem_id, attempt_id)
 
     # Return visible cases only
     visible_cases = [
@@ -63,9 +233,11 @@ def get_coding_problem(
         "id": problem.id,
         "title": problem.title,
         "description": problem.description,
+        "statement": problem.description,
         "constraints": problem.constraints,
         "difficulty": problem.difficulty,
         "field": problem.field,
+        "category": problem.field,
         "marks": problem.marks,
         "time_limit_ms": problem.time_limit_ms,
         "memory_limit_mb": problem.memory_limit_mb,
@@ -79,43 +251,87 @@ def get_coding_problem(
 def run_code(
     payload: RunCodeRequest,
     db: Session = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    user: User = Depends(require_learner),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    # Check rate limiting per user
+    check_execution_rate_limit(user.id)
+
+    is_custom_input = payload.custom_input is not None
     cases = []
-    if payload.problem_id:
-        problem = db.get(CodingProblem, payload.problem_id)
-        if problem:
-            cases = [
+
+    if is_custom_input:
+        # Custom input box run: report program output without pass/fail verdict
+        cases = [
+            {
+                "input_data": payload.custom_input,
+                "expected_output": "",
+                "is_hidden": False,
+                "is_custom": True,
+                "weight": 0.0,
+            }
+        ]
+    elif payload.problem_id:
+        problem = verify_problem_access(db, user, payload.problem_id, payload.attempt_id)
+        cases = [
+            {
+                "input_data": tc.input_data,
+                "expected_output": tc.expected_output,
+                "is_hidden": False,
+                "is_custom": False,
+                "weight": 1.0,
+            }
+            for tc in problem.test_cases
+            if not tc.is_hidden
+        ]
+        if not cases:
+            cases = [{"input_data": "", "expected_output": "", "is_hidden": False, "is_custom": False, "weight": 1.0}]
+    else:
+        cases = [{"input_data": "", "expected_output": "", "is_hidden": False, "is_custom": False, "weight": 1.0}]
+
+    # Concurrency queue gating
+    acquired = _EXECUTION_SEMAPHORE.acquire(timeout=10.0)
+    if not acquired:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Code execution concurrency queue is full. Please try again shortly.",
+        )
+    try:
+        exec_result = CodeRunner.execute(
+            code=payload.code,
+            language=payload.language,
+            test_cases=cases,
+            time_limit_ms=3000,
+            mask_hidden_inputs=False,
+            is_custom_run=is_custom_input,
+        )
+    finally:
+        _EXECUTION_SEMAPHORE.release()
+
+    if is_custom_input:
+        actual_output = exec_result.custom_output if exec_result.custom_output is not None else (
+            exec_result.case_results[0].actual_output if exec_result.case_results else ""
+        )
+        return {
+            "verdict": None,
+            "stdout": actual_output,
+            "stderr": exec_result.case_results[0].error_message if exec_result.case_results else None,
+            "output": actual_output,
+            "runtime_ms": exec_result.runtime_ms,
+            "memory_mb": exec_result.memory_mb,
+            "compile_error": exec_result.compile_error,
+            "case_results": [
                 {
-                    "input_data": tc.input_data,
-                    "expected_output": tc.expected_output,
-                    "is_hidden": False,
-                    "weight": 1.0,
+                    "case_index": 1,
+                    "verdict": None,
+                    "input": payload.custom_input,
+                    "expected": None,
+                    "actual": actual_output,
+                    "runtime_ms": exec_result.runtime_ms,
+                    "error": exec_result.case_results[0].error_message if exec_result.case_results else None,
                 }
-                for tc in problem.test_cases
-                if not tc.is_hidden
-            ]
-
-    # If custom input provided, add it as a case
-    if payload.custom_input is not None:
-        cases.append({
-            "input_data": payload.custom_input,
-            "expected_output": "",
-            "is_hidden": False,
-            "weight": 0.0,
-        })
-
-    if not cases:
-        cases = [{"input_data": "", "expected_output": "", "is_hidden": False, "weight": 1.0}]
-
-    exec_result = CodeRunner.execute(
-        code=payload.code,
-        language=payload.language,
-        test_cases=cases,
-        time_limit_ms=3000,
-        mask_hidden_inputs=False,
-    )
+            ],
+        }
 
     return {
         "verdict": exec_result.verdict,
@@ -143,12 +359,11 @@ def run_code(
 def submit_code(
     payload: SubmitCodeRequest,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_learner),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
-    problem = db.get(CodingProblem, payload.problem_id)
-    if not problem:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Coding problem not found.")
+    check_execution_rate_limit(user.id)
+    problem = verify_problem_access(db, user, payload.problem_id, payload.attempt_id)
 
     cases = [
         {
@@ -160,31 +375,42 @@ def submit_code(
         for tc in problem.test_cases
     ]
 
-    exec_result = CodeRunner.execute(
-        code=payload.code,
-        language=payload.language,
-        test_cases=cases,
-        time_limit_ms=problem.time_limit_ms,
-        memory_limit_mb=problem.memory_limit_mb,
-        mask_hidden_inputs=True,
-    )
-
-    # Compute runtime percentile vs historical submissions for this problem
-    historical_runtimes = (
-        db.execute(
-            select(Submission.runtime_ms).where(
-                Submission.coding_problem_id == problem.id,
-                Submission.verdict == "ACCEPTED",
-            )
+    # Concurrency queue gating
+    acquired = _EXECUTION_SEMAPHORE.acquire(timeout=10.0)
+    if not acquired:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Code execution concurrency queue is full. Please try again shortly.",
         )
-        .scalars()
-        .all()
-    )
+    try:
+        exec_result = CodeRunner.execute(
+            code=payload.code,
+            language=payload.language,
+            test_cases=cases,
+            time_limit_ms=problem.time_limit_ms,
+            memory_limit_mb=problem.memory_limit_mb,
+            mask_hidden_inputs=True,
+            is_custom_run=False,
+        )
+    finally:
+        _EXECUTION_SEMAPHORE.release()
 
-    percentile = 85.0
-    if historical_runtimes:
-        slower_count = sum(1 for r in historical_runtimes if r > exec_result.runtime_ms)
-        percentile = round((slower_count / len(historical_runtimes)) * 100.0, 1)
+    # Compute runtime percentile only for ACCEPTED submissions; return null when no history
+    percentile: float | None = None
+    if exec_result.verdict == "ACCEPTED":
+        historical_runtimes = (
+            db.execute(
+                select(Submission.runtime_ms).where(
+                    Submission.coding_problem_id == problem.id,
+                    Submission.verdict == "ACCEPTED",
+                )
+            )
+            .scalars()
+            .all()
+        )
+        if historical_runtimes:
+            slower_count = sum(1 for r in historical_runtimes if r > exec_result.runtime_ms)
+            percentile = round((slower_count / len(historical_runtimes)) * 100.0, 1)
 
     # Persist submission
     sub = Submission(
@@ -193,7 +419,7 @@ def submit_code(
         learner_id=user.id,
         code=payload.code,
         language=payload.language,
-        verdict=exec_result.verdict,
+        verdict=exec_result.verdict or "SUBMITTED",
         runtime_ms=exec_result.runtime_ms,
         memory_mb=exec_result.memory_mb,
         passed_cases=exec_result.passed_cases,
@@ -211,23 +437,27 @@ def submit_code(
 
     return {
         "submission_id": sub.id,
+        "id": sub.id,
         "verdict": sub.verdict,
         "passed_cases": sub.passed_cases,
         "total_cases": sub.total_cases,
         "score": sub.score,
+        "max_score": problem.marks,
         "runtime_ms": sub.runtime_ms,
         "memory_mb": sub.memory_mb,
         "runtime_percentile": percentile,
         "first_failing_case": exec_result.first_failing_case,
+        "failing_case": exec_result.first_failing_case,
         "compile_error": exec_result.compile_error,
+        "created_at": sub.created_at.isoformat(),
     }
 
 
 @router.get("/submissions/{problem_id}", summary="Get learner submission history for a problem")
-def get_submission_history(
+def get_submission_history_by_problem(
     problem_id: str,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_learner),
 ) -> list[dict[str, Any]]:
     subs = (
         db.execute(
@@ -241,6 +471,32 @@ def get_submission_history(
         .scalars()
         .all()
     )
+    return [
+        {
+            "id": s.id,
+            "verdict": s.verdict,
+            "passed_cases": s.passed_cases,
+            "total_cases": s.total_cases,
+            "runtime_ms": s.runtime_ms,
+            "memory_mb": s.memory_mb,
+            "language": s.language,
+            "score": s.score,
+            "submitted_at": s.created_at.isoformat(),
+        }
+        for s in subs
+    ]
+
+
+@router.get("/submissions", summary="List learner submission history across problems")
+def list_submissions(
+    problem_id: str | None = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_learner),
+) -> list[dict[str, Any]]:
+    query = select(Submission).where(Submission.learner_id == user.id)
+    if problem_id:
+        query = query.where(Submission.coding_problem_id == problem_id)
+    subs = db.execute(query.order_by(Submission.created_at.desc())).scalars().all()
     return [
         {
             "id": s.id,

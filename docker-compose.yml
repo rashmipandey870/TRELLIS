@@ -63,12 +63,29 @@ services:
       - SECRET_KEY=${SECRET_KEY:-default_32_byte_hex_secret_key_change_in_prod}
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-qW7GZ9X_8K4jL2mN5pQ8rT1vX3zB6dF9hJ0lP2sU4wY=}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - CODE_RUNNER=${CODE_RUNNER:-local}
+      - JUDGE0_URL=${JUDGE0_URL:-http://judge0:2358}
     ports:
       - "8000:8000"
     networks:
       - trellis-internal
     depends_on:
       - mysql
+      - redis
+
+  judge0:
+    image: judge0/judge0:latest
+    container_name: trellis-judge0
+    restart: unless-stopped
+    ports:
+      - "2358:2358"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-CSMTrellis2026!}
+    networks:
+      - trellis-internal
+    depends_on:
       - redis
 
   celery_worker:

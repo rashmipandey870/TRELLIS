@@ -57,6 +57,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`mcq_options` TO 'trellis_a
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`coding_problems` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`test_cases` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessments` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessment_audience` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessment_questions` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`assessment_attempts` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`answers` TO 'trellis_app'@'%';

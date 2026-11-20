@@ -31,7 +31,7 @@ import { AdminDashboardData, AdminService } from '../../core/services/admin.serv
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#008FBB]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Enrolled Learners</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.total_learners ?? 6 }}</span>
+            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.total_learners ?? 0 }}</span>
             <span class="text-xs font-semibold text-emerald-500">Active</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400">Assigned across cohorts</p>
@@ -42,7 +42,7 @@ import { AdminDashboardData, AdminService } from '../../core/services/admin.serv
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#FAA634]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Mentors</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.total_mentors ?? 2 }}</span>
+            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.total_mentors ?? 0 }}</span>
             <span class="text-xs font-semibold text-[#FAA634]">Advisors</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400">Leading curriculum &amp; reviews</p>
@@ -53,7 +53,7 @@ import { AdminDashboardData, AdminService } from '../../core/services/admin.serv
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#D7182A]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Org Average Score</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.average_score ?? 84.5 }}%</span>
+            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.average_score ?? 0 }}%</span>
             <span class="text-xs font-semibold text-emerald-500">&uarr; 3.2% MoM</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400">Across MCQ &amp; coding tests</p>
@@ -64,7 +64,7 @@ import { AdminDashboardData, AdminService } from '../../core/services/admin.serv
           <div class="absolute top-0 left-0 right-0 h-1 bg-purple-500"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Batches</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.total_batches ?? 2 }}</span>
+            <span class="text-3xl font-black text-slate-900 dark:text-white">{{ data()?.total_batches ?? 0 }}</span>
             <span class="text-xs font-semibold text-purple-600">Cohorts</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400">Batch Alpha &amp; Batch Beta</p>

@@ -1,12 +1,19 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResult, PracticeService } from '../../core/services/practice.service';
+import {
+  DedicationScoreSummary,
+  GeneratedPracticeQuestion,
+  PracticeAttemptResult,
+  PracticeService,
+} from '../../core/services/practice.service';
+import { ToastService } from '../../core/services/toast.service';
+import { MonacoEditorComponent } from '../../shared/components/monaco-editor.component';
 
 @Component({
   selector: 'app-learner-practice',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MonacoEditorComponent],
   template: `
     <div class="space-y-6">
       <!-- Title & Intro -->
@@ -70,7 +77,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
 
           <div class="flex items-center gap-3">
             <span class="text-xs font-bold text-slate-500">Difficulty:</span>
-            <select [(ngModel)]="selectedDifficulty" (ngModelChange)="generateNewQuestion()" class="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold">
+            <select [(ngModel)]="selectedDifficulty" (ngModelChange)="generateNewQuestion()" class="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white">
               <option value="EASY">Easy</option>
               <option value="MEDIUM">Medium</option>
               <option value="HARD">Hard</option>
@@ -83,7 +90,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
               class="px-5 py-2 rounded-xl bg-gradient-to-r from-[#FAA634] to-[#e09228] hover:from-[#e09228] hover:to-[#c67c1e] disabled:opacity-50 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5">
               @if (isGenerating()) {
                 <span class="animate-spin text-xs">&#9696;</span>
-                <span>Generating &amp; Sandbox Verifying...</span>
+                <span>Generating Problem...</span>
               } @else {
                 <span>Generate Verified Problem &rarr;</span>
               }
@@ -94,7 +101,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
 
       <!-- Active Practice Question Box -->
       @if (activeQuestion()) {
-        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5 animate-in fade-in">
+        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
           
           <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
             <div>
@@ -102,6 +109,18 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
                   {{ activeQuestion()?.field }} &bull; {{ activeQuestion()?.difficulty }}
                 </span>
+                
+                <!-- Source Transparency Badge (Phase 4 requirement) -->
+                @if (activeQuestion()?.source === 'llm') {
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-100 text-purple-700">
+                    ✨ AI-generated
+                  </span>
+                } @else {
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    📚 Practice bank
+                  </span>
+                }
+
                 <span class="text-[10px] text-emerald-600 font-bold">&check; Sandbox Pre-Verified Solution</span>
               </div>
               <h3 class="text-base font-black text-slate-900 dark:text-white mt-1">{{ activeQuestion()?.title }}</h3>
@@ -112,7 +131,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
             {{ getQuestionContent() }}
           </div>
 
-          <!-- MCQ Options -->
+          <!-- MCQ Options (Without leaking correct answer or explanation) -->
           @if (isMcq()) {
             <div class="space-y-2.5">
               @for (opt of getQuestionOptions(); track opt.id) {
@@ -126,7 +145,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
             </div>
           }
 
-          <!-- Coding Solution Area -->
+          <!-- Coding Solution Area with Monaco Editor -->
           @if (isCoding()) {
             <div class="space-y-3">
               @if (activeQuestion()?.constraints) {
@@ -134,14 +153,16 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
                   <strong class="text-slate-700 dark:text-slate-200">Constraints:</strong> {{ activeQuestion()?.constraints }}
                 </div>
               }
-              <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold uppercase text-slate-400">Your Python Solution:</span>
-                <span class="text-[10px] text-slate-400">Executes in sandboxed test runner</span>
+
+              <!-- Monaco Editor Integration for Coding Practice -->
+              <div class="h-[380px]">
+                <app-monaco-editor
+                  [(code)]="codeSolution"
+                  [language]="practiceLanguage"
+                  (languageChange)="onLanguageChanged($event)"
+                  (reset)="resetPracticeCode()">
+                </app-monaco-editor>
               </div>
-              <textarea 
-                [(ngModel)]="codeSolution" 
-                rows="10" 
-                class="w-full font-mono text-xs p-4 bg-slate-950 text-emerald-400 border border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
             </div>
           }
 
@@ -177,7 +198,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
             </div>
           }
 
-          <!-- Post-Attempt Feedback: Mistake Explanation & Complexity Analysis (Step 6) -->
+          <!-- Post-Attempt Feedback (Reveals Explanation and Verdict strictly after submission) -->
           @if (attemptResult()) {
             <div class="p-4 rounded-xl border text-xs space-y-2"
               [ngClass]="attemptResult()?.correct ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 text-emerald-900 dark:text-emerald-100' : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 text-rose-900 dark:text-rose-100'">
@@ -231,8 +252,9 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
               </div>
             </div>
           } @empty {
-            <div class="col-span-3 p-4 text-center text-xs text-slate-400">
-              Loading dedication metrics...
+            <!-- Clean Empty State (Zero Hardcoded Demo Numbers) -->
+            <div class="col-span-3 p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+              No practice sessions recorded yet. Solve practice problems above to start accumulating dedication points!
             </div>
           }
         </div>
@@ -243,6 +265,7 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
 })
 export class LearnerPracticeComponent implements OnInit {
   private readonly practiceService = inject(PracticeService);
+  private readonly toastService = inject(ToastService);
 
   readonly practiceFields = [
     'Python',
@@ -258,6 +281,7 @@ export class LearnerPracticeComponent implements OnInit {
   readonly selectedField = signal<string>('Python');
   readonly selectedMode = signal<'MCQ' | 'CODING'>('MCQ');
   selectedDifficulty: 'EASY' | 'MEDIUM' | 'HARD' = 'MEDIUM';
+  practiceLanguage = 'python';
 
   readonly isGenerating = signal<boolean>(false);
   readonly isEvaluating = signal<boolean>(false);
@@ -279,28 +303,18 @@ export class LearnerPracticeComponent implements OnInit {
   loadDedicationScores(): void {
     this.practiceService.getDedicationScores().subscribe({
       next: (scores) => {
-        if (scores && scores.length > 0) {
-          this.dedicationScores.set(scores);
-        } else {
-          this.dedicationScores.set([
-            { field: 'Python', active_days_30d: 14, problems_attempted: 18, weighted_accuracy: 88, dedication_score: 92, trend: 'UP', talent_spotlight_qualified: true },
-            { field: 'SQL', active_days_30d: 10, problems_attempted: 12, weighted_accuracy: 85, dedication_score: 88, trend: 'UP', talent_spotlight_qualified: true },
-            { field: 'DSA', active_days_30d: 8, problems_attempted: 10, weighted_accuracy: 76, dedication_score: 76, trend: 'STABLE', talent_spotlight_qualified: false },
-          ]);
-        }
+        // Return pure real data from backend (empty list shows empty state)
+        this.dedicationScores.set(scores || []);
       },
       error: () => {
-        this.dedicationScores.set([
-          { field: 'Python', active_days_30d: 14, problems_attempted: 18, weighted_accuracy: 88, dedication_score: 92, trend: 'UP', talent_spotlight_qualified: true },
-          { field: 'SQL', active_days_30d: 10, problems_attempted: 12, weighted_accuracy: 85, dedication_score: 88, trend: 'UP', talent_spotlight_qualified: true },
-          { field: 'DSA', active_days_30d: 8, problems_attempted: 10, weighted_accuracy: 76, dedication_score: 76, trend: 'STABLE', talent_spotlight_qualified: false },
-        ]);
+        this.dedicationScores.set([]);
       },
     });
   }
 
   onSelectField(field: string): void {
     this.selectedField.set(field);
+    this.practiceLanguage = this.mapFieldToLanguage(field);
     this.generateNewQuestion();
   }
 
@@ -309,12 +323,23 @@ export class LearnerPracticeComponent implements OnInit {
     this.generateNewQuestion();
   }
 
+  private mapFieldToLanguage(field: string): string {
+    const f = field.toLowerCase();
+    if (f.includes('java') && !f.includes('script')) return 'java';
+    if (f.includes('web') || f.includes('javascript') || f.includes('js')) return 'javascript';
+    if (f.includes('sql')) return 'sql';
+    return 'python';
+  }
+
   generateNewQuestion(): void {
     this.isGenerating.set(true);
     this.attemptResult.set(null);
     this.currentHintIndex.set(0);
     this.activeHint.set(null);
     this.selectedOptionId = '';
+
+    const lang = this.mapFieldToLanguage(this.selectedField());
+    this.practiceLanguage = lang;
 
     this.practiceService.generateQuestion({
       field: this.selectedField(),
@@ -331,53 +356,36 @@ export class LearnerPracticeComponent implements OnInit {
         this.activeQuestion.set(normalized);
         if (normalized.question_type === 'CODING') {
           const starter = typeof q.starter_code === 'object' && q.starter_code
-            ? (q.starter_code['python'] || Object.values(q.starter_code)[0])
+            ? (q.starter_code[this.practiceLanguage] || Object.values(q.starter_code)[0])
             : (typeof q.starter_code === 'string' ? q.starter_code : 'def solve():\n    pass');
           this.codeSolution = starter;
         }
       },
-      error: () => {
+      error: (err) => {
         this.isGenerating.set(false);
-        // Fallback verified practice question
-        if (this.selectedMode() === 'MCQ') {
-          this.activeQuestion.set({
-            id: 'pq_mcq_1',
-            field: this.selectedField(),
-            difficulty: this.selectedDifficulty,
-            question_type: 'MCQ',
-            title: `${this.selectedField()} Memory & Performance Optimization`,
-            content: `When handling high-throughput asynchronous workloads in ${this.selectedField()}, which pattern prevents event loop thread blockage?`,
-            options: [
-              { id: 'opt_0', option_text: 'Offloading CPU-bound operations to an isolated process pool' },
-              { id: 'opt_1', option_text: 'Adding nested sleep statements inside coroutines' },
-              { id: 'opt_2', option_text: 'Using synchronous database drivers' },
-              { id: 'opt_3', option_text: 'Disabling garbage collection entirely' },
-            ],
-            hints: [
-              'Consider the difference between I/O bound coroutines and compute-intensive operations.',
-              'Remember that Python GIL prevents multi-threaded CPU acceleration on pure Python threads.',
-            ],
-            explanation: 'CPU-bound operations block the asynchronous event loop unless executed in a ProcessPoolExecutor or dedicated worker process.',
-          });
-        } else {
-          this.activeQuestion.set({
-            id: 'pq_code_1',
-            field: this.selectedField(),
-            difficulty: this.selectedDifficulty,
-            question_type: 'CODING',
-            title: `${this.selectedField()} LRU Cache Eviction Policy`,
-            content: 'Design a data structure that follows the constraints of a Least Recently Used (LRU) cache.\nImplement get(key) and put(key, value) in O(1) time complexity.',
-            hints: [
-              'A combination of a Hash Map and a Doubly Linked List achieves O(1) lookup and eviction.',
-              'In Python, collections.OrderedDict provides this structure natively.',
-            ],
-            starter_code: { python: 'class LRUCache:\n    def __init__(self, capacity: int):\n        pass\n\n    def get(self, key: int) -> int:\n        return -1\n\n    def put(self, key: int, value: int) -> None:\n        pass' },
-            explanation: 'Optimal solution runs in O(1) using Doubly Linked List and Hash Table.',
-          });
-          this.codeSolution = 'class LRUCache:\n    def __init__(self, capacity: int):\n        self.cap = capacity\n        self.cache = {}\n';
-        }
+        this.toastService.showProblemError(err, 'Practice Question Generation Failed');
       },
     });
+  }
+
+  onLanguageChanged(newLang: string): void {
+    this.practiceLanguage = newLang;
+    this.resetPracticeCode();
+  }
+
+  resetPracticeCode(): void {
+    const q = this.activeQuestion();
+    if (q && q.starter_code && q.starter_code[this.practiceLanguage]) {
+      this.codeSolution = q.starter_code[this.practiceLanguage];
+    } else {
+      if (this.practiceLanguage === 'java') {
+        this.codeSolution = 'import java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        // solve\n    }\n}';
+      } else if (this.practiceLanguage === 'javascript') {
+        this.codeSolution = 'const fs = require("fs");\n\nfunction solve() {\n    // solve\n}\nsolve();';
+      } else {
+        this.codeSolution = 'def solve():\n    pass';
+      }
+    }
   }
 
   isMcq(): boolean {
@@ -447,23 +455,16 @@ export class LearnerPracticeComponent implements OnInit {
       question_id: q.id,
       answer_text: mode === 'MCQ' ? this.selectedOptionId : undefined,
       source_code: mode === 'CODING' ? this.codeSolution : undefined,
-      language: 'python',
+      language: this.practiceLanguage,
     }).subscribe({
       next: (res) => {
         this.isEvaluating.set(false);
         this.attemptResult.set(res);
         this.loadDedicationScores();
       },
-      error: () => {
+      error: (err) => {
         this.isEvaluating.set(false);
-        this.attemptResult.set({
-          correct: true,
-          score_delta: 15,
-          explanation: q.explanation || 'Excellent reasoning! Your approach satisfies all efficiency constraints.',
-          complexity_feedback: 'Time Complexity: O(1) amortized. Space Complexity: O(1). Passes all enterprise verification checks.',
-          current_streak: 15,
-        });
-        this.loadDedicationScores();
+        this.toastService.showProblemError(err, 'Submission Evaluation Failed');
       },
     });
   }

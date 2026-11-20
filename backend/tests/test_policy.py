@@ -26,7 +26,7 @@ def db_session() -> Generator[Session, None, None]:
 
 def test_strict_default_deny() -> None:
     """Verify that any unlisted tuple is strictly forbidden under Default-Deny."""
-    user = UserContext(user_id="usr_01", org_id="org_csm", roles=["EMPLOYEE"])
+    user = UserContext(user_id="usr_01", org_id="org_csm", roles=["LEARNER"])
 
     # Unlisted resources and actions
     assert can(user, "destroy", "infrastructure") is False
@@ -36,8 +36,8 @@ def test_strict_default_deny() -> None:
 
 
 def test_employee_own_scope_permissions() -> None:
-    """Verify that EMPLOYEE can read/update OWN data but is denied for other users."""
-    emp = UserContext(user_id="emp_priya", org_id="org_csm", roles=["EMPLOYEE"])
+    """Verify that LEARNER can read/update OWN data but is denied for other users."""
+    emp = UserContext(user_id="emp_priya", org_id="org_csm", roles=["LEARNER"])
 
     # Reading own profile is allowed
     assert can(emp, "read", "users", {"target_user_id": "emp_priya"}) is True
@@ -57,7 +57,7 @@ def test_employee_own_scope_permissions() -> None:
 def test_separation_of_duties_author_self_approval_forbidden() -> None:
     """INVARIANT: Authors cannot self-approve their own submissions (Separation of Duties)."""
     trainer = UserContext(
-        user_id="tr_rahul", org_id="org_csm", roles=["TRAINER_MENTOR"], cohort_id="cohort_alpha"
+        user_id="tr_rahul", org_id="org_csm", roles=["MENTOR"], cohort_id="cohort_alpha"
     )
 
     # Trainer approving an idea from a cohort learner: ALLOWED
@@ -84,8 +84,8 @@ def test_separation_of_duties_author_self_approval_forbidden() -> None:
 
 
 def test_trainer_blind_grading_scope() -> None:
-    """Verify that TRAINER_MENTOR can grade responses under strict blind grading scope without PII."""
-    trainer = UserContext(user_id="tr_vikram", org_id="org_csm", roles=["TRAINER_MENTOR"])
+    """Verify that MENTOR can grade responses under strict blind grading scope without PII."""
+    trainer = UserContext(user_id="tr_vikram", org_id="org_csm", roles=["MENTOR"])
 
     # Negative test 1: Missing blind grading context returns False
     assert can(trainer, "grade", "responses", {}) is False
@@ -137,7 +137,7 @@ def test_trainer_blind_grading_scope() -> None:
 
 def test_anonymized_aggregate_scope_enforces_k_anonymity() -> None:
     """Verify that aggregate reports enforce k-anonymity (k >= 5) and forbid individual user IDs."""
-    clo = UserContext(user_id="clo_deepak", org_id="org_csm", roles=["LK_HEAD_CLO"])
+    clo = UserContext(user_id="clo_deepak", org_id="org_csm", roles=["ADMIN"])
 
     # Negative test 1: Small group size (sample_size < 5) is rejected
     assert (
@@ -188,7 +188,7 @@ def test_anonymized_aggregate_scope_enforces_k_anonymity() -> None:
 
 def test_organization_scope_rejects_cross_tenant_access() -> None:
     """Verify that ORGANIZATION scope strictly compares target entity org_id with subject org_id."""
-    emp = UserContext(user_id="emp_csm_01", org_id="org_csm", roles=["EMPLOYEE"])
+    emp = UserContext(user_id="emp_csm_01", org_id="org_csm", roles=["LEARNER"])
 
     # Negative test: Target resource belongs to another tenant organisation
     assert (
@@ -283,19 +283,19 @@ def test_policy_registry_fails_startup_when_matrix_missing() -> None:
 
 
 def test_manager_team_direct_scope() -> None:
-    """Verify that MANAGER can access direct reports but is denied for non-reports."""
-    mgr = UserContext(user_id="mgr_sunita", org_id="org_csm", roles=["MANAGER"])
+    """Verify that MENTOR can access cohort learners but is denied for non-cohort."""
+    mgr = UserContext(user_id="mgr_sunita", org_id="org_csm", roles=["MENTOR"], cohort_id="cohort_alpha")
 
-    # Accessing direct report's growth ring: ALLOWED
-    assert can(mgr, "read", "growth_ring", {"is_direct_report": True}) is True
+    # Accessing cohort learner's growth ring: ALLOWED
+    assert can(mgr, "read", "growth_ring", {"cohort_id": "cohort_alpha"}) is True
 
-    # Accessing non-direct report's growth ring: FORBIDDEN
+    # Accessing non-cohort learner's growth ring: FORBIDDEN
     assert (
         can(
             mgr,
             "read",
             "growth_ring",
-            {"is_direct_report": False, "target_user_id": "other_emp"},
+            {"cohort_id": "cohort_beta", "target_user_id": "other_emp"},
         )
         is False
     )
@@ -303,7 +303,7 @@ def test_manager_team_direct_scope() -> None:
 
 def test_super_admin_immutability_invariants() -> None:
     """INVARIANT: Super admin CANNOT update or delete audit_log or evidence_ledger."""
-    super_admin = UserContext(user_id="admin_root", org_id="org_csm", roles=["SUPER_ADMIN"])
+    super_admin = UserContext(user_id="admin_root", org_id="org_csm", roles=["ADMIN"])
 
     # Super admin cannot alter audit logs
     assert can(super_admin, "update", "audit_log") is False
@@ -337,15 +337,15 @@ def test_access_receipt_recording(db_session: Session) -> None:
 
 def test_multi_role_evaluation_all_roles_evaluated_and_explicit_deny_wins() -> None:
     """Verify that a subject with multiple roles is evaluated against all of them, with explicit deny winning."""
-    # 1. Subject with EMPLOYEE and TRAINER_MENTOR:
-    # TRAINER_MENTOR has publish permission on pathways (scope ORGANIZATION, condition author != subject)
+    # 1. Subject with LEARNER and MENTOR:
+    # MENTOR has publish permission on pathways (scope ORGANIZATION, condition author != subject)
     user_multi = UserContext(
         user_id="user_trainer_1",
         org_id="org_csm",
-        roles=["EMPLOYEE", "TRAINER_MENTOR"],
+        roles=["LEARNER", "MENTOR"],
     )
 
-    # When SoD condition holds (author != subject), user gets the grant from TRAINER_MENTOR role
+    # When SoD condition holds (author != subject), user gets the grant from MENTOR role
     assert (
         can(
             user_multi,
@@ -405,8 +405,8 @@ def test_separation_of_duties_requires_real_db_author_and_denies_unknown_author(
     db_session.add(ev_record)
     db_session.commit()
 
-    reviewer_ctx = UserContext(user_id=user_reviewer.id, org_id=org.id, roles=["TRAINER_MENTOR"])
-    author_ctx = UserContext(user_id=user_author.id, org_id=org.id, roles=["TRAINER_MENTOR"])
+    reviewer_ctx = UserContext(user_id=user_reviewer.id, org_id=org.id, roles=["MENTOR"])
+    author_ctx = UserContext(user_id=user_author.id, org_id=org.id, roles=["MENTOR"])
 
     # 1. Server-side context loads real author from DB
     ctx_loaded = resolve_server_side_context(
@@ -477,8 +477,8 @@ def test_require_permission_with_real_database_row_no_hand_supplied_author(
     }
     request = Request(scope)
 
-    author_claims = {"sub": author.id, "org_id": org.id, "roles": ["EMPLOYEE"]}
-    reviewer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["EMPLOYEE"]}
+    author_claims = {"sub": author.id, "org_id": org.id, "roles": ["LEARNER"]}
+    reviewer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["LEARNER"]}
 
     # Author attempting to approve own evidence record: Denied by require_permission (Separation of duties)
     approve_dep = require_permission("approve", "evidence_records")
@@ -515,7 +515,7 @@ def test_require_permission_with_real_database_row_no_hand_supplied_author(
         "headers": [],
     }
     req_unmodeled = Request(unmodeled_scope)
-    trainer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["TRAINER_MENTOR"]}
+    trainer_claims = {"sub": reviewer.id, "org_id": org.id, "roles": ["MENTOR"]}
     publish_dep = require_permission("publish", "pathways")
 
     with pytest.raises(HTTPException) as exc_info:
@@ -540,21 +540,21 @@ def test_time_limited_grant_expiry_excludes_role(db_session: Session) -> None:
     db_session.add(user)
     db_session.flush()
 
-    role_emp = Role(code="EMPLOYEE", name="Employee Role")
-    role_trainer = Role(code="TRAINER_MENTOR", name="Trainer Role")
+    role_emp = Role(code="LEARNER", name="Employee Role")
+    role_trainer = Role(code="MENTOR", name="Trainer Role")
     db_session.add_all([role_emp, role_trainer])
     db_session.flush()
 
     now = datetime.now(UTC)
 
-    # Permanent grant for EMPLOYEE
+    # Permanent grant for LEARNER
     grant_perm = Grant(
         user_id=user.id,
         role_id=role_emp.id,
         org_id=org.id,
         expires_at=None,
     )
-    # Expired grant for TRAINER_MENTOR (expired 1 hour ago)
+    # Expired grant for MENTOR (expired 1 hour ago)
     grant_expired = Grant(
         user_id=user.id,
         role_id=role_trainer.id,
@@ -568,9 +568,9 @@ def test_time_limited_grant_expiry_excludes_role(db_session: Session) -> None:
 
     # Active roles strictly excludes expired grant
     active_roles = get_active_user_roles(user, as_of=now)
-    assert "EMPLOYEE" in active_roles
-    assert "TRAINER_MENTOR" not in active_roles
+    assert "LEARNER" in active_roles
+    assert "MENTOR" not in active_roles
 
     # If evaluated prior to expiration, role was active
     past_roles = get_active_user_roles(user, as_of=now - timedelta(hours=2))
-    assert "TRAINER_MENTOR" in past_roles
+    assert "MENTOR" in past_roles

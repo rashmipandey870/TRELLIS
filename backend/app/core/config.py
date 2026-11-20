@@ -64,6 +64,25 @@ class Settings(BaseSettings):
         "http://localhost:8000",
     ]
 
+    # Code Execution Runner Configuration ("judge0", "docker", or dev-only "local")
+    CODE_RUNNER: str = "local"
+    JUDGE0_URL: str = "http://localhost:2358"
+    JUDGE0_API_KEY: str = ""
+
+    # Meeting Allowed Hostnames (configurable allow-list)
+    MEETING_ALLOWLIST_HOSTS: list[str] = [
+        "teams.microsoft.com",
+        "meet.google.com",
+        "zoom.us",
+        "csm.tech",
+    ]
+
+    # AI Practice & Role Assistant Configuration
+    AI_MODEL_ID: str = "claude-3-5-sonnet-20241022"
+    AI_REQUEST_TIMEOUT_SECONDS: int = 45
+    AI_API_KEY: str = ""
+    AI_BASE_URL: str = "https://api.anthropic.com"
+
     @model_validator(mode="after")
     def validate_production_invariants(self) -> "Settings":
         """Strictly refuse startup in non-dev environments if secrets or keys are missing."""
@@ -86,6 +105,11 @@ class Settings(BaseSettings):
             if not self.FIELD_ENCRYPTION_KEY or "dev-only" in self.FIELD_ENCRYPTION_KEY:
                 raise RuntimeError(
                     "FATAL: FIELD_ENCRYPTION_KEY must be provided as a secure production key in non-dev environment."
+                )
+            if self.CODE_RUNNER not in {"judge0", "docker"}:
+                raise RuntimeError(
+                    f"FATAL: In production (TRELLIS_ENV={self.TRELLIS_ENV}), CODE_RUNNER must be 'judge0' or 'docker', "
+                    f"got '{self.CODE_RUNNER}'. Local subprocess execution is strictly forbidden outside dev."
                 )
         return self
 

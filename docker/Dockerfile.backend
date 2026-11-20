@@ -1,22 +1,42 @@
-FROM python:3.11-slim
+# Build stage: compile dependencies requiring native build tools
+FROM python:3.11-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /app
+WORKDIR /build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     default-libmysqlclient-dev \
-    curl \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Hardening: Upgrade pip to >=26.2.0 to resolve local tooling advisories
 RUN python -m pip install --no-cache-dir --upgrade "pip>=26.2.0"
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
+
+# Final runtime stage: Clean, minimal image without runner compiler toolchains
+# Runner toolchains (Python, Node, JDK 21, gcc/g++) are isolated in dedicated runner containers
+FROM python:3.11-slim AS runner
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/install/bin:$PATH" \
+    PYTHONPATH="/install/lib/python3.11/site-packages:$PYTHONPATH"
+
+WORKDIR /app
+
+# Only runtime shared libraries (e.g. libmariadb/libmysqlclient), NO compilers/toolchains
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-mysql-client \
+    libmariadb3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /install /install
 COPY . .
 
 # Run as unprivileged user

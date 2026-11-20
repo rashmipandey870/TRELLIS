@@ -149,6 +149,25 @@ class Assessment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     attempts: Mapped[list["AssessmentAttempt"]] = relationship(
         "AssessmentAttempt", back_populates="assessment", cascade="all, delete-orphan"
     )
+    audience_learners: Mapped[list["AssessmentAudience"]] = relationship(
+        "AssessmentAudience", back_populates="assessment", cascade="all, delete-orphan"
+    )
+
+
+class AssessmentAudience(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Specific learners assigned to an assessment outside or within batches."""
+
+    __tablename__ = "assessment_audience"
+
+    assessment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("assessments.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    learner_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="audience_learners")
+    learner: Mapped["User"] = relationship("User")
 
 
 class AssessmentQuestion(Base, UUIDPrimaryKeyMixin, TimestampMixin):

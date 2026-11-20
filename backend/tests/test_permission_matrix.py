@@ -27,24 +27,24 @@ def test_permission_matrix_file_exists() -> None:
 
 
 def test_permission_matrix_dimensions_and_default_deny() -> None:
-    """Verify 20 resources x 15 actions x 12 roles = 3,600 tuples under default-deny."""
+    """Verify collapsed 3-role matrix: 20 resources x 15 actions x 3 roles = 900 tuples under default-deny."""
     matrix_path = get_matrix_path()
     with open(matrix_path, encoding="utf-8") as f:
         data = json.load(f)
 
     active_roles = data["active_roles"]
-    future_roles = data["future_roles_modeled"]
+    future_roles = data.get("future_roles_modeled", [])
     all_roles = active_roles + future_roles
     resources = data["resources"]
     actions = data["actions"]
     rules = data["rules"]
 
-    assert len(all_roles) == 12, f"Expected 12 roles, got {len(all_roles)}"
+    assert set(all_roles) == {"ADMIN", "MENTOR", "LEARNER"}, f"Expected 3 collapsed roles, got {all_roles}"
     assert len(resources) == 20, f"Expected 20 resources, got {len(resources)}"
     assert len(actions) == 15, f"Expected 15 actions, got {len(actions)}"
 
     total_tuples = len(all_roles) * len(resources) * len(actions)
-    assert total_tuples == 3600
+    assert total_tuples == 900
 
     explicit_grants = 0
     for res_rule in rules:
@@ -57,16 +57,16 @@ def test_permission_matrix_dimensions_and_default_deny() -> None:
                 assert "scope" in grant
                 explicit_grants += 1
 
-    assert explicit_grants == 118, f"Expected 118 explicit grants, got {explicit_grants}"
+    assert explicit_grants == 90, f"Expected 90 explicit grants, got {explicit_grants}"
     default_denied = total_tuples - explicit_grants
-    assert default_denied == 3482, f"Expected 3,482 default-denied tuples, got {default_denied}"
+    assert default_denied == 810, f"Expected 810 default-denied tuples, got {default_denied}"
 
-    # Invariant: SUPER_ADMIN cannot update/delete audit_log or evidence_ledger
+    # Invariant: ADMIN cannot update/delete audit_log or evidence_ledger
     for res_rule in rules:
         if res_rule["resource"] in ["audit_log", "evidence_ledger"]:
             for action in ["update", "delete"]:
                 action_grants = res_rule.get("actions", {}).get(action, {})
-                super_admin_grant = action_grants.get("SUPER_ADMIN", {})
-                assert super_admin_grant.get("allowed") is not True, (
-                    f"Forbidden: SUPER_ADMIN must not have allowed {action} on {res_rule['resource']}"
+                admin_grant = action_grants.get("ADMIN", {})
+                assert admin_grant.get("allowed") is not True, (
+                    f"Forbidden: ADMIN must not have allowed {action} on {res_rule['resource']}"
                 )

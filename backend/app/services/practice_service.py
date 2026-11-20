@@ -31,7 +31,7 @@ from app.models.practice import (
 )
 from app.models.settings import SystemSetting
 from app.models.user import User
-from app.services.ai_question_generator import generate_ai_practice_problem
+from app.services.ai_question_generator import compute_question_hash, generate_ai_practice_problem
 from app.services.code_runner import CodeRunner
 
 # Supported Practice Fields
@@ -196,10 +196,32 @@ VERIFIED_TEMPLATES: dict[str, dict[str, list[dict[str, Any]]]] = {
                 "statement": "Given a string s, output 'true' if it is a palindrome (reads same forwards and backwards ignoring case), otherwise 'false'.\nInput: A single line string.",
                 "constraints": "1 <= s.length <= 10^4",
                 "examples": [{"input": "racecar", "output": "true"}, {"input": "hello", "output": "false"}],
+                "language": "java",
                 "starter_code": {
-                    "python": "import sys\n\ndef solve():\n    s = sys.stdin.read().strip().lower()\n    print('true' if s == s[::-1] else 'false')\n\nif __name__ == '__main__':\n    solve()",
+                    "java": (
+                        "import java.util.*;\n\n"
+                        "public class Solution {\n"
+                        "    public static void main(String[] args) {\n"
+                        "        Scanner sc = new Scanner(System.in);\n"
+                        "        if (!sc.hasNextLine()) return;\n"
+                        "        String s = sc.nextLine().trim().toLowerCase();\n"
+                        "        // Check palindrome in Java\n"
+                        "    }\n"
+                        "}\n"
+                    )
                 },
-                "reference_solution": "import sys\n\ndef solve():\n    s = sys.stdin.read().strip().lower()\n    print('true' if s == s[::-1] else 'false')\n\nif __name__ == '__main__':\n    solve()",
+                "reference_solution": (
+                    "import java.util.*;\n\n"
+                    "public class Solution {\n"
+                    "    public static void main(String[] args) {\n"
+                    "        Scanner sc = new Scanner(System.in);\n"
+                    "        if (!sc.hasNextLine()) return;\n"
+                    "        String s = sc.nextLine().trim().toLowerCase();\n"
+                    "        String rev = new StringBuilder(s).reverse().toString();\n"
+                    "        System.out.println(s.equals(rev) ? \"true\" : \"false\");\n"
+                    "    }\n"
+                    "}\n"
+                ),
                 "test_cases": [
                     {"input_data": "racecar", "expected_output": "true", "is_hidden": False, "weight": 1.0},
                     {"input_data": "hello", "expected_output": "false", "is_hidden": False, "weight": 1.0},
@@ -228,10 +250,26 @@ VERIFIED_TEMPLATES: dict[str, dict[str, list[dict[str, Any]]]] = {
                 "statement": "Given a URL query string, parse and print the value of parameter 'key'.\nInput format: Line 1: Target key. Line 2: Query string (e.g. user=csm&role=admin&env=prod). Output 'null' if key is missing.",
                 "constraints": "1 <= query_string.length <= 10^4",
                 "examples": [{"input": "role\nuser=csm&role=admin&env=prod", "output": "admin"}],
+                "language": "javascript",
                 "starter_code": {
-                    "python": "import sys\n\ndef solve():\n    lines = sys.stdin.read().strip().split('\\n')\n    if len(lines) < 2: return\n    target = lines[0].strip()\n    qs = lines[1].strip()\n    params = dict(part.split('=', 1) for part in qs.split('&') if '=' in part)\n    print(params.get(target, 'null'))\n\nif __name__ == '__main__':\n    solve()",
+                    "javascript": (
+                        "const fs = require('fs');\n"
+                        "const lines = fs.readFileSync(0, 'utf-8').trim().split('\\n');\n"
+                        "if (lines.length < 2) process.exit(0);\n"
+                        "const target = lines[0].trim();\n"
+                        "const qs = lines[1].trim();\n"
+                        "// Parse parameters and print value\n"
+                    )
                 },
-                "reference_solution": "import sys\n\ndef solve():\n    lines = sys.stdin.read().strip().split('\\n')\n    if len(lines) < 2: return\n    target = lines[0].strip()\n    qs = lines[1].strip()\n    params = dict(part.split('=', 1) for part in qs.split('&') if '=' in part)\n    print(params.get(target, 'null'))\n\nif __name__ == '__main__':\n    solve()",
+                "reference_solution": (
+                    "const fs = require('fs');\n"
+                    "const lines = fs.readFileSync(0, 'utf-8').trim().split('\\n');\n"
+                    "if (lines.length < 2) process.exit(0);\n"
+                    "const target = lines[0].trim();\n"
+                    "const qs = lines[1].trim();\n"
+                    "const params = new URLSearchParams(qs);\n"
+                    "console.log(params.get(target) || 'null');\n"
+                ),
                 "test_cases": [
                     {"input_data": "role\nuser=csm&role=admin&env=prod", "expected_output": "admin", "is_hidden": False, "weight": 1.0},
                     {"input_data": "token\nuser=csm&role=admin", "expected_output": "null", "is_hidden": False, "weight": 1.0},
@@ -375,12 +413,34 @@ def generate_practice_question(
     target_mode = mode.upper() if mode.upper() in {"MCQ", "CODING"} else "MCQ"
     target_diff = difficulty.upper() if difficulty else get_adaptive_difficulty(session, learner_id, target_field)
 
+    # Collect previously seen question hashes for this learner to prevent duplicate questions
+    recent_pqs = (
+        session.execute(
+            select(PracticeQuestion.question_data_json)
+            .join(PracticeSession, PracticeQuestion.session_id == PracticeSession.id)
+            .where(PracticeSession.learner_id == learner_id)
+        )
+        .scalars()
+        .all()
+    )
+    seen_hashes: set[str] = set()
+    for q_data in recent_pqs:
+        if isinstance(q_data, dict):
+            h = q_data.get("question_hash")
+            if not h:
+                txt = q_data.get("question") or q_data.get("statement") or ""
+                if txt:
+                    h = compute_question_hash(txt)
+            if h:
+                seen_hashes.add(h)
+
     # 1. Generate problem dynamically using AI generator (Live LLM or Procedural Engine)
     try:
         selected_tmpl = generate_ai_practice_problem(
             field=target_field,
             difficulty=target_diff,
             mode=target_mode,
+            seen_hashes=seen_hashes,
         )
     except Exception:
         # Fallback to verified template library if generation encountered an unexpected exception
@@ -393,9 +453,10 @@ def generate_practice_question(
     if target_mode == "CODING" and selected_tmpl.get("reference_solution") and selected_tmpl.get("test_cases"):
         ref_code = selected_tmpl["reference_solution"]
         test_cases = selected_tmpl["test_cases"]
+        code_lang = selected_tmpl.get("language") or "python"
         exec_res = CodeRunner.execute(
             code=ref_code,
-            language="python",
+            language=code_lang,
             test_cases=test_cases,
             time_limit_ms=3000,
             mask_hidden_inputs=False,
@@ -470,7 +531,7 @@ def record_practice_attempt(
 
     elif pq.mode == "CODING":
         user_code = str(answer_payload.get("code") or answer_payload.get("source_code") or "")
-        language = str(answer_payload.get("language", "python"))
+        language = str(answer_payload.get("language") or pq.question_data_json.get("language") or "python")
         test_cases = pq.question_data_json.get("test_cases", [])
         exec_res = CodeRunner.execute(
             code=user_code,

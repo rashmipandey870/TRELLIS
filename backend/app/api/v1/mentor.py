@@ -14,17 +14,21 @@ import csv
 import io
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, HttpUrl
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_uow, require_mentor, verify_mentor_learner_access
+from app.core.config import settings
+from app.models.audit import AuditLog
 from app.models.assessments import (
     Answer,
     Assessment,
     AssessmentAttempt,
+    AssessmentAudience,
     AssessmentQuestion,
     CodingProblem,
     McqOption,
@@ -74,8 +78,170 @@ class AssessmentCreateRequest(BaseModel):
     start_window: datetime | None = None
     end_window: datetime | None = None
     batch_id: str | None = None
+    learner_ids: list[str] = Field(default_factory=list)
     show_explanations: bool = True
     mask_hidden_cases: bool = True
+
+
+def validate_mentor_targets(
+    db: Session,
+    mentor: User,
+    batch_id: str | None,
+    learner_ids: list[str] | None,
+) -> None:
+    """Validate that batch_id and learner_ids belong to the mentor's own assignments."""
+    if (mentor.role or "").upper() == "ADMIN":
+        return
+
+    assigned_batches = set(
+        db.execute(
+            select(MentorLearnerAssignment.batch_id).where(
+                MentorLearnerAssignment.mentor_id == mentor.id,
+                MentorLearnerAssignment.batch_id.is_not(None),
+            )
+        ).scalars().all()
+    )
+    assigned_learners = set(
+        db.execute(
+            select(MentorLearnerAssignment.learner_id).where(
+                MentorLearnerAssignment.mentor_id == mentor.id
+            )
+        ).scalars().all()
+    )
+
+    if batch_id and assigned_batches and batch_id not in assigned_batches:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied: Mentor is not assigned to batch '{batch_id}'.",
+        )
+
+    if learner_ids:
+        for lid in learner_ids:
+            if assigned_learners and lid not in assigned_learners:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Access denied: Learner '{lid}' is not assigned to this mentor.",
+                )
+
+
+def validate_meeting_url(url: str, allowed_hosts: list[str]) -> None:
+    """Validate that meeting link uses https and its host matches the configured allow-list."""
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Meeting link is required.",
+        )
+    parsed = urlparse(url)
+    if (parsed.scheme or "").lower() != "https":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid meeting URL: Only https:// scheme is allowed (javascript:, data:, and http: are strictly rejected).",
+        )
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid meeting URL: Hostname is missing.",
+        )
+
+    def is_allowed(host: str, rule: str) -> bool:
+        clean_rule = rule.lower().lstrip("*.")
+        return host == clean_rule or host.endswith("." + clean_rule)
+
+    if not any(is_allowed(hostname, rule) for rule in allowed_hosts):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Meeting host '{hostname}' is not in allowed domains: {allowed_hosts}.",
+        )
+
+
+def validate_meeting_schedule_and_conflicts(
+    db: Session,
+    mentor_id: str,
+    meeting_date: str,
+    start_time: str,
+    end_time: str,
+    batch_id: str | None,
+    learner_ids: list[str],
+    exclude_meeting_id: str | None = None,
+) -> None:
+    """Validate date not in the past, end_time > start_time, and overlapping conflicts for mentor and audience."""
+    # 1. Date not in past
+    try:
+        m_date = datetime.strptime(meeting_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Expected YYYY-MM-DD.")
+
+    now_utc = datetime.now(UTC)
+    if m_date < now_utc.date():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Meeting date cannot be in the past.")
+
+    # 2. end_time > start_time
+    try:
+        s_time = datetime.strptime(start_time, "%H:%M").time()
+        e_time = datetime.strptime(end_time, "%H:%M").time()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid time format. Expected HH:MM.")
+
+    if e_time <= s_time:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Meeting end_time must be strictly after start_time.")
+
+    # 3. Conflict detection for SAME mentor (overlapping time range)
+    query_mentor = select(Meeting).where(
+        Meeting.mentor_id == mentor_id,
+        Meeting.meeting_date == meeting_date,
+        Meeting.status == "SCHEDULED",
+        Meeting.start_time < end_time,
+        Meeting.end_time > start_time,
+    )
+    if exclude_meeting_id:
+        query_mentor = query_mentor.where(Meeting.id != exclude_meeting_id)
+
+    mentor_conflict = db.execute(query_mentor).scalars().first()
+    if mentor_conflict:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Scheduling conflict: Mentor already has meeting '{mentor_conflict.title}' scheduled on {meeting_date} ({mentor_conflict.start_time} - {mentor_conflict.end_time}).",
+        )
+
+    # 4. Conflict detection for ANY learner in audience
+    audience_learners = set(learner_ids or [])
+    if batch_id:
+        batch_lids = db.execute(
+            select(MentorLearnerAssignment.learner_id).where(MentorLearnerAssignment.batch_id == batch_id)
+        ).scalars().all()
+        audience_learners.update(batch_lids)
+
+    if audience_learners:
+        overlapping_query = select(Meeting).where(
+            Meeting.meeting_date == meeting_date,
+            Meeting.status == "SCHEDULED",
+            Meeting.start_time < end_time,
+            Meeting.end_time > start_time,
+        )
+        if exclude_meeting_id:
+            overlapping_query = overlapping_query.where(Meeting.id != exclude_meeting_id)
+
+        overlapping_meetings = db.execute(overlapping_query).scalars().all()
+        for om in overlapping_meetings:
+            om_learners = set()
+            om_aud = db.execute(select(MeetingAudience).where(MeetingAudience.meeting_id == om.id)).scalars().all()
+            for aud in om_aud:
+                if aud.learner_id:
+                    om_learners.add(aud.learner_id)
+                elif aud.batch_id:
+                    om_b_lids = db.execute(
+                        select(MentorLearnerAssignment.learner_id).where(MentorLearnerAssignment.batch_id == aud.batch_id)
+                    ).scalars().all()
+                    om_learners.update(om_b_lids)
+
+            conflict_lids = audience_learners.intersection(om_learners)
+            if conflict_lids:
+                cl_name = sorted(conflict_lids)[0]
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Scheduling conflict: Learner '{cl_name}' is already scheduled in meeting '{om.title}' on {meeting_date} ({om.start_time} - {om.end_time}).",
+                )
 
 
 class McqQuestionCreateRequest(BaseModel):
@@ -113,6 +279,11 @@ class RemarkCreateRequest(BaseModel):
 class AlertActionRequest(BaseModel):
     action: str = Field(..., pattern="^(INVITE_ASSESSMENT|SCHEDULE_INTERVIEW|RECOMMEND_PROMOTION|DISMISSED)$")
     notes: str | None = None
+    assessment_id: str | None = None
+    meeting_date: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    meeting_link: str | None = None
 
 
 # --- Mentor Dashboard ---
@@ -238,30 +409,17 @@ def schedule_meeting(
     mentor: User = Depends(require_mentor),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
-    # Conflict detection: check if mentor has another meeting at same date/time
-    conflict = (
-        db.execute(
-            select(Meeting).where(
-                Meeting.mentor_id == mentor.id,
-                Meeting.meeting_date == payload.meeting_date,
-                Meeting.status == "SCHEDULED",
-                Meeting.start_time == payload.start_time,
-            )
-        )
-        .scalars()
-        .first()
+    validate_mentor_targets(db, mentor, payload.batch_id, payload.learner_ids)
+    validate_meeting_url(payload.meeting_link, settings.MEETING_ALLOWLIST_HOSTS)
+    validate_meeting_schedule_and_conflicts(
+        db=db,
+        mentor_id=mentor.id,
+        meeting_date=payload.meeting_date,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        batch_id=payload.batch_id,
+        learner_ids=payload.learner_ids,
     )
-    if conflict:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Scheduling conflict: You already have meeting '{conflict.title}' scheduled on {conflict.meeting_date} at {conflict.start_time}.",
-        )
-
-    # Validate meeting link
-    link = payload.meeting_link.lower()
-    if not any(provider in link for provider in ["teams", "meet.google", "zoom", "meet.csmtech", "csm.tech"]):
-        if not link.startswith("http://") and not link.startswith("https://"):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid meeting URL protocol.")
 
     meeting = Meeting(
         title=payload.title,
@@ -320,6 +478,19 @@ def edit_meeting(
     meeting = db.get(Meeting, meeting_id)
     if not meeting or meeting.mentor_id != mentor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found.")
+
+    validate_mentor_targets(db, mentor, payload.batch_id, payload.learner_ids)
+    validate_meeting_url(payload.meeting_link, settings.MEETING_ALLOWLIST_HOSTS)
+    validate_meeting_schedule_and_conflicts(
+        db=db,
+        mentor_id=mentor.id,
+        meeting_date=payload.meeting_date,
+        start_time=payload.start_time,
+        end_time=payload.end_time,
+        batch_id=payload.batch_id,
+        learner_ids=payload.learner_ids,
+        exclude_meeting_id=meeting.id,
+    )
 
     meeting.title = payload.title
     meeting.description = payload.description
@@ -389,7 +560,26 @@ def mark_attendance(
     if not meeting or meeting.mentor_id != mentor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found.")
 
+    # Determine all valid learner IDs in the meeting audience
+    valid_learners = set()
+    audiences = db.execute(select(MeetingAudience).where(MeetingAudience.meeting_id == meeting.id)).scalars().all()
+    for aud in audiences:
+        if aud.learner_id:
+            valid_learners.add(aud.learner_id)
+        elif aud.batch_id:
+            batch_lids = db.execute(
+                select(MentorLearnerAssignment.learner_id).where(MentorLearnerAssignment.batch_id == aud.batch_id)
+            ).scalars().all()
+            valid_learners.update(batch_lids)
+
+    # Validate that every attendance entry belongs to the audience
     for item in payload.attendances:
+        if item.learner_id not in valid_learners:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Attendance error: Learner '{item.learner_id}' is not in the audience for meeting '{meeting.title}'.",
+            )
+
         att = (
             db.execute(
                 select(MeetingAttendance).where(
@@ -450,6 +640,8 @@ def create_assessment(
     mentor: User = Depends(require_mentor),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    validate_mentor_targets(db, mentor, payload.batch_id, payload.learner_ids)
+
     assessment = Assessment(
         mentor_id=mentor.id,
         batch_id=payload.batch_id,
@@ -466,6 +658,11 @@ def create_assessment(
         version=1,
     )
     db.add(assessment)
+    db.flush()
+
+    for lid in payload.learner_ids:
+        db.add(AssessmentAudience(assessment_id=assessment.id, learner_id=lid))
+
     db.commit()
     db.refresh(assessment)
     return {"id": assessment.id, "title": assessment.title, "status": assessment.status, "version": assessment.version}
@@ -482,6 +679,8 @@ def update_assessment(
     assessment = db.get(Assessment, assessment_id)
     if not assessment or assessment.mentor_id != mentor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    validate_mentor_targets(db, mentor, payload.batch_id, payload.learner_ids)
 
     # Check if assessment is published and has submissions
     submissions_count = (
@@ -511,6 +710,9 @@ def update_assessment(
             version=assessment.version + 1,
         )
         db.add(new_version)
+        db.flush()
+        for lid in payload.learner_ids:
+            db.add(AssessmentAudience(assessment_id=new_version.id, learner_id=lid))
         db.commit()
         db.refresh(new_version)
         return {
@@ -528,6 +730,15 @@ def update_assessment(
     assessment.end_window = payload.end_window
     assessment.show_explanations = payload.show_explanations
     assessment.mask_hidden_cases = payload.mask_hidden_cases
+    assessment.batch_id = payload.batch_id
+
+    # Sync audience
+    db.execute(
+        delete(AssessmentAudience).where(AssessmentAudience.assessment_id == assessment.id)
+    )
+    for lid in payload.learner_ids:
+        db.add(AssessmentAudience(assessment_id=assessment.id, learner_id=lid))
+
     db.commit()
     return {"message": "Assessment updated.", "id": assessment.id, "version": assessment.version}
 
@@ -543,14 +754,23 @@ def publish_assessment(
     if not assessment or assessment.mentor_id != mentor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
 
+    # Idempotency check: Publishing an already published assessment must be a no-op (no duplicate notifications)
+    if assessment.status == "PUBLISHED":
+        return {
+            "id": assessment.id,
+            "status": assessment.status,
+            "message": "Assessment is already published.",
+        }
+
     if len(assessment.questions) == 0:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot publish assessment without questions.")
 
     assessment.status = "PUBLISHED"
 
+    recipients = set()
     # Notify learners in batch
     if assessment.batch_id:
-        learners = (
+        batch_learners = (
             db.execute(
                 select(MentorLearnerAssignment.learner_id).where(
                     MentorLearnerAssignment.batch_id == assessment.batch_id
@@ -559,16 +779,30 @@ def publish_assessment(
             .scalars()
             .all()
         )
-        for lid in learners:
-            notif = Notification(
-                recipient_id=lid,
-                sender_id=mentor.id,
-                title=f"New Assessment Available: {assessment.title}",
-                message=f"Mentor {mentor.full_name} published assessment '{assessment.title}'. Duration: {assessment.duration_minutes} mins.",
-                notification_type="ASSESSMENT",
-                link="/learner/assessments",
+        recipients.update(batch_learners)
+
+    # Notify explicit audience
+    audience_learners = (
+        db.execute(
+            select(AssessmentAudience.learner_id).where(
+                AssessmentAudience.assessment_id == assessment.id
             )
-            db.add(notif)
+        )
+        .scalars()
+        .all()
+    )
+    recipients.update(audience_learners)
+
+    for lid in recipients:
+        notif = Notification(
+            recipient_id=lid,
+            sender_id=mentor.id,
+            title=f"New Assessment Available: {assessment.title}",
+            message=f"Mentor {mentor.full_name} published assessment '{assessment.title}'. Duration: {assessment.duration_minutes} mins.",
+            notification_type="ASSESSMENT",
+            link="/learner/assessments",
+        )
+        db.add(notif)
 
     db.commit()
     return {"id": assessment.id, "status": assessment.status}
@@ -589,47 +823,6 @@ def list_question_bank(
         query = query.where(QuestionBank.difficulty == difficulty.upper())
 
     items = db.execute(query).scalars().all()
-    if not items:
-        # Pre-seed default question bank items if empty
-        return [
-            {
-                "id": "qb_1",
-                "title": "FastAPI Dependency Injection & Concurrency",
-                "type": "MCQ",
-                "field": "Python",
-                "difficulty": "MEDIUM",
-                "tags": ["FastAPI", "AsyncIO", "Concurrency"],
-                "content": "Which pattern guarantees database connection pool release when handling concurrent FastAPI requests with Depends?",
-            },
-            {
-                "id": "qb_2",
-                "title": "Two Sum Hash Map Eviction",
-                "type": "CODING",
-                "field": "DSA",
-                "difficulty": "EASY",
-                "tags": ["Array", "Hash Table", "Algorithms"],
-                "content": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.",
-            },
-            {
-                "id": "qb_3",
-                "title": "PostgreSQL Index Selection for Range Queries",
-                "type": "MCQ",
-                "field": "SQL",
-                "difficulty": "HARD",
-                "tags": ["PostgreSQL", "B-Tree", "Optimization"],
-                "content": "Which index type is optimal for timestamp range filtering combined with equality lookups on tenant_id?",
-            },
-            {
-                "id": "qb_4",
-                "title": "LRU Cache Data Structure Implementation",
-                "type": "CODING",
-                "field": "Python",
-                "difficulty": "MEDIUM",
-                "tags": ["Design", "Doubly Linked List", "O(1)"],
-                "content": "Design and implement a data structure for Least Recently Used (LRU) cache with O(1) get and put time complexity.",
-            },
-        ]
-
     return [
         {
             "id": q.id,
@@ -834,9 +1027,7 @@ def get_assigned_learners(
     learners = db.execute(select(User).where(User.id.in_(learner_ids))).scalars().all() if learner_ids else []
 
     if not learners:
-        # Pre-seeded fallback learners for mentor demo if not assigned
-        all_learners = db.execute(select(User).where(User.role == "LEARNER")).scalars().all()
-        learners = all_learners[:4] if all_learners else []
+        return []
 
     result = []
     for l in learners:
@@ -852,17 +1043,23 @@ def get_assigned_learners(
             select(AssessmentAttempt)
             .where(AssessmentAttempt.learner_id == l.id, AssessmentAttempt.status == "SUBMITTED")
         ).scalars().all()
-        avg_score = round(sum(a.score for a in attempts) / len(attempts), 1) if attempts else 92.0
+        avg_score = round(sum(a.score for a in attempts) / len(attempts), 1) if attempts else 0.0
+
+        # Find learner batch
+        assignment = db.execute(
+            select(MentorLearnerAssignment).where(MentorLearnerAssignment.learner_id == l.id)
+        ).scalars().first()
+        batch_name = assignment.batch.name if assignment and assignment.batch else "Direct Assignment"
 
         result.append({
             "id": l.id,
             "name": l.full_name,
             "full_name": l.full_name,
             "email": l.email,
-            "streak_days": l.streak_days or 14,
-            "batch_name": "Batch Alpha",
+            "streak_days": l.streak_days or 0,
+            "batch_name": batch_name,
             "avg_score": avg_score,
-            "latest_remark": latest_remark.remark_text if latest_remark else "Strong architectural thinking on Docker sandboxes.",
+            "latest_remark": latest_remark.remark_text if latest_remark else "",
         })
     return result
 
@@ -973,32 +1170,119 @@ def act_on_talent_alert(
     if not alert or alert.mentor_id != mentor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found.")
 
+    # Invariant: Block repeat actions on a closed alert
+    if alert.status != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Repeat actions blocked: Alert is already closed with status '{alert.status}'.",
+        )
+
     alert.status = payload.action
     alert.action_taken = payload.action
     alert.action_notes = payload.notes
     alert.action_time = datetime.now(UTC)
 
-    # Record discrete audit action
-    action_log = AlertAction(
-        alert_id=alert.id,
-        mentor_id=mentor.id,
-        action_taken=payload.action,
-        notes=payload.notes,
-    )
-    db.add(action_log)
-
-    # Trigger action specific notifications
+    # 1. INVITE_ASSESSMENT must create a real assessment_audience row for a chosen assessment
     if payload.action == "INVITE_ASSESSMENT":
+        target_assessment = None
+        if payload.assessment_id:
+            target_assessment = db.get(Assessment, payload.assessment_id)
+            if not target_assessment:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target assessment not found.")
+        else:
+            # Query mentor's latest published assessment or any published assessment in the track
+            target_assessment = (
+                db.execute(
+                    select(Assessment)
+                    .where(Assessment.mentor_id == mentor.id, Assessment.status == "PUBLISHED")
+                    .order_by(Assessment.created_at.desc())
+                )
+                .scalars()
+                .first()
+            )
+            if not target_assessment:
+                target_assessment = (
+                    db.execute(
+                        select(Assessment)
+                        .where(Assessment.status == "PUBLISHED")
+                        .order_by(Assessment.created_at.desc())
+                    )
+                    .scalars()
+                    .first()
+                )
+
+        if target_assessment:
+            existing_aud = db.execute(
+                select(AssessmentAudience).where(
+                    AssessmentAudience.assessment_id == target_assessment.id,
+                    AssessmentAudience.learner_id == alert.learner_id,
+                )
+            ).first()
+            if not existing_aud:
+                db.add(AssessmentAudience(assessment_id=target_assessment.id, learner_id=alert.learner_id))
+
         notif = Notification(
             recipient_id=alert.learner_id,
             sender_id=mentor.id,
             title="Special Assessment Invitation",
-            message=f"Based on your outstanding practice dedication in {alert.field}, you have been invited to an advanced assessment.",
+            message=f"Based on your outstanding practice dedication in {alert.field}, you have been invited to assessment '{target_assessment.title if target_assessment else 'Assessment'}'.",
             notification_type="ASSESSMENT",
             link="/learner/assessments",
         )
         db.add(notif)
+
+    # 2. SCHEDULE_INTERVIEW must create a real Meeting for that learner
+    elif payload.action == "SCHEDULE_INTERVIEW":
+        m_date = payload.meeting_date or datetime.now(UTC).date().isoformat()
+        s_time = payload.start_time or "14:00"
+        e_time = payload.end_time or "15:00"
+        m_link = payload.meeting_link or "https://meet.google.com/talent-interview"
+        validate_meeting_url(m_link, settings.MEETING_ALLOWLIST_HOSTS)
+
+        interview_meeting = Meeting(
+            title=f"Talent Interview: {alert.learner.full_name if alert.learner else 'Learner'}",
+            description=f"Special talent interview for {alert.field}. Notes: {payload.notes or 'None'}",
+            meeting_date=m_date,
+            start_time=s_time,
+            end_time=e_time,
+            duration_minutes=60,
+            meeting_link=m_link,
+            mentor_id=mentor.id,
+            status="SCHEDULED",
+        )
+        db.add(interview_meeting)
+        db.flush()
+        db.add(MeetingAudience(meeting_id=interview_meeting.id, learner_id=alert.learner_id))
+
+        notif = Notification(
+            recipient_id=alert.learner_id,
+            sender_id=mentor.id,
+            title="Interview Scheduled: Talent Spotlight",
+            message=f"Your mentor scheduled a talent review interview on {m_date} at {s_time}.",
+            notification_type="MEETING",
+            link="/learner/meetings",
+        )
+        db.add(notif)
+
+    # 3. RECOMMEND_PROMOTION must persist a record visible to admin
     elif payload.action == "RECOMMEND_PROMOTION":
+        audit = AuditLog(
+            org_id=mentor.org_id,
+            actor_id=mentor.id,
+            action="RECOMMEND_PROMOTION",
+            resource="talent_alerts",
+            resource_id=alert.id,
+            reason=payload.notes,
+            after_state_json={
+                "alert_id": alert.id,
+                "learner_id": alert.learner_id,
+                "field": alert.field,
+                "status": "RECOMMENDED_PROMOTION",
+                "notes": payload.notes,
+            },
+        )
+        db.add(audit)
+
         notif = Notification(
             recipient_id=alert.learner_id,
             sender_id=mentor.id,
@@ -1008,6 +1292,15 @@ def act_on_talent_alert(
             link="/learner/profile",
         )
         db.add(notif)
+
+    # Record discrete audit action log
+    action_log = AlertAction(
+        alert_id=alert.id,
+        mentor_id=mentor.id,
+        action_taken=payload.action,
+        notes=payload.notes,
+    )
+    db.add(action_log)
 
     db.commit()
     return {"message": "Action recorded successfully.", "status": alert.status}

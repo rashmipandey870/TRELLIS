@@ -14,21 +14,11 @@
     }
   },
   "active_roles": [
-    "EMPLOYEE",
-    "TRAINER_MENTOR",
-    "MANAGER",
-    "LK_ADMIN",
-    "SUPER_ADMIN"
+    "ADMIN",
+    "MENTOR",
+    "LEARNER"
   ],
-  "future_roles_modeled": [
-    "LK_HEAD_CLO",
-    "DEPARTMENT_HEAD",
-    "CONTENT_AUTHOR",
-    "ASSESSMENT_REVIEWER",
-    "HR_PARTNER",
-    "GUEST_CANDIDATE",
-    "AUDITOR"
-  ],
+  "future_roles_modeled": [],
   "actions": [
     "create",
     "read",
@@ -83,20 +73,49 @@
       "resource": "users",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT" },
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "update": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "fields": ["profile_preferences", "dyslexia_font_enabled", "theme"] },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "fields": [
+              "profile_preferences",
+              "dyslexia_font_enabled",
+              "theme"
+            ]
+          }
         },
         "delete": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": true, "audit": true, "note": "DPDP_RIGHT_TO_ERASURE_CRYPTO_SHRED" },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": true,
+            "audit": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "approval_required": true,
+            "audit": true,
+            "note": "DPDP_RIGHT_TO_ERASURE_CRYPTO_SHRED"
+          }
         }
       }
     },
@@ -104,18 +123,32 @@
       "resource": "roles_grants",
       "actions": {
         "create": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "target_role != 'SUPER_ADMIN'" },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "time_bounded_with_expiry" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": true,
+            "audit": true,
+            "condition": "time_bounded_with_expiry"
+          }
         },
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "delete": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": true,
+            "audit": true
+          }
         }
       }
     },
@@ -123,14 +156,25 @@
       "resource": "consents",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "AUDITOR": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "audit": true }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "create": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true
+          }
         },
         "update": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true, "note": "ONE_CLICK_REVOCATION" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true,
+            "note": "ONE_CLICK_REVOCATION"
+          }
         }
       }
     },
@@ -138,20 +182,40 @@
       "resource": "skills",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "ORGANIZATION" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION" },
-          "MANAGER": { "allowed": true, "scope": "ORGANIZATION" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          }
         },
         "create": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "update": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "delete": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": true,
+            "audit": true
+          }
         }
       }
     },
@@ -159,23 +223,53 @@
       "resource": "pathways",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "ORGANIZATION" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION" },
-          "MANAGER": { "allowed": true, "scope": "ORGANIZATION" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          }
         },
         "create": {
-          "CONTENT_AUTHOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "publish": {
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION", "approval_required": false, "audit": true, "condition": "author != subject" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true, "condition": "author != subject" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true,
+            "condition": "author != subject"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": false,
+            "audit": true,
+            "condition": "author != subject"
+          }
         },
         "assign": {
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "audit": true, "condition": "learning_load_guard_passed" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "TEAM_DIRECT",
+            "audit": true,
+            "condition": "learning_load_guard_passed"
+          }
         }
       }
     },
@@ -183,15 +277,35 @@
       "resource": "enrolments",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT" },
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "enrol": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true },
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "audit": true },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "TEAM_DIRECT",
+            "audit": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true
+          }
         }
       }
     },
@@ -199,15 +313,35 @@
       "resource": "assessments",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "COHORT", "condition": "is_active == true" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "COHORT",
+            "condition": "is_active == true"
+          }
         },
         "create": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "publish": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "author != subject" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": true,
+            "audit": true,
+            "condition": "author != subject"
+          }
         }
       }
     },
@@ -215,16 +349,24 @@
       "resource": "items",
       "actions": {
         "read": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" },
-          "ASSESSMENT_REVIEWER": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          }
         },
         "create": {
-          "CONTENT_AUTHOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "review": {
-          "ASSESSMENT_REVIEWER": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         }
       }
     },
@@ -232,15 +374,33 @@
       "resource": "attempts",
       "actions": {
         "create": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true
+          }
         },
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "condition": "candidate_identity_redacted" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT",
+            "condition": "candidate_identity_redacted"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "update": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "condition": "attempt_in_progress == true" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "condition": "attempt_in_progress == true"
+          }
         }
       }
     },
@@ -248,11 +408,21 @@
       "resource": "responses",
       "actions": {
         "grade": {
-          "TRAINER_MENTOR": { "allowed": true, "scope": "BLIND_GRADING", "audit": true, "condition": "candidate_identity_redacted" },
-          "ASSESSMENT_REVIEWER": { "allowed": true, "scope": "BLIND_GRADING", "audit": true, "condition": "candidate_identity_redacted" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "BLIND_GRADING",
+            "audit": true,
+            "condition": "candidate_identity_redacted"
+          }
         },
         "override": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "approval_required": true, "audit": true, "condition": "mandatory_justification_logged" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "approval_required": true,
+            "audit": true,
+            "condition": "mandatory_justification_logged"
+          }
         }
       }
     },
@@ -260,17 +430,37 @@
       "resource": "growth_ring",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "audit": true, "access_receipt": true },
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "audit": true, "access_receipt": true, "condition": "consent.growth_ring == true" },
-          "LK_ADMIN": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "audit": true },
-          "LK_HEAD_CLO": { "allowed": true, "scope": "ANONYMIZED_AGGREGATE", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ANONYMIZED_AGGREGATE",
+            "audit": true
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT",
+            "audit": true,
+            "access_receipt": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "download": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true, "note": "GROWTH_RING_PDF_DOWNLOAD" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true,
+            "note": "GROWTH_RING_PDF_DOWNLOAD"
+          }
         },
         "share": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true, "note": "CONSENT_PASSPORT_SHARING" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true,
+            "note": "CONSENT_PASSPORT_SHARING"
+          }
         }
       }
     },
@@ -278,21 +468,54 @@
       "resource": "evidence_ledger",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "audit": true, "access_receipt": true },
-          "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true, "condition": "hash_verification_only" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT",
+            "audit": true,
+            "access_receipt": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "create": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "approval_required": true, "audit": true, "condition": "type == 'self_reflection'" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "audit": true }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT",
+            "audit": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "approval_required": true,
+            "audit": true,
+            "condition": "type == 'self_reflection'"
+          }
         },
         "update": {
-          "EMPLOYEE": { "allowed": false, "scope": "NONE", "note": "IMMUTABLE_INVARIANT" },
-          "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "note": "IMMUTABLE_INVARIANT" }
+          "ADMIN": {
+            "allowed": false,
+            "scope": "NONE",
+            "note": "IMMUTABLE_INVARIANT"
+          },
+          "LEARNER": {
+            "allowed": false,
+            "scope": "NONE",
+            "note": "IMMUTABLE_INVARIANT"
+          }
         },
         "delete": {
-          "EMPLOYEE": { "allowed": false, "scope": "NONE", "note": "IMMUTABLE_INVARIANT" },
-          "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "note": "IMMUTABLE_INVARIANT" }
+          "ADMIN": {
+            "allowed": false,
+            "scope": "NONE",
+            "note": "IMMUTABLE_INVARIANT"
+          },
+          "LEARNER": {
+            "allowed": false,
+            "scope": "NONE",
+            "note": "IMMUTABLE_INVARIANT"
+          }
         }
       }
     },
@@ -300,13 +523,26 @@
       "resource": "sessions",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "COHORT" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT" },
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "COHORT"
+          }
         },
         "create": {
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "audit": true },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT",
+            "audit": true
+          }
         }
       }
     },
@@ -314,17 +550,41 @@
       "resource": "greenhouse_ideas",
       "actions": {
         "create": {
-          "EMPLOYEE": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "ORGANIZATION", "condition": "confidentiality_match == true" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "condition": "confidentiality_match == true"
+          }
         },
         "approve": {
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT", "audit": true, "condition": "author != subject" },
-          "MANAGER": { "allowed": true, "scope": "TEAM_DIRECT", "audit": true, "condition": "author != subject" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true, "condition": "author != subject" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true,
+            "condition": "author != subject"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT",
+            "audit": true,
+            "condition": "author != subject"
+          }
         }
       }
     },
@@ -332,12 +592,25 @@
       "resource": "grove_spaces",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "COHORT" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "COHORT"
+          }
         },
         "create": {
-          "EMPLOYEE": { "allowed": true, "scope": "COHORT", "note": "DOUBT_THREAD_CREATION" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "COHORT" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "COHORT"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "COHORT",
+            "note": "DOUBT_THREAD_CREATION"
+          }
         }
       }
     },
@@ -345,16 +618,35 @@
       "resource": "kb_articles",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "ORGANIZATION" },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION" }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          },
+          "LEARNER": {
+            "allowed": true,
+            "scope": "ORGANIZATION"
+          }
         },
         "create": {
-          "CONTENT_AUTHOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "publish": {
-          "TRAINER_MENTOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true, "condition": "author != subject" },
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true, "condition": "author != subject" }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true,
+            "condition": "author != subject"
+          },
+          "MENTOR": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true,
+            "condition": "author != subject"
+          }
         }
       }
     },
@@ -362,11 +654,19 @@
       "resource": "ai_runs",
       "actions": {
         "create": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true, "note": "GARDENER_QUERY" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true,
+            "note": "GARDENER_QUERY"
+          }
         },
         "read": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         }
       }
     },
@@ -374,15 +674,25 @@
       "resource": "audit_log",
       "actions": {
         "read": {
-          "LK_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "SUPER_ADMIN": { "allowed": true, "scope": "ORGANIZATION", "audit": true },
-          "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "ADMIN": {
+            "allowed": true,
+            "scope": "ORGANIZATION",
+            "audit": true
+          }
         },
         "update": {
-          "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "note": "IMMUTABLE_INVARIANT" }
+          "ADMIN": {
+            "allowed": false,
+            "scope": "NONE",
+            "note": "IMMUTABLE_INVARIANT"
+          }
         },
         "delete": {
-          "SUPER_ADMIN": { "allowed": false, "scope": "NONE", "note": "IMMUTABLE_INVARIANT" }
+          "ADMIN": {
+            "allowed": false,
+            "scope": "NONE",
+            "note": "IMMUTABLE_INVARIANT"
+          }
         }
       }
     },
@@ -390,8 +700,11 @@
       "resource": "access_receipts",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "note": "CONSENT_PASSPORT_VIEW" },
-          "AUDITOR": { "allowed": true, "scope": "ORGANIZATION", "audit": true }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "note": "CONSENT_PASSPORT_VIEW"
+          }
         }
       }
     },
@@ -399,13 +712,25 @@
       "resource": "credentials",
       "actions": {
         "read": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN"
+          }
         },
         "export": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true, "note": "SKILLS_PASSPORT_VC_EXPORT" }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true,
+            "note": "SKILLS_PASSPORT_VC_EXPORT"
+          }
         },
         "download": {
-          "EMPLOYEE": { "allowed": true, "scope": "OWN", "audit": true }
+          "LEARNER": {
+            "allowed": true,
+            "scope": "OWN",
+            "audit": true
+          }
         }
       }
     }

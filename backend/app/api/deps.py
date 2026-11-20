@@ -20,29 +20,22 @@ _sync_engine = None
 
 
 def get_sync_engine() -> Any:
-    """Return synchronous database engine."""
+    """Return synchronous database engine.
+    
+    Alembic migrations are the sole schema source. Base.metadata.create_all and silent fallbacks are removed.
+    """
     global _sync_engine
     if _sync_engine is None:
-        import os
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        local_db_path = os.path.join(base_dir, "trellis.db").replace("\\", "/")
-        db_url = settings.DATABASE_URL.replace("mysql+asyncmy://", "mysql+pymysql://") if settings.DATABASE_URL else ""
-        if db_url.startswith("sqlite+aiosqlite://"):
+        db_url = settings.DATABASE_URL
+        if not db_url:
+            raise RuntimeError("DATABASE_URL is not configured in settings.")
+
+        if db_url.startswith("mysql+asyncmy://"):
+            db_url = db_url.replace("mysql+asyncmy://", "mysql+pymysql://", 1)
+        elif db_url.startswith("sqlite+aiosqlite://"):
             db_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
-        if not db_url or "mysql" in db_url:
-            try:
-                if db_url and "mysql" in db_url:
-                    _sync_engine = create_engine(db_url, pool_pre_ping=True)
-                    Base.metadata.create_all(_sync_engine)
-                else:
-                    _sync_engine = create_engine(f"sqlite:///{local_db_path}")
-                    Base.metadata.create_all(_sync_engine)
-            except Exception:
-                _sync_engine = create_engine(f"sqlite:///{local_db_path}")
-                Base.metadata.create_all(_sync_engine)
-        else:
-            _sync_engine = create_engine(db_url)
-            Base.metadata.create_all(_sync_engine)
+
+        _sync_engine = create_engine(db_url, pool_pre_ping=True)
     return _sync_engine
 
 
@@ -137,14 +130,6 @@ def require_role(*roles: str) -> Any:
             for g in current_user.grants:
                 if g.role and g.role.code:
                     user_roles.add(g.role.code.upper())
-
-        # Map legacy role names if present
-        if "SUPER_ADMIN" in user_roles or "LK_ADMIN" in user_roles:
-            user_roles.add("ADMIN")
-        if "TRAINER" in user_roles or "TRAINER_MENTOR" in user_roles:
-            user_roles.add("MENTOR")
-        if "EMPLOYEE" in user_roles:
-            user_roles.add("LEARNER")
 
         allowed = {r.upper() for r in roles}
         if not user_roles.intersection(allowed):

@@ -39,6 +39,18 @@ export interface RefreshResponse {
   expires_in: number;
 }
 
+const REFRESH_TOKEN_KEY = 'trellis_refresh_token';
+
+/**
+ * Security Architecture Trade-Off:
+ * --------------------------------
+ * Access tokens are stored strictly in-memory (Angular signals) to prevent unauthorized exfiltration
+ * via persistent browser storage. To support seamless session persistence across browser reloads,
+ * the rotation-capable refresh token is persisted in sessionStorage.
+ * On application start, `initSession()` performs a silent refresh to re-acquire a fresh in-memory
+ * access token and user profile. If token reuse or tampering is detected by the server, the token family
+ * is revoked and the session is cleared.
+ */
 @Injectable({
   providedIn: 'root',
 })
@@ -46,7 +58,7 @@ export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
 
-  // In-memory token storage (XSS prevention invariant: NEVER in localStorage/sessionStorage)
+  // In-memory access token (XSS mitigation)
   readonly accessToken = signal<string | null>(null);
   private refreshToken: string | null = null;
 
@@ -62,6 +74,19 @@ export class AuthService {
   readonly isAdmin = computed(() => this.primaryRole() === 'ADMIN');
   readonly isMentor = computed(() => this.primaryRole() === 'MENTOR');
   readonly isLearner = computed(() => this.primaryRole() === 'LEARNER');
+
+  constructor() {
+    // Attempt to recover refresh token from sessionStorage
+    try {
+      this.refreshToken = sessionStorage.getItem(REFRESH_TOKEN_KEY);
+    } catch {
+      this.refreshToken = null;
+    }
+  }
+
+  getRefreshToken(): string | null {
+    return this.refreshToken;
+  }
 
   /**
    * Determine the target landing route based on user role.
@@ -81,7 +106,6 @@ export class AuthService {
 
   /**
    * Perform standard employee / admin login.
-   * Access token is held strictly in-memory.
    */
   login(email: string, password: string): Observable<UserProfileResponse> {
     return this.http
@@ -98,42 +122,50 @@ export class AuthService {
           }
 
           this.accessToken.set(res.tokens.access_token);
-          this.refreshToken = res.tokens.refresh_token;
+          this.setRefreshToken(res.tokens.refresh_token);
 
-          return this.http.get<UserProfileResponse>('/api/v1/auth/me').pipe(
-            tap((user) => {
-              const roleNormalized = (user.role || user.roles?.[0] || 'LEARNER').toUpperCase();
-              this.currentUser.set({
-                id: user.id,
-                email: user.email,
-                fullName: user.full_name,
-                roles: user.roles || [roleNormalized],
-                role: roleNormalized,
-                orgId: user.org_id,
-                avatarUrl: user.avatar_url,
-              });
-            })
-          );
+          return this.fetchUserProfile();
         })
       );
+  }
+
+  /**
+   * Fetch current user profile.
+   */
+  fetchUserProfile(): Observable<UserProfileResponse> {
+    return this.http.get<UserProfileResponse>('/api/v1/auth/me').pipe(
+      tap((user) => {
+        const roleNormalized = (user.role || user.roles?.[0] || 'LEARNER').toUpperCase();
+        this.currentUser.set({
+          id: user.id,
+          email: user.email,
+          fullName: user.full_name,
+          roles: user.roles || [roleNormalized],
+          role: roleNormalized,
+          orgId: user.org_id,
+          avatarUrl: user.avatar_url,
+        });
+      })
+    );
   }
 
   /**
    * Rotate refresh token and update in-memory access token.
    */
   rotateTokens(): Observable<RefreshResponse> {
-    if (!this.refreshToken) {
+    const token = this.refreshToken;
+    if (!token) {
       return throwError(() => new Error('NO_REFRESH_TOKEN'));
     }
 
     return this.http
       .post<RefreshResponse>('/api/v1/auth/refresh', {
-        refresh_token: this.refreshToken,
+        refresh_token: token,
       })
       .pipe(
         tap((res) => {
           this.accessToken.set(res.access_token);
-          this.refreshToken = res.refresh_token;
+          this.setRefreshToken(res.refresh_token);
         }),
         catchError((err) => {
           this.logout();
@@ -143,18 +175,51 @@ export class AuthService {
   }
 
   /**
+   * Silent refresh on application startup to restore session.
+   */
+  initSession(): Observable<boolean> {
+    if (!this.refreshToken) {
+      return of(false);
+    }
+
+    return this.rotateTokens().pipe(
+      switchMap(() => this.fetchUserProfile()),
+      map(() => true),
+      catchError(() => {
+        this.logout();
+        return of(false);
+      })
+    );
+  }
+
+  private setRefreshToken(token: string | null): void {
+    this.refreshToken = token;
+    try {
+      if (token) {
+        sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
+      } else {
+        sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+      }
+    } catch {
+      // Ignore sessionStorage exceptions
+    }
+  }
+
+  /**
    * Invalidate session and clear in-memory state.
    */
   logout(): void {
-    if (this.refreshToken) {
+    const token = this.refreshToken;
+    this.accessToken.set(null);
+    this.setRefreshToken(null);
+    this.currentUser.set(null);
+
+    if (token) {
       this.http
-        .post('/api/v1/auth/logout', { refresh_token: this.refreshToken })
+        .post('/api/v1/auth/logout', { refresh_token: token })
         .pipe(catchError(() => of(null)))
         .subscribe();
     }
-    this.accessToken.set(null);
-    this.refreshToken = null;
-    this.currentUser.set(null);
     this.router.navigate(['/login']);
   }
 }
