@@ -31,6 +31,7 @@ from app.models.practice import (
 )
 from app.models.settings import SystemSetting
 from app.models.user import User
+from app.services.ai_question_generator import generate_ai_practice_problem
 from app.services.code_runner import CodeRunner
 
 # Supported Practice Fields
@@ -369,24 +370,27 @@ def generate_practice_question(
     difficulty: str | None = None,
     mode: str = "MCQ",
 ) -> PracticeQuestion:
-    """Generate or retrieve a vetted practice question."""
+    """Generate or retrieve an AI-generated, verified practice question."""
     target_field = field if field in SUPPORTED_FIELDS else "Python"
     target_mode = mode.upper() if mode.upper() in {"MCQ", "CODING"} else "MCQ"
     target_diff = difficulty.upper() if difficulty else get_adaptive_difficulty(session, learner_id, target_field)
 
-    # 1. Check if LLM API key is configured (Anthropic Claude or OpenAI)
-    llm_key = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY")
-
-    # 2. Retrieve verified question from library or generate dynamically
-    templates = VERIFIED_TEMPLATES.get(target_field, VERIFIED_TEMPLATES["Python"]).get(target_mode, [])
-    if not templates:
-        templates = VERIFIED_TEMPLATES["Python"][target_mode]
-
-    # Select template matching difficulty or fallback
-    selected_tmpl = next((t for t in templates if t.get("difficulty") == target_diff), templates[0])
+    # 1. Generate problem dynamically using AI generator (Live LLM or Procedural Engine)
+    try:
+        selected_tmpl = generate_ai_practice_problem(
+            field=target_field,
+            difficulty=target_diff,
+            mode=target_mode,
+        )
+    except Exception:
+        # Fallback to verified template library if generation encountered an unexpected exception
+        templates = VERIFIED_TEMPLATES.get(target_field, VERIFIED_TEMPLATES["Python"]).get(target_mode, [])
+        if not templates:
+            templates = VERIFIED_TEMPLATES["Python"][target_mode]
+        selected_tmpl = next((t for t in templates if t.get("difficulty") == target_diff), templates[0])
 
     # If Coding problem, verify reference solution through sandbox before saving
-    if target_mode == "CODING":
+    if target_mode == "CODING" and selected_tmpl.get("reference_solution") and selected_tmpl.get("test_cases"):
         ref_code = selected_tmpl["reference_solution"]
         test_cases = selected_tmpl["test_cases"]
         exec_res = CodeRunner.execute(
@@ -415,7 +419,7 @@ def generate_practice_question(
         field=target_field,
         difficulty=target_diff,
         mode=target_mode,
-        title=selected_tmpl["title"],
+        title=selected_tmpl.get("title", f"{target_field} {target_diff} {target_mode}"),
         question_data_json=selected_tmpl,
         reference_solution=selected_tmpl.get("reference_solution"),
         verified=True,

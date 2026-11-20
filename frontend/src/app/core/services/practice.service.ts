@@ -14,6 +14,7 @@ export interface GeneratedPracticeQuestion {
   field: string;
   difficulty: 'EASY' | 'MEDIUM' | 'HARD';
   question_type: 'MCQ' | 'CODING';
+  mode?: 'MCQ' | 'CODING';
   title: string;
   content: string;
   options?: Array<{ id: string; option_text: string }>;
@@ -22,6 +23,7 @@ export interface GeneratedPracticeQuestion {
   starter_code?: Record<string, string>;
   constraints?: string;
   sample_cases?: Array<{ input: string; output: string }>;
+  question_data?: any;
 }
 
 export interface PracticeAttemptResult {

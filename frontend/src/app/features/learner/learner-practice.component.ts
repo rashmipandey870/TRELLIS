@@ -108,18 +108,18 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
             </div>
           </div>
 
-          <div class="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
-            {{ activeQuestion()?.content }}
+          <div class="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed font-sans">
+            {{ getQuestionContent() }}
           </div>
 
           <!-- MCQ Options -->
-          @if (activeQuestion()?.question_type === 'MCQ') {
-            <div class="space-y-2">
-              @for (opt of activeQuestion()?.options; track opt.id) {
+          @if (isMcq()) {
+            <div class="space-y-2.5">
+              @for (opt of getQuestionOptions(); track opt.id) {
                 <label 
-                  class="flex items-center gap-3 p-3.5 rounded-xl border text-xs cursor-pointer transition"
-                  [ngClass]="selectedOptionId === opt.id ? 'bg-sky-50 dark:bg-sky-950/40 border-[#008FBB] text-[#008FBB] font-bold' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'">
-                  <input type="radio" name="practice_opt" [value]="opt.id" [(ngModel)]="selectedOptionId" class="text-[#008FBB]" />
+                  class="flex items-center gap-3 p-3.5 rounded-xl border text-xs cursor-pointer transition select-none"
+                  [ngClass]="selectedOptionId === opt.id ? 'bg-sky-50 dark:bg-sky-950/40 border-[#008FBB] text-[#008FBB] font-bold shadow-sm' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-400'">
+                  <input type="radio" name="practice_opt" [value]="opt.id" [(ngModel)]="selectedOptionId" class="text-[#008FBB] focus:ring-[#008FBB]" />
                   <span>{{ opt.option_text }}</span>
                 </label>
               }
@@ -127,13 +127,21 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
           }
 
           <!-- Coding Solution Area -->
-          @if (activeQuestion()?.question_type === 'CODING') {
-            <div class="space-y-2">
-              <span class="text-[10px] font-bold uppercase text-slate-400">Your Python Solution:</span>
+          @if (isCoding()) {
+            <div class="space-y-3">
+              @if (activeQuestion()?.constraints) {
+                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-400">
+                  <strong class="text-slate-700 dark:text-slate-200">Constraints:</strong> {{ activeQuestion()?.constraints }}
+                </div>
+              }
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase text-slate-400">Your Python Solution:</span>
+                <span class="text-[10px] text-slate-400">Executes in sandboxed test runner</span>
+              </div>
               <textarea 
                 [(ngModel)]="codeSolution" 
-                rows="8" 
-                class="w-full font-mono text-xs p-4 bg-slate-950 text-slate-100 border border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
+                rows="10" 
+                class="w-full font-mono text-xs p-4 bg-slate-950 text-emerald-400 border border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
             </div>
           }
 
@@ -143,17 +151,18 @@ import { DedicationScoreSummary, GeneratedPracticeQuestion, PracticeAttemptResul
               type="button" 
               (click)="showNextHint()"
               [disabled]="currentHintIndex() >= (activeQuestion()?.hints?.length || 0)"
-              class="px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-[#FAA634] text-xs font-bold border border-amber-200 disabled:opacity-40">
+              class="px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-[#FAA634] text-xs font-bold border border-amber-200 disabled:opacity-40 transition">
               💡 Request Progressive Hint ({{ currentHintIndex() }} / {{ activeQuestion()?.hints?.length || 2 }})
             </button>
 
             <button 
               type="button" 
-              [disabled]="isEvaluating()"
+              [disabled]="isEvaluating() || isSubmitDisabled()"
               (click)="submitAttempt()"
-              class="px-5 py-2 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-white text-xs font-bold shadow-md transition">
+              class="px-5 py-2 rounded-xl bg-[#008FBB] hover:bg-[#007499] disabled:opacity-40 text-white text-xs font-bold shadow-md transition flex items-center gap-2">
               @if (isEvaluating()) {
-                <span>Evaluating...</span>
+                <span class="animate-spin text-xs">&#9696;</span>
+                <span>Evaluating in Sandbox...</span>
               } @else {
                 <span>Submit Practice Attempt</span>
               }
@@ -314,8 +323,13 @@ export class LearnerPracticeComponent implements OnInit {
     }).subscribe({
       next: (q) => {
         this.isGenerating.set(false);
-        this.activeQuestion.set(q);
-        if (q.question_type === 'CODING') {
+        const normalized: GeneratedPracticeQuestion = {
+          ...q,
+          question_type: (q.question_type || (q as any).mode || this.selectedMode()).toUpperCase() as any,
+          content: q.content || (q as any).question || (q as any).statement || (q as any).question_data?.question || (q as any).question_data?.statement || '',
+        };
+        this.activeQuestion.set(normalized);
+        if (normalized.question_type === 'CODING') {
           const starter = typeof q.starter_code === 'object' && q.starter_code
             ? (q.starter_code['python'] || Object.values(q.starter_code)[0])
             : (typeof q.starter_code === 'string' ? q.starter_code : 'def solve():\n    pass');
@@ -366,6 +380,53 @@ export class LearnerPracticeComponent implements OnInit {
     });
   }
 
+  isMcq(): boolean {
+    const q = this.activeQuestion();
+    if (!q) return true;
+    return (q.question_type || q.mode || 'MCQ').toUpperCase() === 'MCQ';
+  }
+
+  isCoding(): boolean {
+    const q = this.activeQuestion();
+    if (!q) return false;
+    return (q.question_type || q.mode) === 'CODING';
+  }
+
+  getQuestionContent(): string {
+    const q = this.activeQuestion();
+    if (!q) return '';
+    return q.content || (q as any).question || (q as any).statement || (q as any).question_data?.question || (q as any).question_data?.statement || '';
+  }
+
+  getQuestionOptions(): Array<{ id: string; option_text: string }> {
+    const q = this.activeQuestion();
+    if (!q) return [];
+    if (q.options && q.options.length > 0) {
+      return q.options.map((opt: any, i: number) => {
+        if (typeof opt === 'string') return { id: `opt_${i}`, option_text: opt };
+        return { id: opt.id || `opt_${i}`, option_text: opt.option_text || String(opt) };
+      });
+    }
+    const qdata = (q as any).question_data;
+    if (qdata && qdata.options && qdata.options.length > 0) {
+      return qdata.options.map((opt: any, i: number) => {
+        if (typeof opt === 'string') return { id: `opt_${i}`, option_text: opt };
+        return { id: opt.id || `opt_${i}`, option_text: opt.option_text || String(opt) };
+      });
+    }
+    return [];
+  }
+
+  isSubmitDisabled(): boolean {
+    const q = this.activeQuestion();
+    if (!q) return true;
+    const isMcq = (q.question_type || (q as any).mode || 'MCQ') === 'MCQ';
+    if (isMcq) {
+      return !this.selectedOptionId;
+    }
+    return !this.codeSolution || this.codeSolution.trim().length === 0;
+  }
+
   showNextHint(): void {
     const q = this.activeQuestion();
     if (!q || !q.hints || q.hints.length === 0) return;
@@ -381,10 +442,11 @@ export class LearnerPracticeComponent implements OnInit {
     if (!q) return;
 
     this.isEvaluating.set(true);
+    const mode = (q.question_type || (q as any).mode || 'MCQ').toUpperCase();
     this.practiceService.submitAttempt({
       question_id: q.id,
-      answer_text: q.question_type === 'MCQ' ? this.selectedOptionId : undefined,
-      source_code: q.question_type === 'CODING' ? this.codeSolution : undefined,
+      answer_text: mode === 'MCQ' ? this.selectedOptionId : undefined,
+      source_code: mode === 'CODING' ? this.codeSolution : undefined,
       language: 'python',
     }).subscribe({
       next: (res) => {
