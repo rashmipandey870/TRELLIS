@@ -7,403 +7,291 @@ import { RouterModule } from '@angular/router';
   standalone: true,
   imports: [CommonModule, RouterModule],
   template: `
-    <div class="min-h-screen bg-white text-slate-800 flex flex-col font-sans selection:bg-[#008FBB] selection:text-white">
+    <div class="min-h-screen bg-white text-slate-900 flex flex-col font-sans selection:bg-[#008FBB] selection:text-white relative overflow-x-hidden">
       
-      <!-- Top Announcement Ribbon (Official CSM Header Style) -->
-      <div class="bg-slate-50 border-b border-slate-200 text-[11px] py-2 px-4 text-slate-600">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span class="font-bold text-slate-800">CMMI Level 5 V2.0 Appraised</span>
-            <span class="hidden sm:inline text-slate-400">&bull;</span>
-            <span class="hidden sm:inline">25+ Years of Digital Transformation Excellence</span>
-          </div>
-          <div class="flex items-center gap-4 text-slate-500 font-medium">
-            <span class="hidden md:inline">Global HQ: Bhubaneswar, India</span>
-            <span class="hidden md:inline text-slate-300">|</span>
-            <a routerLink="/login" class="text-[#FAA634] hover:text-[#d48419] font-bold flex items-center gap-1 transition">
-              <span>Employee &amp; Learner Access &rarr;</span>
-            </a>
-          </div>
+      <!-- Ambient Diagonal Speed-Trails & Grid Background (Pixel-Matched to csm.tech) -->
+      <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <!-- Subtle Grid Pattern -->
+        <div class="absolute inset-0 opacity-[0.035]" 
+             style="background-image: linear-gradient(to right, #0f172a 1px, transparent 1px), linear-gradient(to bottom, #0f172a 1px, transparent 1px); background-size: 40px 40px;">
         </div>
+
+        <!-- Diagonal Color Streaks (Cyan, Saffron, Red Trails) -->
+        <svg class="absolute -right-20 top-0 w-[1100px] h-[900px] opacity-40" viewBox="0 0 1100 900" fill="none">
+          <line x1="200" y1="900" x2="850" y2="0" stroke="url(#streak-cyan)" stroke-width="2.5" stroke-linecap="round" />
+          <line x1="320" y1="900" x2="970" y2="0" stroke="url(#streak-orange)" stroke-width="2" stroke-linecap="round" />
+          <line x1="450" y1="900" x2="1100" y2="0" stroke="url(#streak-cyan)" stroke-width="1.5" stroke-linecap="round" />
+          <line x1="120" y1="900" x2="770" y2="0" stroke="url(#streak-red)" stroke-width="1" stroke-linecap="round" />
+          <line x1="50" y1="900" x2="700" y2="0" stroke="url(#streak-soft)" stroke-width="3" stroke-linecap="round" />
+          <line x1="400" y1="900" x2="1050" y2="0" stroke="url(#streak-soft)" stroke-width="4" stroke-linecap="round" opacity="0.4" />
+          <defs>
+            <linearGradient id="streak-cyan" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#008FBB" stop-opacity="0" />
+              <stop offset="50%" stop-color="#008FBB" stop-opacity="0.8" />
+              <stop offset="100%" stop-color="#008FBB" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="streak-orange" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#FAA634" stop-opacity="0" />
+              <stop offset="50%" stop-color="#FAA634" stop-opacity="0.9" />
+              <stop offset="100%" stop-color="#FAA634" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="streak-red" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#D7182A" stop-opacity="0" />
+              <stop offset="50%" stop-color="#D7182A" stop-opacity="0.7" />
+              <stop offset="100%" stop-color="#D7182A" stop-opacity="0" />
+            </linearGradient>
+            <linearGradient id="streak-soft" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#94a3b8" stop-opacity="0" />
+              <stop offset="50%" stop-color="#cbd5e1" stop-opacity="0.6" />
+              <stop offset="100%" stop-color="#94a3b8" stop-opacity="0" />
+            </linearGradient>
+          </defs>
+        </svg>
       </div>
 
-      <!-- Main Navigation Bar (Clean White, Glassmorphic Shadow) -->
-      <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Official Top Navbar -->
+      <header class="relative z-30 bg-white/90 backdrop-blur-md border-b border-slate-100">
+        <div class="max-w-[1400px] mx-auto px-6 sm:px-8">
           <div class="flex items-center justify-between h-20">
             
-            <!-- CSM Technologies Brand Logo -->
-            <a routerLink="/" class="flex items-center gap-3 group">
-              <!-- Stylized 3-Slashes Emblem: Inward (Saffron), Outward (Signal Red), Upward (Cerulean) -->
-              <div class="relative w-11 h-11 flex items-center justify-center">
-                <div class="w-11 h-11 rounded-xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center p-2 group-hover:border-[#008FBB] transition">
-                  <svg class="w-full h-full" viewBox="0 0 40 40" fill="none">
-                    <!-- Saffron Slash (Inward) -->
-                    <rect x="6" y="24" width="7" height="12" rx="3.5" transform="rotate(-30 6 24)" fill="#FAA634" />
-                    <!-- Signal Red Slash (Outward) -->
-                    <rect x="16" y="16" width="7" height="18" rx="3.5" transform="rotate(-30 16 16)" fill="#D7182A" />
-                    <!-- Cerulean Slash (Upward) -->
-                    <rect x="26" y="8" width="7" height="24" rx="3.5" transform="rotate(-30 26 8)" fill="#008FBB" />
-                  </svg>
+            <!-- Left: Brand Logo & MOSIP Partner Tag -->
+            <div class="flex items-center gap-6">
+              <!-- CSM Official Logo: 3 Slashes + Bold Italic CSM -->
+              <a routerLink="/" class="flex items-center gap-1.5 focus:outline-none">
+                <!-- 3 Slashes (Orange, Red, Teal) -->
+                <div class="flex items-center space-x-[3px] font-black italic tracking-tighter text-2xl select-none">
+                  <span class="text-[#FAA634] font-black -rotate-12 inline-block">/</span>
+                  <span class="text-[#D7182A] font-black -rotate-12 inline-block">/</span>
+                  <span class="text-[#008FBB] font-black -rotate-12 inline-block">/</span>
                 </div>
-              </div>
-
-              <div class="flex flex-col">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xl font-black tracking-tight text-slate-900 leading-none">CSM</span>
-                  <span class="text-xs font-bold text-slate-600 tracking-wider uppercase">Technologies</span>
-                </div>
-                <span class="text-[9px] font-bold text-[#FAA634] uppercase tracking-widest mt-0.5">
-                  Breaking Thought Barriers
-                </span>
-              </div>
-            </a>
-
-            <!-- Corporate Nav Items -->
-            <nav class="hidden lg:flex items-center gap-8 text-xs font-bold text-slate-600">
-              <a href="#solutions" class="hover:text-[#008FBB] transition">Solutions</a>
-              <a href="#ai-foundry" class="hover:text-[#008FBB] transition flex items-center gap-1.5">
-                <span>AI Foundry</span>
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-sky-100 text-[#008FBB] border border-sky-200">NEW</span>
+                <span class="text-2xl font-black italic tracking-tight text-slate-900 ml-1">CSM</span>
+                <span class="text-[9px] font-bold text-slate-400 uppercase -mt-2.5">TM</span>
               </a>
-              <a href="#industries" class="hover:text-[#008FBB] transition">Industries</a>
-              <a href="#certifications" class="hover:text-[#008FBB] transition">Certifications</a>
-              <a href="#trellis" class="hover:text-[#FAA634] transition text-amber-600">TRELLIS Portal</a>
+
+              <!-- Divider -->
+              <div class="hidden sm:block h-7 w-[1px] bg-slate-200"></div>
+
+              <!-- MOSIP Partner Tag -->
+              <div class="hidden sm:flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-400 via-rose-500 to-sky-500 p-[1.5px] flex items-center justify-center">
+                  <div class="w-full h-full bg-white rounded-full flex items-center justify-center text-[9px] font-black text-slate-800">
+                    M
+                  </div>
+                </div>
+                <div class="flex flex-col text-[10px] leading-tight">
+                  <span class="font-bold tracking-wider text-slate-800">MOSIP</span>
+                  <span class="text-[8px] tracking-widest text-slate-400 uppercase font-semibold">PARTNER</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Center Navigation Links -->
+            <nav class="hidden xl:flex items-center gap-8 text-[13px] font-medium text-slate-700">
+              <a href="#platforms" class="hover:text-slate-950 transition">Platforms</a>
+              <a href="#industries" class="hover:text-slate-950 transition">Industries</a>
+              <a href="#services" class="hover:text-slate-950 transition">Services</a>
+              <a href="#company" class="hover:text-slate-950 transition">Company</a>
+              <a href="#careers" class="hover:text-slate-950 transition">Careers</a>
+              <a href="#investors" class="hover:text-slate-950 transition">Investors</a>
             </nav>
 
-            <!-- Action CTAs -->
+            <!-- Right Controls: Search, Region Switcher, Contact, TRELLIS Login -->
             <div class="flex items-center gap-3">
+              <!-- Search Icon -->
+              <button type="button" aria-label="Search" class="p-2 text-slate-600 hover:text-slate-900 transition">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+
+              <!-- Region Switcher Pill -->
+              <div class="hidden md:flex items-center bg-slate-100 rounded-full p-1 text-[11px] font-bold text-slate-500">
+                <span class="px-2.5 py-0.5 rounded-full bg-slate-900 text-white shadow-sm">IN</span>
+                <span class="px-2.5 py-0.5 cursor-pointer hover:text-slate-900">AM</span>
+                <span class="px-2.5 py-0.5 cursor-pointer hover:text-slate-900">AF</span>
+              </div>
+
+              <!-- Contact Button -->
+              <a 
+                href="#contact" 
+                class="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold transition">
+                <span>Contact</span>
+                <span class="text-xs">&rarr;</span>
+              </a>
+
+              <!-- TRELLIS Portal Access (Direct Gateway) -->
               <a 
                 routerLink="/login" 
-                class="px-5 py-2.5 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-white text-xs font-bold shadow-md shadow-sky-900/10 transition transform hover:-translate-y-0.5 flex items-center gap-2">
-                <span>Sign In to TRELLIS</span>
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                </svg>
+                class="px-4 py-2 rounded-lg bg-gradient-to-r from-[#FAA634] to-[#e09228] hover:from-[#e09228] hover:to-[#c67c1e] text-slate-950 text-xs font-black shadow-sm transition flex items-center gap-1.5">
+                <span>TRELLIS Login</span>
+                <span>&rarr;</span>
               </a>
+
+              <!-- Hamburger Menu -->
+              <button type="button" aria-label="Menu" class="p-2 text-slate-800 hover:text-slate-950">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
             </div>
 
           </div>
         </div>
       </header>
 
-      <!-- Hero Section (Clean Crisp White, High-Impact Typography) -->
-      <section class="relative pt-16 pb-24 overflow-hidden bg-white">
-        <!-- Subtle Ambient Background Glows -->
-        <div class="pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[400px] bg-gradient-to-r from-sky-100/50 via-amber-50/40 to-rose-50/30 blur-3xl rounded-full" aria-hidden="true"></div>
-
-        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
+      <!-- Hero Main Section -->
+      <main class="relative z-10 flex-1 flex flex-col justify-between max-w-[1400px] w-full mx-auto px-6 sm:px-8 pt-12 sm:pt-20 pb-12">
+        
+        <!-- Big Hero Content -->
+        <div class="space-y-8 max-w-4xl">
           
-          <!-- Pill Badge -->
-          <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-700 shadow-sm">
-            <span class="w-2 h-2 rounded-full bg-[#FAA634]"></span>
-            <span class="font-bold">GovTech &bull; Agentic AI &bull; Digital Identity</span>
-            <span class="text-slate-300">|</span>
-            <span class="text-xs text-[#008FBB] font-mono font-bold">CMMI Level 5 Dev V2.0</span>
-          </div>
-
-          <!-- Hero Headline -->
-          <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black text-slate-950 tracking-tight max-w-4xl mx-auto leading-[1.08]">
-            Intelligence you can answer for.
-            <span class="block bg-gradient-to-r from-[#FAA634] via-[#D7182A] to-[#008FBB] bg-clip-text text-transparent mt-1">
-              Audit. Explain. Sign off on.
-            </span>
+          <!-- Headline -->
+          <h1 class="text-5xl sm:text-7xl lg:text-[96px] font-black text-slate-950 tracking-tight leading-[1.04]">
+            Intelligence you<br />
+            can <span class="bg-gradient-to-r from-[#FAA634] via-[#D7182A] to-[#008FBB] bg-clip-text text-transparent">audit.</span>
           </h1>
 
-          <!-- Hero Subtitle -->
-          <p class="text-sm sm:text-base text-slate-600 max-w-2xl mx-auto leading-relaxed">
-            Pioneering GovTech, AI Foundry automation, and mission-critical public enterprise architectures for over two decades. Empowering governments, citizens, and modern engineering cohorts.
-          </p>
-
-          <!-- Action Buttons -->
-          <div class="pt-4 flex flex-wrap items-center justify-center gap-4">
-            <a 
-              routerLink="/login" 
-              class="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#FAA634] to-[#e09228] hover:from-[#e09228] hover:to-[#c67c1e] text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 transition transform active:scale-95 flex items-center gap-2">
-              <span>Enter TRELLIS Portal</span>
-              <span>&rarr;</span>
-            </a>
-
-            <a 
-              href="#ai-foundry" 
-              class="px-7 py-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 font-bold text-sm shadow-sm transition">
-              Explore Enterprise Solutions
-            </a>
-          </div>
-
-          <!-- Metrics Strip (Clean White Cards with Soft Borders) -->
-          <div class="pt-16 grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto text-left">
-            <div class="p-6 rounded-2xl bg-slate-50/80 border border-slate-200/90 shadow-sm hover:border-[#FAA634] transition">
-              <span class="text-3xl sm:text-4xl font-black text-slate-900 block">25+</span>
-              <span class="text-xs text-[#FAA634] font-bold block mt-1">Years of Innovation</span>
-              <span class="text-[11px] text-slate-500 mt-1 block">Founded in 1998, Bhubaneswar</span>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/80 border border-slate-200/90 shadow-sm hover:border-[#008FBB] transition">
-              <span class="text-3xl sm:text-4xl font-black text-slate-900 block">Level 5</span>
-              <span class="text-xs text-[#008FBB] font-bold block mt-1">CMMI Dev V2.0</span>
-              <span class="text-[11px] text-slate-500 mt-1 block">Highest process maturity</span>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/80 border border-slate-200/90 shadow-sm hover:border-purple-500 transition">
-              <span class="text-3xl sm:text-4xl font-black text-slate-900 block">1,500+</span>
-              <span class="text-xs text-purple-700 font-bold block mt-1">Technology Pioneers</span>
-              <span class="text-[11px] text-slate-500 mt-1 block">Engineers &amp; domain consultants</span>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/80 border border-slate-200/90 shadow-sm hover:border-emerald-500 transition">
-              <span class="text-3xl sm:text-4xl font-black text-slate-900 block">40M+</span>
-              <span class="text-xs text-emerald-700 font-bold block mt-1">Citizens Empowered</span>
-              <span class="text-[11px] text-slate-500 mt-1 block">Across 3 continents</span>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
-      <!-- Innovation Pillars: AI Foundry, MOSIP, Mining, Governance (Soft Light Gray Canvas) -->
-      <section id="ai-foundry" class="py-20 bg-slate-50/70 border-y border-slate-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-            <div>
-              <span class="text-xs font-bold uppercase tracking-widest text-[#008FBB]">Core Capabilities</span>
-              <h2 class="text-3xl font-black text-slate-950 tracking-tight mt-1">
-                AI Foundry &amp; Enterprise Architecture
-              </h2>
-            </div>
-            <p class="text-xs text-slate-600 max-w-md">
-              From pilot to production: Sandboxed agents, verified inference pipelines, and immutable audit trails that comply with strict government standards.
+          <!-- Subheadline & Action Buttons Row -->
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-8 pt-2">
+            
+            <!-- Description -->
+            <p class="text-base sm:text-lg text-slate-600 max-w-lg leading-relaxed font-normal">
+              Every barrier starts in the mind. We break it there first, then build AI that governments and enterprises can trust in the real world.
             </p>
-          </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <!-- Pillar 1: AI Foundry -->
-            <div class="p-8 rounded-2xl bg-white border border-slate-200/90 hover:border-[#008FBB] shadow-sm hover:shadow-md transition space-y-4 group">
-              <div class="w-12 h-12 rounded-xl bg-sky-50 border border-sky-200 flex items-center justify-center text-[#008FBB] font-black text-lg">
-                🤖
-              </div>
-              <h3 class="text-lg font-black text-slate-900 group-hover:text-[#008FBB] transition">
-                AI Foundry: Pilot to Production
-              </h3>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                Deploy autonomous AI agents that act while human officials decide. Full sandbox verification, guardrails, and role-based policy enforcement across models.
-              </p>
-              <div class="pt-2 flex flex-wrap gap-1.5 text-[10px] font-mono">
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">Agentic GovTech</span>
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">Audit Trails</span>
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">Pre-Verified</span>
-              </div>
-            </div>
+            <!-- Dual Action CTAs -->
+            <div class="flex flex-wrap items-center gap-4 shrink-0">
+              <a 
+                routerLink="/login" 
+                class="px-7 py-3.5 rounded-lg bg-[#243949] hover:bg-[#1a2b38] text-white text-sm font-semibold shadow-lg shadow-slate-900/10 transition flex items-center gap-2">
+                <span>See what we build</span>
+                <span class="text-emerald-400">&rarr;</span>
+              </a>
 
-            <!-- Pillar 2: Digital Identity & MOSIP -->
-            <div class="p-8 rounded-2xl bg-white border border-slate-200/90 hover:border-[#FAA634] shadow-sm hover:shadow-md transition space-y-4 group">
-              <div class="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#FAA634] font-black text-lg">
-                🆔
-              </div>
-              <h3 class="text-lg font-black text-slate-900 group-hover:text-[#FAA634] transition">
-                Digital Identity &amp; MOSIP
-              </h3>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                National-scale biometric identity and accurate welfare delivery. Ensuring transparent, leak-proof citizen registry integration with international privacy standards.
-              </p>
-              <div class="pt-2 flex flex-wrap gap-1.5 text-[10px] font-mono">
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">MOSIP Partner</span>
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">Welfare Delivery</span>
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">Zero Duplication</span>
-              </div>
-            </div>
-
-            <!-- Pillar 3: Mining & Mineral Logistics -->
-            <div class="p-8 rounded-2xl bg-white border border-slate-200/90 hover:border-[#D7182A] shadow-sm hover:shadow-md transition space-y-4 group">
-              <div class="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-[#D7182A] font-black text-lg">
-                ⛏️
-              </div>
-              <h3 class="text-lg font-black text-slate-900 group-hover:text-[#D7182A] transition">
-                Mining Tech &amp; Leakage Prevention
-              </h3>
-              <p class="text-xs text-slate-600 leading-relaxed">
-                Real-time mineral logistics tracking, i3MS digital mines, RFID weighbridge integration, and revenue reconciliation that prevents billions in leaks.
-              </p>
-              <div class="pt-2 flex flex-wrap gap-1.5 text-[10px] font-mono">
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">IoT Weighbridge</span>
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">i3MS Tech</span>
-                <span class="px-2.5 py-1 rounded bg-slate-100 border border-slate-200 text-slate-700 font-bold">e-Pass Transit</span>
-              </div>
+              <a 
+                routerLink="/login" 
+                class="px-7 py-3.5 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-sm font-semibold shadow-sm transition">
+                Talk to an expert
+              </a>
             </div>
 
           </div>
+
         </div>
-      </section>
 
-      <!-- Industries We Transform (Crisp White Grid) -->
-      <section id="industries" class="py-20 bg-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
-          
-          <div class="text-center space-y-2 max-w-2xl mx-auto">
-            <span class="text-xs font-bold uppercase tracking-widest text-[#FAA634]">Sectors &amp; Impact</span>
-            <h2 class="text-3xl font-black text-slate-950 tracking-tight">
-              Transforming Key Economic Drivers
-            </h2>
-            <p class="text-xs text-slate-600">
-              Proven GovTech and enterprise deployments trusted across public administrations and global enterprises.
-            </p>
-          </div>
-
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#008FBB] transition space-y-2">
-              <span class="text-2xl block">🌾</span>
-              <h4 class="text-sm font-bold text-slate-900">Agriculture &amp; AgriStack</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Farmer registries, crop insurance automation, and supply chain transparency.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#008FBB] transition space-y-2">
-              <span class="text-2xl block">🏛️</span>
-              <h4 class="text-sm font-bold text-slate-900">Public Services &amp; GovTech</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Citizen service portals, digital revenue records, and paperless administrative workflows.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#FAA634] transition space-y-2">
-              <span class="text-2xl block">🎓</span>
-              <h4 class="text-sm font-bold text-slate-900">Education &amp; Skilling</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Curriculum lifecycle governance, talent spotlight tracking, and sandboxed assessments.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#D7182A] transition space-y-2">
-              <span class="text-2xl block">🏥</span>
-              <h4 class="text-sm font-bold text-slate-900">Healthcare &amp; Diagnostics</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Integrated clinical databases, drug supply monitoring, and telemedicine systems.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#008FBB] transition space-y-2">
-              <span class="text-2xl block">🏭</span>
-              <h4 class="text-sm font-bold text-slate-900">Trade &amp; Industry</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Single window clearance, investor facilitation, and industrial land bank GIS.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#FAA634] transition space-y-2">
-              <span class="text-2xl block">⛰️</span>
-              <h4 class="text-sm font-bold text-slate-900">Mining &amp; Natural Resources</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">End-to-end mineral logistics, concession mapping, and royalty reconciliation.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#008FBB] transition space-y-2">
-              <span class="text-2xl block">🏖️</span>
-              <h4 class="text-sm font-bold text-slate-900">Tourism &amp; Culture</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Heritage asset digitisation, tourist booking portals, and smart destination kiosks.</p>
-            </div>
-
-            <div class="p-6 rounded-2xl bg-slate-50/70 border border-slate-200/80 hover:border-[#D7182A] transition space-y-2">
-              <span class="text-2xl block">🛡️</span>
-              <h4 class="text-sm font-bold text-slate-900">Cybersecurity &amp; Auditing</h4>
-              <p class="text-[11px] text-slate-500 leading-relaxed">Vulnerability mitigation, compliance monitoring, and immutable ledger logging.</p>
-            </div>
-
-          </div>
+        <!-- Vertical Scroll Indicator on Right -->
+        <div class="hidden lg:flex items-center gap-2 absolute right-8 top-1/2 -translate-y-1/2 rotate-90 origin-right text-[10px] uppercase font-bold tracking-widest text-slate-400">
+          <span>SCROLL</span>
+          <div class="w-8 h-[1px] bg-slate-300"></div>
         </div>
-      </section>
 
-      <!-- TRELLIS Internal Learning & Talent Portal Spotlight Banner -->
-      <section id="trellis" class="py-16 bg-slate-50/60 border-t border-slate-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-8 sm:p-12 shadow-xl">
+        <!-- Bottom 5 Sleek Feature Cards Strip (Matching Official CSM 5-Card Layout) -->
+        <div class="pt-16 sm:pt-24">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             
-            <div class="pointer-events-none absolute -right-20 -bottom-20 w-80 h-80 rounded-full bg-sky-100/60 blur-3xl"></div>
-
-            <div class="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-              
-              <div class="space-y-3 text-center lg:text-left">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-[#FAA634]">
-                  <span>🔒 INTERNAL EMPLOYEE &amp; LEARNER GATEWAY</span>
+            <!-- Card 01: AI Foundry -->
+            <div class="p-5 rounded-2xl bg-white border border-slate-200/90 border-t-2 border-t-[#008FBB] shadow-sm hover:shadow-md transition flex flex-col justify-between h-40 group cursor-pointer">
+              <div>
+                <div class="text-[#008FBB] text-lg mb-2">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                  </svg>
                 </div>
-                <h3 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  TRELLIS: Learning &amp; Knowledge Portal
+                <h3 class="text-sm font-bold text-slate-900 group-hover:text-[#008FBB] transition">
+                  AI Foundry
                 </h3>
-                <p class="text-xs sm:text-sm text-slate-600 max-w-xl">
-                  Authorized gateway for CSM Technology engineers, mentors, and program administrators. Access your assigned cohorts, timed coding sandbox, and AI Practice Lab.
-                </p>
-                <div class="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2 text-xs text-slate-500 font-semibold">
-                  <span class="flex items-center gap-1.5 text-emerald-600">&check; 3 Strictly Enforced Roles</span>
-                  <span class="flex items-center gap-1.5 text-[#008FBB]">&check; AI Practice Lab</span>
-                  <span class="flex items-center gap-1.5 text-[#FAA634]">&check; Sandboxed Code Verification</span>
-                </div>
               </div>
-
-              <div class="shrink-0 flex flex-col sm:flex-row items-center gap-3">
-                <a 
-                  routerLink="/login" 
-                  class="px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#FAA634] via-[#D7182A] to-[#008FBB] hover:opacity-95 text-white font-black text-sm shadow-xl transition transform hover:scale-105 active:scale-95 text-center">
-                  Proceed to Login &rarr;
-                </a>
+              <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>01</span>
+                <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-[#008FBB] group-hover:text-white transition">&rarr;</span>
               </div>
-
             </div>
+
+            <!-- Card 02: Agentic GovTech -->
+            <div class="p-5 rounded-2xl bg-white border border-slate-200/90 border-t-2 border-t-[#00BCD4] shadow-sm hover:shadow-md transition flex flex-col justify-between h-40 group cursor-pointer">
+              <div>
+                <div class="text-[#00BCD4] text-lg mb-2">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900 group-hover:text-[#00BCD4] transition">
+                  Agentic GovTech
+                </h3>
+              </div>
+              <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>02</span>
+                <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-[#00BCD4] group-hover:text-white transition">&rarr;</span>
+              </div>
+            </div>
+
+            <!-- Card 03: Digital Identity -->
+            <div class="p-5 rounded-2xl bg-white border border-slate-200/90 border-t-2 border-t-[#FAA634] shadow-sm hover:shadow-md transition flex flex-col justify-between h-40 group cursor-pointer">
+              <div>
+                <div class="text-[#FAA634] text-lg mb-2">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 004 11m0 0a8 8 0 00.99 7.132" />
+                  </svg>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900 group-hover:text-[#FAA634] transition">
+                  Digital Identity
+                </h3>
+              </div>
+              <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>03</span>
+                <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-[#FAA634] group-hover:text-white transition">&rarr;</span>
+              </div>
+            </div>
+
+            <!-- Card 04: Mining Technology -->
+            <div class="p-5 rounded-2xl bg-white border border-slate-200/90 border-t-2 border-t-[#F59E0B] shadow-sm hover:shadow-md transition flex flex-col justify-between h-40 group cursor-pointer">
+              <div>
+                <div class="text-[#F59E0B] text-lg mb-2">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900 group-hover:text-[#F59E0B] transition">
+                  Mining Technology
+                </h3>
+              </div>
+              <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>04</span>
+                <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-[#F59E0B] group-hover:text-white transition">&rarr;</span>
+              </div>
+            </div>
+
+            <!-- Card 05: Cybersecurity -->
+            <div class="p-5 rounded-2xl bg-white border border-slate-200/90 border-t-2 border-t-[#D7182A] shadow-sm hover:shadow-md transition flex flex-col justify-between h-40 group cursor-pointer">
+              <div>
+                <div class="text-[#D7182A] text-lg mb-2">
+                  <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h3 class="text-sm font-bold text-slate-900 group-hover:text-[#D7182A] transition">
+                  Cybersecurity
+                </h3>
+              </div>
+              <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                <span>05</span>
+                <span class="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-hover:bg-[#D7182A] group-hover:text-white transition">&rarr;</span>
+              </div>
+            </div>
+
           </div>
         </div>
-      </section>
 
-      <!-- Footer (Professional Corporate Footer matching CSM Standards) -->
-      <footer class="mt-auto border-t border-slate-200 bg-slate-900 text-xs text-slate-400 py-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
-            <div class="space-y-3">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#FAA634] via-[#D7182A] to-[#008FBB] flex items-center justify-center text-white font-black text-xs shadow-sm">
-                  T
-                </div>
-                <span class="font-bold text-white text-sm">CSM Technologies</span>
-              </div>
-              <p class="text-[11px] text-slate-400 leading-relaxed">
-                Headquartered in Bhubaneswar, India. Transforming governance and enterprise operations through cutting-edge technology and human-centric design.
-              </p>
-            </div>
+      </main>
 
-            <div>
-              <h5 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-3">Enterprise Capabilities</h5>
-              <ul class="space-y-2 text-[11px]">
-                <li><a href="#ai-foundry" class="hover:text-white transition">AI Foundry &amp; Agents</a></li>
-                <li><a href="#solutions" class="hover:text-white transition">MOSIP Digital Identity</a></li>
-                <li><a href="#solutions" class="hover:text-white transition">Mining Logistics (i3MS)</a></li>
-                <li><a href="#solutions" class="hover:text-white transition">Cybersecurity Defence</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h5 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-3">Portals &amp; Workspaces</h5>
-              <ul class="space-y-2 text-[11px]">
-                <li><a routerLink="/login" class="text-[#FAA634] hover:underline font-bold">TRELLIS Portal Login</a></li>
-                <li><a routerLink="/login" class="hover:text-white transition">Learner Coding Lab</a></li>
-                <li><a routerLink="/login" class="hover:text-white transition">Mentor Command Center</a></li>
-                <li><a routerLink="/login" class="hover:text-white transition">Admin Governance</a></li>
-              </ul>
-            </div>
-
-            <div>
-              <h5 class="font-bold text-slate-200 uppercase tracking-wider text-[11px] mb-3">Certifications &amp; Standards</h5>
-              <p class="text-[11px] text-slate-400 leading-relaxed">
-                CMMI Level 5 Dev V2.0 &bull; ISO 9001:2015 &bull; ISO 27001:2013 &bull; CMMI SVC Level 3.
-              </p>
-              <div class="pt-3 text-[11px]">
-                Corporate Email: <span class="text-slate-200 font-mono">contact&#64;csm.tech</span>
-              </div>
-            </div>
+      <!-- Footer (Minimal Corporate Footer) -->
+      <footer class="border-t border-slate-100 bg-white py-6 text-xs text-slate-400">
+        <div class="max-w-[1400px] mx-auto px-6 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>&copy; 2026 CSM Technologies. All rights reserved. Breaking Thought Barriers.</p>
+          <div class="flex items-center gap-6">
+            <a routerLink="/login" class="text-[#008FBB] font-bold hover:underline">TRELLIS Portal Login &rarr;</a>
+            <span>Bhubaneswar, India</span>
           </div>
-
-          <div class="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px]">
-            <p>&copy; 2026 CSM Technologies. All rights reserved. Breaking Thought Barriers.</p>
-            <div class="flex items-center gap-4 text-slate-500">
-              <a href="#" class="hover:text-slate-300">Privacy Policy</a>
-              <span>&bull;</span>
-              <a href="#" class="hover:text-slate-300">Terms of Service</a>
-              <span>&bull;</span>
-              <a href="#" class="hover:text-slate-300">Disclaimer</a>
-            </div>
-          </div>
-
         </div>
       </footer>
 
