@@ -616,6 +616,9 @@ class LocalSubprocessRunner(BaseCodeRunner):
             with open(script_path, "w", encoding="utf-8") as f:
                 f.write(code)
 
+            # Node.js on Windows requires SystemRoot for CSPRNG crypto subsystem initialization
+            node_env = {"SYSTEMROOT": os.environ.get("SYSTEMROOT", r"C:\Windows")} if sys.platform == "win32" else {}
+
             return self._evaluate_cases(
                 cmd=[node_bin, script_path],
                 cwd=tmpdir,
@@ -624,6 +627,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                 memory_limit_mb=memory_limit_mb,
                 mask_hidden=mask_hidden,
                 is_custom_run=is_custom_run,
+                proc_env=node_env,
             )
 
     def _run_compiled_c(
@@ -707,8 +711,26 @@ class LocalSubprocessRunner(BaseCodeRunner):
         mask_hidden: bool,
         is_custom_run: bool,
     ) -> ExecutionResult:
-        javac = shutil.which("javac")
-        java = shutil.which("java")
+        javac = None
+        java = None
+        for cand_dir in [
+            os.environ.get("JAVA_HOME"),
+            r"C:\Program Files\Java\jdk-24",
+            r"C:\Program Files\Java\jdk-21",
+            r"C:\Program Files\Java\jdk-17",
+        ]:
+            if cand_dir and os.path.isdir(cand_dir):
+                j_c = os.path.join(cand_dir, "bin", "javac.exe" if os.name == "nt" else "javac")
+                j_r = os.path.join(cand_dir, "bin", "java.exe" if os.name == "nt" else "java")
+                if os.path.isfile(j_c) and os.path.isfile(j_r):
+                    javac = j_c
+                    java = j_r
+                    break
+
+        if not javac:
+            javac = shutil.which("javac")
+        if not java:
+            java = shutil.which("java")
         if not javac or not java:
             return ExecutionResult(
                 verdict="RUNNER_UNAVAILABLE",
@@ -774,6 +796,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
         memory_limit_mb: int,
         mask_hidden: bool,
         is_custom_run: bool,
+        proc_env: dict[str, str] | None = None,
     ) -> ExecutionResult:
         case_results: list[TestCaseResult] = []
         passed_count = 0
@@ -800,7 +823,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                     cmd,
                     input=input_text,
                     cwd=cwd,
-                    env={},  # Empty environment: no leaked secrets or paths
+                    env=proc_env if proc_env is not None else {},  # Empty environment: no leaked secrets or paths
                     capture_output=True,
                     text=True,
                     timeout=timeout_sec,
