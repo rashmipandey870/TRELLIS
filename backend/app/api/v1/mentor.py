@@ -277,13 +277,56 @@ class RemarkCreateRequest(BaseModel):
 
 
 class AlertActionRequest(BaseModel):
-    action: str = Field(..., pattern="^(INVITE_ASSESSMENT|SCHEDULE_INTERVIEW|RECOMMEND_PROMOTION|DISMISSED)$")
+    action: str = Field(..., pattern="^(INVITE_ASSESSMENT|SCHEDULE_INTERVIEW|RECOMMEND_PROMOTION|DISMISSED|DISMISS)$")
     notes: str | None = None
     assessment_id: str | None = None
     meeting_date: str | None = None
     start_time: str | None = None
     end_time: str | None = None
     meeting_link: str | None = None
+
+
+class AttachQuestionRequest(BaseModel):
+    question_id: str | None = None
+    bank_question_id: str | None = None
+    marks: float = 5.0
+    order: int | None = None
+    sequence_order: int | None = None
+
+
+class QuestionReorderItem(BaseModel):
+    question_id: str | None = None
+    bank_question_id: str | None = None
+    aq_id: str | None = None
+    id: str | None = None
+    marks: float = 5.0
+    order: int = 1
+    sequence_order: int | None = None
+
+
+class ReorderQuestionsRequest(BaseModel):
+    questions: list[QuestionReorderItem] = Field(default_factory=list)
+
+
+class UnifiedQuestionCreateRequest(BaseModel):
+    title: str
+    question_text: str | None = None
+    description: str | None = None
+    type: str = "MCQ"
+    question_type: str | None = None
+    field: str = "Python"
+    topic: str = "General"
+    difficulty: str = "MEDIUM"
+    marks: float = 10.0
+    tags: list[str] = Field(default_factory=list)
+    explanation: str | None = None
+    options: list[dict[str, Any]] = Field(default_factory=list)
+    constraints: str | None = None
+    starter_code: dict[str, str] = Field(default_factory=dict)
+    reference_solution: str | None = None
+    test_cases: list[dict[str, Any]] = Field(default_factory=list)
+    time_limit_ms: int = 3000
+    memory_limit_mb: int = 256
 
 
 # --- Mentor Dashboard ---
@@ -622,12 +665,31 @@ def list_mentor_assessments(
             "id": a.id,
             "title": a.title,
             "field": a.field,
+            "instructions": a.instructions,
             "duration_minutes": a.duration_minutes,
             "passing_score": a.passing_score,
             "status": a.status,
+            "is_published": a.status == "PUBLISHED",
             "version": a.version,
             "questions_count": len(a.questions),
+            "total_marks": sum(float(q.marks) for q in a.questions),
+            "submissions_count": sum(1 for att in a.attempts if att.status == "SUBMITTED"),
+            "batch_id": a.batch_id,
             "batch_name": a.batch.name if a.batch else "All Assigned",
+            "start_window": a.start_window.isoformat() if a.start_window else None,
+            "end_window": a.end_window.isoformat() if a.end_window else None,
+            "audience_learners": [aud.learner_id for aud in a.audience_learners],
+            "questions": [
+                {
+                    "id": q.id,
+                    "bank_question_id": q.bank_question_id,
+                    "title": q.question.title if q.question else "",
+                    "type": q.question.question_type if q.question else "MCQ",
+                    "marks": q.marks,
+                    "order": q.sequence_order,
+                }
+                for q in sorted(a.questions, key=lambda x: x.sequence_order)
+            ],
         }
         for a in assessments
     ]
@@ -711,6 +773,15 @@ def update_assessment(
         )
         db.add(new_version)
         db.flush()
+        for q in assessment.questions:
+            db.add(
+                AssessmentQuestion(
+                    assessment_id=new_version.id,
+                    bank_question_id=q.bank_question_id,
+                    sequence_order=q.sequence_order,
+                    marks=q.marks,
+                )
+            )
         for lid in payload.learner_ids:
             db.add(AssessmentAudience(assessment_id=new_version.id, learner_id=lid))
         db.commit()
@@ -808,6 +879,384 @@ def publish_assessment(
     return {"id": assessment.id, "status": assessment.status}
 
 
+@router.get("/assessments/{assessment_id}/questions", summary="Get questions attached to an assessment")
+def get_assessment_questions(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> list[dict[str, Any]]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment or assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    return [
+        {
+            "id": aq.id,
+            "aq_id": aq.id,
+            "assessment_id": aq.assessment_id,
+            "bank_question_id": aq.bank_question_id,
+            "sequence_order": aq.sequence_order,
+            "order": aq.sequence_order,
+            "marks": aq.marks,
+            "title": aq.question.title if aq.question else "",
+            "type": aq.question.question_type if aq.question else "MCQ",
+            "question_type": aq.question.question_type if aq.question else "MCQ",
+            "field": aq.question.field if aq.question else "",
+            "difficulty": aq.question.difficulty if aq.question else "MEDIUM",
+            "content": aq.question.question_text if aq.question else "",
+            "options": [
+                {
+                    "id": opt.id,
+                    "option_text": opt.option_text,
+                    "is_correct": opt.is_correct,
+                    "explanation": opt.explanation,
+                }
+                for opt in (getattr(aq.question, "options", None) or [])
+            ],
+            "coding_problem": (
+                {
+                    "constraints": aq.question.coding_problem.constraints,
+                    "time_limit_ms": aq.question.coding_problem.time_limit_ms,
+                    "memory_limit_mb": aq.question.coding_problem.memory_limit_mb,
+                    "starter_code": aq.question.coding_problem.starter_code_json,
+                }
+                if aq.question and aq.question.coding_problem
+                else None
+            ),
+        }
+        for aq in sorted(assessment.questions, key=lambda x: x.sequence_order)
+    ]
+
+
+@router.post("/assessments/{assessment_id}/questions", status_code=status.HTTP_201_CREATED, summary="Attach question to assessment")
+def attach_question_to_assessment(
+    assessment_id: str,
+    payload: AttachQuestionRequest,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment or assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    qid = payload.question_id or payload.bank_question_id
+    if not qid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="question_id is required.")
+
+    bank_q = db.get(QuestionBank, qid)
+    if not bank_q:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found in question bank.")
+
+    if bank_q.author_id and bank_q.author_id != mentor.id and bank_q.author and bank_q.author.org_id != mentor.org_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied: Cannot use question from another organization.")
+
+    submissions_count = (
+        db.execute(
+            select(func.count(AssessmentAttempt.id)).where(AssessmentAttempt.assessment_id == assessment.id)
+        ).scalar()
+        or 0
+    )
+
+    if assessment.status == "PUBLISHED" and submissions_count > 0:
+        new_version = Assessment(
+            mentor_id=mentor.id,
+            batch_id=assessment.batch_id,
+            title=assessment.title,
+            field=assessment.field,
+            instructions=assessment.instructions,
+            duration_minutes=assessment.duration_minutes,
+            passing_score=assessment.passing_score,
+            start_window=assessment.start_window,
+            end_window=assessment.end_window,
+            show_explanations=assessment.show_explanations,
+            mask_hidden_cases=assessment.mask_hidden_cases,
+            status="DRAFT",
+            version=assessment.version + 1,
+        )
+        db.add(new_version)
+        db.flush()
+
+        for q in assessment.questions:
+            db.add(
+                AssessmentQuestion(
+                    assessment_id=new_version.id,
+                    bank_question_id=q.bank_question_id,
+                    sequence_order=q.sequence_order,
+                    marks=q.marks,
+                )
+            )
+        for aud in assessment.audience_learners:
+            db.add(AssessmentAudience(assessment_id=new_version.id, learner_id=aud.learner_id))
+
+        new_order = len(assessment.questions) + 1
+        new_aq = AssessmentQuestion(
+            assessment_id=new_version.id,
+            bank_question_id=bank_q.id,
+            sequence_order=payload.order or payload.sequence_order or new_order,
+            marks=payload.marks,
+        )
+        db.add(new_aq)
+        db.commit()
+        db.refresh(new_version)
+        return {
+            "message": f"Assessment has active submissions. Created version {new_version.version} instead.",
+            "versioned": True,
+            "assessment_id": new_version.id,
+            "new_assessment_id": new_version.id,
+            "id": new_aq.id,
+            "version": new_version.version,
+        }
+
+    order = payload.order or payload.sequence_order or (len(assessment.questions) + 1)
+    existing = next((q for q in assessment.questions if q.bank_question_id == bank_q.id), None)
+    if existing:
+        existing.marks = payload.marks
+        existing.sequence_order = order
+        db.commit()
+        db.refresh(existing)
+        return {
+            "id": existing.id,
+            "assessment_id": assessment.id,
+            "bank_question_id": bank_q.id,
+            "marks": existing.marks,
+            "sequence_order": existing.sequence_order,
+            "title": bank_q.title,
+        }
+
+    aq = AssessmentQuestion(
+        assessment_id=assessment.id,
+        bank_question_id=bank_q.id,
+        sequence_order=order,
+        marks=payload.marks,
+    )
+    db.add(aq)
+    db.commit()
+    db.refresh(aq)
+    return {
+        "id": aq.id,
+        "assessment_id": assessment.id,
+        "bank_question_id": bank_q.id,
+        "marks": aq.marks,
+        "sequence_order": aq.sequence_order,
+        "title": bank_q.title,
+    }
+
+
+@router.put("/assessments/{assessment_id}/questions", summary="Reorder or replace assessment questions")
+def update_assessment_questions(
+    assessment_id: str,
+    payload: ReorderQuestionsRequest,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment or assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    submissions_count = (
+        db.execute(
+            select(func.count(AssessmentAttempt.id)).where(AssessmentAttempt.assessment_id == assessment.id)
+        ).scalar()
+        or 0
+    )
+
+    target_assessment = assessment
+    versioned = False
+    if assessment.status == "PUBLISHED" and submissions_count > 0:
+        versioned = True
+        target_assessment = Assessment(
+            mentor_id=mentor.id,
+            batch_id=assessment.batch_id,
+            title=assessment.title,
+            field=assessment.field,
+            instructions=assessment.instructions,
+            duration_minutes=assessment.duration_minutes,
+            passing_score=assessment.passing_score,
+            start_window=assessment.start_window,
+            end_window=assessment.end_window,
+            show_explanations=assessment.show_explanations,
+            mask_hidden_cases=assessment.mask_hidden_cases,
+            status="DRAFT",
+            version=assessment.version + 1,
+        )
+        db.add(target_assessment)
+        db.flush()
+        for aud in assessment.audience_learners:
+            db.add(AssessmentAudience(assessment_id=target_assessment.id, learner_id=aud.learner_id))
+
+    existing_by_bank = {q.bank_question_id: q for q in target_assessment.questions}
+    existing_by_id = {q.id: q for q in target_assessment.questions}
+    kept_ids = set()
+    added = []
+
+    for idx, item in enumerate(payload.questions, start=1):
+        bank_qid = (
+            item.bank_question_id
+            or item.question_id
+            or (existing_by_id.get(item.id or item.aq_id).bank_question_id if (item.id or item.aq_id) in existing_by_id else None)
+            or (item.id if item.id in existing_by_bank else None)
+        )
+        if not bank_qid:
+            continue
+        bank_q = db.get(QuestionBank, bank_qid)
+        if not bank_q:
+            continue
+
+        seq = item.order or item.sequence_order or idx
+        match_aq = existing_by_id.get(item.id) or existing_by_id.get(item.aq_id) or existing_by_bank.get(bank_q.id)
+
+        if match_aq and not versioned:
+            match_aq.sequence_order = seq
+            match_aq.marks = item.marks
+            kept_ids.add(match_aq.id)
+            added.append(match_aq)
+        else:
+            new_aq = AssessmentQuestion(
+                assessment_id=target_assessment.id,
+                bank_question_id=bank_q.id,
+                sequence_order=seq,
+                marks=item.marks,
+            )
+            db.add(new_aq)
+            added.append(new_aq)
+
+    if not versioned:
+        for q in list(target_assessment.questions):
+            if q.id not in kept_ids:
+                db.delete(q)
+
+    db.commit()
+    return {
+        "status": "updated",
+        "message": "Questions updated.",
+        "versioned": versioned,
+        "assessment_id": target_assessment.id,
+        "new_assessment_id": target_assessment.id if versioned else None,
+        "version": target_assessment.version,
+        "questions_count": len(added),
+    }
+
+
+@router.delete("/assessments/{assessment_id}/questions/{aq_id}", summary="Remove question from assessment")
+def remove_question_from_assessment(
+    assessment_id: str,
+    aq_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment or assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    submissions_count = (
+        db.execute(
+            select(func.count(AssessmentAttempt.id)).where(AssessmentAttempt.assessment_id == assessment.id)
+        ).scalar()
+        or 0
+    )
+
+    if assessment.status == "PUBLISHED" and submissions_count > 0:
+        new_version = Assessment(
+            mentor_id=mentor.id,
+            batch_id=assessment.batch_id,
+            title=assessment.title,
+            field=assessment.field,
+            instructions=assessment.instructions,
+            duration_minutes=assessment.duration_minutes,
+            passing_score=assessment.passing_score,
+            start_window=assessment.start_window,
+            end_window=assessment.end_window,
+            show_explanations=assessment.show_explanations,
+            mask_hidden_cases=assessment.mask_hidden_cases,
+            status="DRAFT",
+            version=assessment.version + 1,
+        )
+        db.add(new_version)
+        db.flush()
+        for q in assessment.questions:
+            if q.id != aq_id and q.bank_question_id != aq_id:
+                db.add(
+                    AssessmentQuestion(
+                        assessment_id=new_version.id,
+                        bank_question_id=q.bank_question_id,
+                        sequence_order=q.sequence_order,
+                        marks=q.marks,
+                    )
+                )
+        for aud in assessment.audience_learners:
+            db.add(AssessmentAudience(assessment_id=new_version.id, learner_id=aud.learner_id))
+
+        db.commit()
+        return {
+            "message": f"Assessment has active submissions. Created version {new_version.version} with question removed.",
+            "versioned": True,
+            "assessment_id": new_version.id,
+            "version": new_version.version,
+        }
+
+    aq = db.execute(
+        select(AssessmentQuestion).where(
+            AssessmentQuestion.assessment_id == assessment.id,
+            (AssessmentQuestion.id == aq_id) | (AssessmentQuestion.bank_question_id == aq_id),
+        )
+    ).scalar_one_or_none()
+
+    if not aq:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question is not attached to this assessment.")
+
+    db.delete(aq)
+    db.commit()
+    return {"status": "deleted", "message": "Question detached from assessment.", "id": aq.id}
+
+
+@router.post("/questions", status_code=status.HTTP_201_CREATED, summary="Create Question in Question Bank (Unified route)")
+def create_question_unified(
+    payload: UnifiedQuestionCreateRequest,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    q_type = (payload.type or payload.question_type or "MCQ").upper()
+    if q_type == "CODING" or payload.test_cases or payload.starter_code:
+        prob_payload = CodingProblemCreateRequest(
+            title=payload.title,
+            description=payload.description or payload.question_text or payload.title,
+            constraints=payload.constraints,
+            field=payload.field,
+            difficulty=payload.difficulty.upper(),
+            marks=payload.marks,
+            time_limit_ms=payload.time_limit_ms,
+            memory_limit_mb=payload.memory_limit_mb,
+            starter_code=payload.starter_code,
+            reference_solution=payload.reference_solution,
+            test_cases=payload.test_cases,
+        )
+        return add_coding_to_bank(prob_payload, db=db, mentor=mentor, _uow=_uow)
+    else:
+        opts = payload.options
+        if not opts:
+            opts = [
+                {"text": "Option A", "is_correct": True, "explanation": "Correct answer"},
+                {"text": "Option B", "is_correct": False, "explanation": ""},
+                {"text": "Option C", "is_correct": False, "explanation": ""},
+                {"text": "Option D", "is_correct": False, "explanation": ""},
+            ]
+        mcq_payload = McqQuestionCreateRequest(
+            title=payload.title,
+            question_text=payload.question_text or payload.description or payload.title,
+            field=payload.field,
+            topic=payload.topic,
+            difficulty=payload.difficulty.upper(),
+            tags=payload.tags,
+            explanation=payload.explanation,
+            options=opts,
+        )
+        return add_mcq_to_bank(mcq_payload, db=db, mentor=mentor, _uow=_uow)
+
+
 @router.get("/questions", summary="List question bank items")
 @router.get("/question-bank", summary="List question bank items alias")
 def list_question_bank(
@@ -869,7 +1318,7 @@ def add_mcq_to_bank(
         db.add(o)
 
     db.commit()
-    return {"id": q.id, "title": q.title}
+    return {"id": q.id, "title": q.title, "type": "MCQ"}
 
 
 @router.post("/question-bank/coding", status_code=status.HTTP_201_CREATED, summary="Add Coding Problem to Question Bank")
@@ -910,15 +1359,15 @@ def add_coding_to_bank(
     for tc in payload.test_cases:
         t = TestCase(
             problem_id=prob.id,
-            input_data=tc["input_data"],
-            expected_output=tc["expected_output"],
+            input_data=tc.get("input_data") or tc.get("input") or "",
+            expected_output=tc.get("expected_output") or tc.get("output") or "",
             is_hidden=bool(tc.get("is_hidden", False)),
             weight=float(tc.get("weight", 1.0)),
         )
         db.add(t)
 
     db.commit()
-    return {"id": q.id, "coding_problem_id": prob.id, "title": prob.title}
+    return {"id": q.id, "coding_problem_id": prob.id, "title": prob.title, "type": "CODING"}
 
 
 @router.get("/assessments/{assessment_id}/analysis", summary="Result analysis with score distribution and CSV export")
@@ -997,6 +1446,24 @@ def export_assessment_results_csv(
     mentor: User = Depends(require_mentor),
 ) -> Response:
     return get_assessment_analysis(assessment_id=assessment_id, export=True, db=db, mentor=mentor)
+
+
+@router.get("/batches", summary="List batches assigned to this mentor")
+def get_mentor_batches(
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> list[dict[str, Any]]:
+    assignments = db.execute(
+        select(MentorLearnerAssignment).where(
+            MentorLearnerAssignment.mentor_id == mentor.id,
+            MentorLearnerAssignment.batch_id.isnot(None),
+        )
+    ).scalars().all()
+    batch_ids = list({a.batch_id for a in assignments if a.batch_id})
+    if not batch_ids:
+        return []
+    batches = db.execute(select(Batch).where(Batch.id.in_(batch_ids))).scalars().all()
+    return [{"id": b.id, "name": b.name, "field": b.field} for b in batches]
 
 
 @router.get("/learners", summary="List learners assigned to this mentor")
@@ -1099,61 +1566,45 @@ def add_learner_remark(
     return {"message": "Feedback submitted.", "id": remark.id}
 
 
+def serialize_talent_alert(a: TalentAlert) -> dict[str, Any]:
+    ev = a.evidence_json or {}
+    return {
+        "id": a.id,
+        "learner_id": a.learner_id,
+        "learner_name": a.learner.full_name if a.learner else "Learner",
+        "mentor_id": a.mentor_id,
+        "mentor_name": a.mentor.full_name if a.mentor else "Mentor",
+        "field": a.field,
+        "active_days": ev.get("active_days_30d") or ev.get("active_days") or 0,
+        "accuracy": round(float(ev.get("weighted_accuracy") or ev.get("accuracy") or 0.0), 1),
+        "problems_count": ev.get("problems_attempted") or ev.get("problems_count") or 0,
+        "dedication_score": round(float(ev.get("dedication_score") or ev.get("score") or 0.0), 0),
+        "acceptance_rate": round(float(ev.get("acceptance_rate") or 0.0), 1),
+        "evidence": ev,
+        "status": a.status,
+        "action_taken": a.action_taken,
+        "action_notes": a.action_notes,
+        "action_time": a.action_time.isoformat() if a.action_time else None,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+        "message": f"{a.learner.full_name if a.learner else 'Learner'} achieved high dedication thresholds in {a.field} track.",
+    }
+
+
 @router.get("/spotlight", summary="List talent spotlight alerts for mentor")
 def get_talent_spotlight_alerts(
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
 ) -> list[dict[str, Any]]:
-    alerts = db.execute(
-        select(TalentAlert)
-        .where(TalentAlert.mentor_id == mentor.id)
-        .order_by(TalentAlert.created_at.desc())
-    ).scalars().all()
-
-    if not alerts:
-        # Pre-seed realistic spotlight alerts so UI is actionable
-        return [
-            {
-                "id": "alert_1",
-                "field": "Python",
-                "learner_name": "Priya Sharma",
-                "learner_id": "l1",
-                "active_days": 14,
-                "accuracy": 88,
-                "problems_count": 18,
-                "dedication_score": 92,
-                "status": "PENDING",
-                "message": "Priya Sharma has maintained a 14-day practice streak with 88% weighted accuracy in Python algorithms and asynchronous paradigms.",
-            },
-            {
-                "id": "alert_2",
-                "field": "SQL",
-                "learner_name": "Sneha Mukherjee",
-                "learner_id": "l3",
-                "active_days": 19,
-                "accuracy": 94,
-                "problems_count": 24,
-                "dedication_score": 96,
-                "status": "PENDING",
-                "message": "Sneha Mukherjee has demonstrated exceptional query design and index tuning in the SQL practice track.",
-            },
-        ]
-
-    return [
-        {
-            "id": a.id,
-            "field": a.field,
-            "learner_name": a.learner.full_name if a.learner else "Learner",
-            "learner_id": a.learner_id,
-            "active_days": a.active_days_count,
-            "accuracy": round(a.weighted_accuracy, 1),
-            "problems_count": a.problems_attempted_count,
-            "dedication_score": round(a.weighted_accuracy, 0),
-            "status": a.status,
-            "message": f"{a.learner.full_name if a.learner else 'Learner'} achieved high dedication thresholds in {a.field} track.",
-        }
-        for a in alerts
-    ]
+    alerts = (
+        db.execute(
+            select(TalentAlert)
+            .where(TalentAlert.mentor_id == mentor.id)
+            .order_by(TalentAlert.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+    return [serialize_talent_alert(a) for a in alerts]
 
 
 # --- Talent Spotlight Actions ---
@@ -1170,15 +1621,16 @@ def act_on_talent_alert(
     if not alert or alert.mentor_id != mentor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found.")
 
-    # Invariant: Block repeat actions on a closed alert
+    # Invariant: Block repeat actions on a closed alert with 409 Conflict
     if alert.status != "PENDING":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"Repeat actions blocked: Alert is already closed with status '{alert.status}'.",
         )
 
-    alert.status = payload.action
-    alert.action_taken = payload.action
+    action_norm = "DISMISSED" if payload.action in {"DISMISS", "DISMISSED"} else payload.action
+    alert.status = action_norm
+    alert.action_taken = action_norm
     alert.action_notes = payload.notes
     alert.action_time = datetime.now(UTC)
 

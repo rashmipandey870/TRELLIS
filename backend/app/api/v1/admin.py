@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_uow, require_admin
+from app.api.v1.mentor import serialize_talent_alert
 from app.core.security import hash_password
 from app.models.assessments import Assessment, AssessmentAttempt, Submission
 from app.models.audit import AuditLog
@@ -640,22 +641,7 @@ def get_all_talent_alerts(
     _admin: User = Depends(require_admin),
 ) -> list[dict[str, Any]]:
     alerts = db.execute(select(TalentAlert).order_by(TalentAlert.created_at.desc())).scalars().all()
-    return [
-        {
-            "id": a.id,
-            "learner_id": a.learner_id,
-            "learner_name": a.learner.full_name if a.learner else "Learner",
-            "mentor_id": a.mentor_id,
-            "mentor_name": a.mentor.full_name if a.mentor else "Mentor",
-            "field": a.field,
-            "evidence": a.evidence_json,
-            "status": a.status,
-            "action_taken": a.action_taken,
-            "action_notes": a.action_notes,
-            "created_at": a.created_at.isoformat(),
-        }
-        for a in alerts
-    ]
+    return [serialize_talent_alert(a) for a in alerts]
 
 
 @router.get("/audit-logs", summary="Immutable audit logs of key administrative and learner actions")

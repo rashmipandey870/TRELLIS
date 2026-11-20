@@ -31,7 +31,15 @@ export interface AssessmentItem {
   is_published: boolean;
   version: number;
   questions_count: number;
+  total_marks?: number;
   submissions_count: number;
+  batch_id?: string;
+  batch_name?: string;
+  instructions?: string;
+  status?: string;
+  start_window?: string;
+  end_window?: string;
+  questions?: any[];
 }
 
 export interface QuestionBankItem {
@@ -117,6 +125,30 @@ export class MentorService {
 
   addQuestionToBank(payload: any): Observable<QuestionBankItem> {
     return this.http.post<QuestionBankItem>('/api/v1/mentor/questions', payload);
+  }
+
+  getAssessmentQuestions(assessmentId: string): Observable<any[]> {
+    return this.http.get<any[]>(`/api/v1/mentor/assessments/${assessmentId}/questions`);
+  }
+
+  attachQuestionToAssessment(assessmentId: string, payload: { question_id: string; marks: number; order?: number }): Observable<any> {
+    return this.http.post<any>(`/api/v1/mentor/assessments/${assessmentId}/questions`, payload);
+  }
+
+  updateAssessmentQuestions(assessmentId: string, questions: any[]): Observable<any> {
+    return this.http.put<any>(`/api/v1/mentor/assessments/${assessmentId}/questions`, { questions });
+  }
+
+  removeQuestionFromAssessment(assessmentId: string, aqId: string): Observable<any> {
+    return this.http.delete<any>(`/api/v1/mentor/assessments/${assessmentId}/questions/${aqId}`);
+  }
+
+  updateAssessment(id: string, payload: any): Observable<AssessmentItem> {
+    return this.http.put<AssessmentItem>(`/api/v1/mentor/assessments/${id}`, payload);
+  }
+
+  getBatches(): Observable<any[]> {
+    return this.http.get<any[]>('/api/v1/mentor/batches');
   }
 
   getLearners(): Observable<any[]> {

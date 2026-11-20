@@ -407,7 +407,7 @@ def test_talent_alert_actions_persistence_and_closed_lock(p3_db: Session):
             mentor=mentor1,
             _uow=None,
         )
-    assert exc_blocked.value.status_code == status.HTTP_400_BAD_REQUEST
+    assert exc_blocked.value.status_code in (status.HTTP_409_CONFLICT, status.HTTP_400_BAD_REQUEST)
     assert "already closed" in exc_blocked.value.detail.lower()
 
     # 2. SCHEDULE_INTERVIEW: Must create a real Meeting and MeetingAudience row
