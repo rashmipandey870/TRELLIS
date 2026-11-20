@@ -7,7 +7,12 @@ import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { LoginComponent } from './features/auth/login.component';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  {
+    path: '',
+    loadComponent: () =>
+      import('./features/landing/csm-landing.component').then((m) => m.CsmLandingComponent),
+    pathMatch: 'full',
+  },
   { path: 'login', component: LoginComponent },
 
   // ADMIN Routes (Governed by authGuard + roleGuard: ADMIN only)
