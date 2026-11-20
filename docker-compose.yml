@@ -52,21 +52,22 @@ services:
       dockerfile: ../docker/Dockerfile.backend
     container_name: trellis-backend
     restart: unless-stopped
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
-      - TRELLIS_ENV=${TRELLIS_ENV:-development}
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-trellis}
-      - DB_USER=${DB_USER:-trellis_user}
-      - DB_PASSWORD=${DB_PASSWORD:-CSMTrellis2026!}
+      - TRELLIS_ENV=${TRELLIS_ENV:-dev}
+      - DATABASE_URL=mysql+asyncmy://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@mysql:3306/${DB_NAME:-trellis}
+      - DATABASE_MIGRATION_URL=mysql+pymysql://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@mysql:3306/${DB_NAME:-trellis}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-CSMTrellis2026!}@redis:6379/0
-      - SECRET_KEY=${SECRET_KEY:-default_32_byte_hex_secret_key_change_in_prod}
+      - SECRET_KEY=${SECRET_KEY:-trellis-secret-key-salt-2026}
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-qW7GZ9X_8K4jL2mN5pQ8rT1vX3zB6dF9hJ0lP2sU4wY=}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - LEDGER_SALT_KEY=${LEDGER_SALT_KEY:-trellis-ledger-pseudonym-salt-2026}
+      - AI_API_KEY=${AI_API_KEY:-}
       - CODE_RUNNER=${CODE_RUNNER:-local}
       - JUDGE0_URL=${JUDGE0_URL:-http://judge0:2358}
     ports:
       - "8000:8000"
+    volumes:
+      - ./secrets:/app/secrets:ro
     networks:
       - trellis-internal
     depends_on:
@@ -96,12 +97,8 @@ services:
     restart: unless-stopped
     command: celery -A app.core.celery_app worker --loglevel=info
     environment:
-      - TRELLIS_ENV=${TRELLIS_ENV:-development}
-      - DB_HOST=mysql
-      - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-trellis}
-      - DB_USER=${DB_USER:-trellis_user}
-      - DB_PASSWORD=${DB_PASSWORD:-CSMTrellis2026!}
+      - TRELLIS_ENV=${TRELLIS_ENV:-dev}
+      - DATABASE_URL=mysql+asyncmy://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@mysql:3306/${DB_NAME:-trellis}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-CSMTrellis2026!}@redis:6379/0
     networks:
       - trellis-internal
@@ -111,8 +108,8 @@ services:
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend
+      context: .
+      dockerfile: docker/Dockerfile.frontend
     container_name: trellis-frontend
     restart: unless-stopped
     ports:
