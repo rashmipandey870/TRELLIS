@@ -77,11 +77,13 @@ class Settings(BaseSettings):
         "csm.tech",
     ]
 
-    # AI Practice & Role Assistant Configuration
-    AI_MODEL_ID: str = "claude-3-5-sonnet-20241022"
+    # AI Practice, Role Assistant & Analytics Engine Configuration
+    AI_PROVIDER: str = "auto"  # "auto", "ollama", "local", "anthropic", "openai", "smart_template"
+    AI_MODEL_ID: str = "qwen2.5-coder:7b"
     AI_REQUEST_TIMEOUT_SECONDS: int = 45
     AI_API_KEY: str = ""
     AI_BASE_URL: str = "https://api.anthropic.com"
+    AI_LOCAL_URL: str = "http://localhost:11434"
 
     @model_validator(mode="after")
     def validate_production_invariants(self) -> "Settings":

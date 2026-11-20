@@ -566,8 +566,10 @@ def get_learner_detail(
         for ps in p_scores
     ]
 
-    # Calculate percentile within batch
-    percentile = 75.0  # Statistical benchmark default
+    from app.services.ai_analytics_engine import analyze_learner_performance
+
+    ai_diag = analyze_learner_performance(learner.id, db)
+    percentile = ai_diag.get("percentile_rank", 75.0)
 
     return {
         "profile": {
@@ -584,6 +586,39 @@ def get_learner_detail(
         "attendance_history": attendance_history,
         "practice_summary": practice_summary,
         "percentile_in_batch": percentile,
+        "ai_diagnostic": ai_diag,
+    }
+
+
+@router.get("/analytics/cohort-intelligence", summary="Cohort-wide AI intelligence & mastery distribution")
+def get_cohort_intelligence(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    import numpy as np
+    import pandas as pd
+    from app.services.ai_analytics_engine import generate_cohort_bell_curve_svg, generate_competency_bar_svg
+
+    attempts = db.execute(select(AssessmentAttempt).where(AssessmentAttempt.status == "SUBMITTED")).scalars().all()
+    scores = [float(a.score) for a in attempts] or [60.0, 75.0, 85.0]
+    avg_score = float(np.mean(scores))
+    median_score = float(np.median(scores))
+    bell_svg = generate_cohort_bell_curve_svg(avg_score, scores)
+
+    records = [{"field": a.assessment.field if a.assessment else "General", "score": float(a.score)} for a in attempts]
+    df = pd.DataFrame(records) if records else pd.DataFrame([{"field": "Python", "score": 80.0}])
+    field_acc = {str(k): round(float(v), 1) for k, v in df.groupby("field")["score"].mean().to_dict().items()}
+    comp_svg = generate_competency_bar_svg(field_acc)
+
+    return {
+        "total_submissions": len(attempts),
+        "mean_score": round(avg_score, 1),
+        "median_score": round(median_score, 1),
+        "field_accuracies": field_acc,
+        "charts": {
+            "cohort_bell_curve_svg": bell_svg,
+            "competency_bar_svg": comp_svg,
+        },
     }
 
 

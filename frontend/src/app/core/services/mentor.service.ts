@@ -162,6 +162,14 @@ export class MentorService {
     });
   }
 
+  getLearnerAiDiagnostic(learnerId: string): Observable<any> {
+    return this.http.get<any>(`/api/v1/mentor/learners/${learnerId}/ai-diagnostic`);
+  }
+
+  getAssessmentAiInsights(assessmentId: string): Observable<any> {
+    return this.http.get<any>(`/api/v1/mentor/assessments/${assessmentId}/ai-insights`);
+  }
+
   getTalentAlerts(): Observable<any[]> {
     return this.http.get<any[]>('/api/v1/mentor/spotlight');
   }

@@ -1448,6 +1448,31 @@ def export_assessment_results_csv(
     return get_assessment_analysis(assessment_id=assessment_id, export=True, db=db, mentor=mentor)
 
 
+@router.get("/assessments/{assessment_id}/ai-insights", summary="Get AI assessment difficulty and cohort insights")
+def get_assessment_ai_insights(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment or assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+    from app.services.ai_analytics_engine import analyze_assessment_ai_insights
+    return analyze_assessment_ai_insights(assessment_id, db)
+
+
+@router.get("/learners/{learner_id}/ai-diagnostic", summary="Get mentor AI diagnostic review for a learner")
+def get_learner_ai_diagnostic_for_mentor(
+    learner_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> dict[str, Any]:
+    if not verify_mentor_learner_access(mentor, learner_id, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Learner is not assigned to you.")
+    from app.services.ai_analytics_engine import analyze_learner_performance
+    return analyze_learner_performance(learner_id, db)
+
+
 @router.get("/batches", summary="List batches assigned to this mentor")
 def get_mentor_batches(
     db: Session = Depends(get_db),

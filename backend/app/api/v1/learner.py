@@ -784,3 +784,12 @@ def get_result_detail(
     if not attempt or attempt.learner_id != learner.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Result not found.")
     return get_assessment_result(assessment_id=attempt.assessment_id, db=db, learner=learner)
+
+
+@router.get("/analytics/ai-diagnostic", summary="Get learner AI diagnostic & visual performance analysis")
+def get_learner_ai_diagnostic(
+    db: Session = Depends(get_db),
+    learner: User = Depends(require_learner),
+) -> dict[str, Any]:
+    from app.services.ai_analytics_engine import analyze_learner_performance
+    return analyze_learner_performance(learner.id, db)

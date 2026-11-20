@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AssessmentItem, MentorService, QuestionBankItem } from '../../core/services/mentor.service';
 
 interface QuestionOption {
@@ -606,6 +607,22 @@ interface TestCase {
                 </div>
               </div>
 
+              <!-- AI Cohort Distribution & Psychometrics Card -->
+              @if (aiInsights()) {
+                <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase text-[11px]">AI Psychometric Distribution Curve</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#008FBB] text-white">SciPy &amp; NumPy</span>
+                  </div>
+                  @if (aiInsights().charts?.distribution_curve_svg) {
+                    <div [innerHTML]="getSafeSvg(aiInsights().charts.distribution_curve_svg)" class="overflow-hidden rounded-lg bg-slate-50/50 dark:bg-slate-950 p-2 border border-slate-100 dark:border-slate-800"></div>
+                  }
+                  <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-amber-50/60 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
+                    {{ aiInsights().ai_summary }}
+                  </p>
+                </div>
+              }
+
               <!-- Learner Attempts List -->
               <div class="space-y-2 text-xs">
                 <span class="font-bold uppercase text-slate-400">Submitted Attempts</span>
@@ -751,12 +768,14 @@ interface TestCase {
 })
 export class MentorAssessmentsComponent {
   private readonly mentorService = inject(MentorService);
+  private readonly sanitizer = inject(DomSanitizer);
 
   readonly assessments = signal<AssessmentItem[]>([]);
   readonly showStudioModal = signal<boolean>(false);
   readonly showQuestionBankModal = signal<boolean>(false);
   readonly selectedAssessmentForResults = signal<AssessmentItem | null>(null);
   readonly resultsData = signal<any>(null);
+  readonly aiInsights = signal<any>(null);
 
   readonly activeStudioAssessment = signal<AssessmentItem | null>(null);
   readonly stagedQuestions = signal<any[]>([]);
@@ -1198,6 +1217,8 @@ export class MentorAssessmentsComponent {
   openResultsAnalysis(a: AssessmentItem): void {
     this.selectedAssessmentForResults.set(a);
     this.resultsData.set(null);
+    this.aiInsights.set(null);
+
     this.mentorService.getAssessmentResults(a.id).subscribe({
       next: (res) => this.resultsData.set(res),
       error: () => this.resultsData.set({
@@ -1208,6 +1229,15 @@ export class MentorAssessmentsComponent {
         learners: [],
       }),
     });
+
+    this.mentorService.getAssessmentAiInsights(a.id).subscribe({
+      next: (insights) => this.aiInsights.set(insights),
+      error: () => {},
+    });
+  }
+
+  getSafeSvg(svg: string | null | undefined): SafeHtml {
+    return this.sanitizer.bypassSecurityTrustHtml(svg || '<svg></svg>');
   }
 
   exportCsv(): void {

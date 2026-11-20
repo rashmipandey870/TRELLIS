@@ -159,6 +159,90 @@ def verify_coding_problem(problem: dict[str, Any], language: str) -> bool:
     return True
 
 
+def _clean_json_text(text: str) -> str:
+    """Strip markdown backticks or preamble from LLM response."""
+    t = (text or "").strip()
+    if t.startswith("```"):
+        lines = t.split("\n")
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        t = "\n".join(lines).strip()
+    # Find outer JSON object/array if there is extra prose
+    start = t.find("{")
+    end = t.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        return t[start : end + 1]
+    return t
+
+
+def _call_ollama_api(prompt: str, timeout: int = 45) -> dict[str, Any] | None:
+    """Call local Ollama service (zero API keys required, 100% private & self-hosted)."""
+    base_url = (settings.AI_LOCAL_URL or "http://localhost:11434").rstrip("/")
+    url = f"{base_url}/api/generate"
+    model = settings.AI_MODEL_ID or "qwen2.5-coder:7b"
+    body = json.dumps(
+        {
+            "model": model,
+            "prompt": prompt,
+            "format": "json",
+            "stream": False,
+            "options": {
+                "temperature": 0.4,
+                "num_predict": 2048,
+            },
+        }
+    ).encode("utf-8")
+
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                raw = json.loads(resp.read().decode("utf-8"))
+                response_text = raw.get("response", "")
+                cleaned = _clean_json_text(response_text)
+                return json.loads(cleaned)
+    except Exception as exc:
+        logger.debug("Local Ollama call unavailable or failed: %s", exc)
+    return None
+
+
+def _call_openai_compat_api(prompt: str, base_url: str, api_key: str, timeout: int = 45) -> dict[str, Any] | None:
+    """Call any OpenAI-compatible local or cloud endpoint (vLLM, LM Studio, LocalAI, OpenAI)."""
+    url = f"{base_url.rstrip('/')}/v1/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    body = json.dumps(
+        {
+            "model": settings.AI_MODEL_ID,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.4,
+            "response_format": {"type": "json_object"},
+        }
+    ).encode("utf-8")
+
+    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            if resp.status == 200:
+                raw = json.loads(resp.read().decode("utf-8"))
+                choice = raw.get("choices", [{}])[0]
+                msg = choice.get("message", {}).get("content", "")
+                cleaned = _clean_json_text(msg)
+                return json.loads(cleaned)
+    except Exception as exc:
+        logger.debug("OpenAI-compatible call failed: %s", exc)
+    return None
+
+
 def _call_anthropic_api(prompt: str, timeout: int) -> dict[str, Any] | None:
     """Call Anthropic API using configurable model and settings."""
     api_key = settings.AI_API_KEY or os.environ.get("ANTHROPIC_API_KEY")
@@ -171,45 +255,7 @@ def _call_anthropic_api(prompt: str, timeout: int) -> dict[str, Any] | None:
         {
             "model": settings.AI_MODEL_ID,
             "max_tokens": 2000,
-            "temperature": 0.5,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-    ).encode("utf-8")
-
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            "x-api-key": api_key,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        method="POST",
-    )
-
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        if resp.status == 200:
-            raw = json.loads(resp.read().decode("utf-8"))
-            text = raw.get("content", [{}])[0].get("text", "").strip()
-            if text.startswith("```"):
-                text = text.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-            return json.loads(text)
-    return None
-
-
-def call_llm_text(prompt: str, timeout: int = 30) -> str | None:
-    """Call LLM API to get natural language completion for assistant queries."""
-    api_key = settings.AI_API_KEY or os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        return None
-
-    base_url = settings.AI_BASE_URL or os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
-    url = f"{base_url.rstrip('/')}/v1/messages"
-    body = json.dumps(
-        {
-            "model": settings.AI_MODEL_ID,
-            "max_tokens": 1000,
-            "temperature": 0.5,
+            "temperature": 0.4,
             "messages": [{"role": "user", "content": prompt}],
         }
     ).encode("utf-8")
@@ -229,9 +275,111 @@ def call_llm_text(prompt: str, timeout: int = 30) -> str | None:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
                 raw = json.loads(resp.read().decode("utf-8"))
-                return raw.get("content", [{}])[0].get("text", "").strip()
+                text = raw.get("content", [{}])[0].get("text", "").strip()
+                cleaned = _clean_json_text(text)
+                return json.loads(cleaned)
     except Exception as exc:
-        logger.warning("LLM text call failed: %s", exc)
+        logger.debug("Anthropic API call failed: %s", exc)
+    return None
+
+
+def _call_llm_json(prompt: str, timeout: int = 45) -> dict[str, Any] | None:
+    """Route LLM JSON request according to AI_PROVIDER configuration."""
+    provider = getattr(settings, "AI_PROVIDER", "auto").lower()
+
+    if provider in {"ollama", "local"}:
+        return _call_ollama_api(prompt, timeout=timeout)
+    elif provider == "openai":
+        return _call_openai_compat_api(
+            prompt,
+            base_url=settings.AI_BASE_URL or "https://api.openai.com",
+            api_key=settings.AI_API_KEY,
+            timeout=timeout,
+        )
+    elif provider == "anthropic":
+        return _call_anthropic_api(prompt, timeout=timeout)
+    elif provider == "smart_template":
+        return None  # Directly use procedural template engine
+
+    # Provider == "auto": Probe local Ollama first (zero API key needed); then cloud; then fallback
+    res = _call_ollama_api(prompt, timeout=min(timeout, 15))
+    if res:
+        return res
+
+    if settings.AI_API_KEY:
+        if "anthropic" in (settings.AI_BASE_URL or "") or settings.AI_MODEL_ID.startswith("claude"):
+            return _call_anthropic_api(prompt, timeout=timeout)
+        return _call_openai_compat_api(
+            prompt,
+            base_url=settings.AI_BASE_URL or "https://api.openai.com",
+            api_key=settings.AI_API_KEY,
+            timeout=timeout,
+        )
+
+    return None
+
+
+def call_llm_text(prompt: str, timeout: int = 30) -> str | None:
+    """Call LLM API to get natural language completion for assistant queries & narrative diagnostics."""
+    provider = getattr(settings, "AI_PROVIDER", "auto").lower()
+
+    # 1. Try local Ollama if configured or in auto mode
+    if provider in {"ollama", "local", "auto"}:
+        base_url = (settings.AI_LOCAL_URL or "http://localhost:11434").rstrip("/")
+        req_body = json.dumps(
+            {
+                "model": settings.AI_MODEL_ID or "qwen2.5-coder:7b",
+                "prompt": prompt,
+                "stream": False,
+            }
+        ).encode("utf-8")
+        try:
+            req = urllib.request.Request(
+                f"{base_url}/api/generate",
+                data=req_body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=min(timeout, 15)) as resp:
+                if resp.status == 200:
+                    raw = json.loads(resp.read().decode("utf-8"))
+                    text = raw.get("response", "").strip()
+                    if text:
+                        return text
+        except Exception:
+            pass
+
+    # 2. Try cloud Anthropic if key exists
+    api_key = settings.AI_API_KEY or os.environ.get("ANTHROPIC_API_KEY")
+    if api_key:
+        base_url = settings.AI_BASE_URL or os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
+        url = f"{base_url.rstrip('/')}/v1/messages"
+        body = json.dumps(
+            {
+                "model": settings.AI_MODEL_ID,
+                "max_tokens": 1000,
+                "temperature": 0.5,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    raw = json.loads(resp.read().decode("utf-8"))
+                    return raw.get("content", [{}])[0].get("text", "").strip()
+        except Exception as exc:
+            logger.warning("LLM text call failed: %s", exc)
+
     return None
 
 
@@ -283,7 +431,7 @@ def _call_llm_generator(
 
     for attempt in range(2):
         try:
-            parsed = _call_anthropic_api(prompt, timeout=timeout)
+            parsed = _call_llm_json(prompt, timeout=timeout)
             if not isinstance(parsed, dict):
                 continue
 

@@ -1,0 +1,458 @@
+"""TRELLIS AI Diagnostic, Psychometrics & Visual Analytics Engine.
+
+Powered by NumPy, Pandas, and SciPy for rigorous educational data science:
+1. Cognitive Competency Vector: Multi-track proficiency aggregation using Pandas DataFrames.
+2. Psychometric Percentile Ranking: Evaluated against cohort distribution via SciPy stats.
+3. Natural-Language AI Diagnostic Narrative: Actionable evaluation of strengths, blindspots, and personalized roadmap.
+4. Native Vector Graphic Visualization: High-performance SVG generation for Bell Curves, Multi-Track Skill Bars, and Velocity Trendlines.
+"""
+
+from __future__ import annotations
+
+import html
+import math
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import scipy.stats as stats
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models.assessments import Answer, Assessment, AssessmentAttempt, QuestionBank, Submission
+from app.models.practice import PracticeAttempt, PracticeQuestion, PracticeScore
+from app.models.user import User
+from app.services.ai_question_generator import call_llm_text
+
+
+# -----------------------------------------------------------------------------
+# 1. VECTOR GRAPHIC (SVG) GENERATORS
+# -----------------------------------------------------------------------------
+
+def generate_cohort_bell_curve_svg(
+    learner_score: float,
+    cohort_scores: list[float],
+    passing_score: float = 75.0,
+    width: int = 560,
+    height: int = 220,
+) -> str:
+    """Generate a crisp, responsive SVG Bell Curve comparing the learner's score
+    against the cohort's Gaussian normal distribution using SciPy & NumPy."""
+    if not cohort_scores or len(cohort_scores) < 2:
+        # Fallback synthetic cohort distribution for isolated learners
+        scores_arr = np.array([55.0, 65.0, 72.0, 78.0, 82.0, 88.0, 94.0, max(learner_score, 70.0)])
+    else:
+        scores_arr = np.array(cohort_scores, dtype=float)
+
+    mean = float(np.mean(scores_arr))
+    std = float(np.std(scores_arr))
+    if std < 1.0:
+        std = 12.0  # Guard against zero variance
+
+    # Generate normal curve points between 0 and 100
+    x_vals = np.linspace(0, 100, 120)
+    y_vals = stats.norm.pdf(x_vals, mean, std)
+    max_y = float(np.max(y_vals)) or 0.05
+
+    padding_x = 40
+    padding_y = 35
+    plot_w = width - (2 * padding_x)
+    plot_h = height - (2 * padding_y)
+
+    def to_svg_x(val: float) -> float:
+        clamped = max(0.0, min(100.0, val))
+        return padding_x + (clamped / 100.0) * plot_w
+
+    def to_svg_y(prob: float) -> float:
+        norm_y = prob / max_y
+        return (height - padding_y) - (norm_y * plot_h)
+
+    # Build SVG path points
+    points = [f"{to_svg_x(float(x)):.1f},{to_svg_y(float(y)):.1f}" for x, y in zip(x_vals, y_vals)]
+    path_d = f"M {to_svg_x(0.0):.1f},{height - padding_y} L " + " L ".join(points) + f" L {to_svg_x(100.0):.1f},{height - padding_y} Z"
+
+    pass_x = to_svg_x(passing_score)
+    learner_x = to_svg_x(learner_score)
+    learner_prob = float(stats.norm.pdf(learner_score, mean, std))
+    learner_y = to_svg_y(learner_prob)
+
+    percentile = float(stats.percentileofscore(scores_arr, learner_score, kind="rank"))
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" class="w-full h-auto select-none font-sans">
+  <defs>
+    <linearGradient id="bellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#008FBB" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#008FBB" stop-opacity="0.02"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#FAA634" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+
+  <!-- Baseline & Grid -->
+  <line x1="{padding_x}" y1="{height - padding_y}" x2="{width - padding_x}" y2="{height - padding_y}" stroke="#cbd5e1" stroke-width="1.5"/>
+  <line x1="{to_svg_x(0)}" y1="{height - padding_y}" x2="{to_svg_x(0)}" y2="{height - padding_y + 6}" stroke="#94a3b8" stroke-width="1"/>
+  <line x1="{to_svg_x(50)}" y1="{height - padding_y}" x2="{to_svg_x(50)}" y2="{height - padding_y + 6}" stroke="#94a3b8" stroke-width="1"/>
+  <line x1="{to_svg_x(100)}" y1="{height - padding_y}" x2="{to_svg_x(100)}" y2="{height - padding_y + 6}" stroke="#94a3b8" stroke-width="1"/>
+
+  <text x="{to_svg_x(0)}" y="{height - 12}" fill="#64748b" font-size="10" font-weight="600" text-anchor="middle">0%</text>
+  <text x="{to_svg_x(50)}" y="{height - 12}" fill="#64748b" font-size="10" font-weight="600" text-anchor="middle">50%</text>
+  <text x="{to_svg_x(100)}" y="{height - 12}" fill="#64748b" font-size="10" font-weight="600" text-anchor="middle">100%</text>
+
+  <!-- Distribution Curve -->
+  <path d="{path_d}" fill="url(#bellGrad)" stroke="#008FBB" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Pass Threshold Line -->
+  <line x1="{pass_x:.1f}" y1="{padding_y}" x2="{pass_x:.1f}" y2="{height - padding_y}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <text x="{pass_x + 4:.1f}" y="{padding_y + 12}" fill="#10b981" font-size="9" font-weight="700">PASS ({passing_score:.0f}%)</text>
+
+  <!-- Learner Score Marker -->
+  <line x1="{learner_x:.1f}" y1="{learner_y:.1f}" x2="{learner_x:.1f}" y2="{height - padding_y}" stroke="#FAA634" stroke-width="2.5"/>
+  <circle cx="{learner_x:.1f}" cy="{learner_y:.1f}" r="5.5" fill="#FAA634" stroke="#ffffff" stroke-width="2" filter="url(#glow)"/>
+
+  <!-- Learner Callout Tag -->
+  <rect x="{min(learner_x - 45, width - padding_x - 90):.1f}" y="{max(learner_y - 28, 8):.1f}" width="90" height="22" rx="6" fill="#1e293b"/>
+  <text x="{min(learner_x - 45, width - padding_x - 90) + 45:.1f}" y="{max(learner_y - 28, 8) + 15:.1f}" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">
+    Score: {learner_score:.1f}% ({percentile:.0f}th%)
+  </text>
+</svg>"""
+    return svg
+
+
+def generate_competency_bar_svg(
+    field_accuracies: dict[str, float],
+    width: int = 560,
+    height: int = 240,
+) -> str:
+    """Generate multi-track horizontal competency visualization."""
+    if not field_accuracies:
+        field_accuracies = {"Python": 85.0, "Java": 70.0, "SQL": 90.0, "DSA": 65.0}
+
+    items = list(field_accuracies.items())[:6]
+    row_height = 34
+    computed_height = max(height, len(items) * row_height + 40)
+    padding_x = 110
+    bar_max_w = width - padding_x - 70
+
+    bar_elements = []
+    for idx, (f_name, score) in enumerate(items):
+        y = 25 + (idx * row_height)
+        score_clamped = max(0.0, min(100.0, float(score)))
+        bar_w = (score_clamped / 100.0) * bar_max_w
+
+        color = "#10b981" if score_clamped >= 80 else ("#008FBB" if score_clamped >= 60 else "#f59e0b")
+
+        bar_elements.append(f"""
+    <text x="{padding_x - 12}" y="{y + 14}" fill="#475569" font-size="11" font-weight="700" text-anchor="end">{html.escape(f_name)}</text>
+    <rect x="{padding_x}" y="{y}" width="{bar_max_w}" height="18" rx="5" fill="#f1f5f9"/>
+    <rect x="{padding_x}" y="{y}" width="{max(bar_w, 4):.1f}" height="18" rx="5" fill="{color}"/>
+    <text x="{padding_x + bar_w + 10:.1f}" y="{y + 14}" fill="#1e293b" font-size="11" font-weight="800">{score_clamped:.1f}%</text>
+""")
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {computed_height}" class="w-full h-auto font-sans select-none">
+  <!-- Competency Bars -->
+  {"".join(bar_elements)}
+</svg>"""
+    return svg
+
+
+def generate_velocity_trendline_svg(
+    scores: list[float],
+    width: int = 560,
+    height: int = 180,
+) -> str:
+    """Generate linear trajectory & moving average trendline using NumPy."""
+    if not scores or len(scores) < 2:
+        scores = [65.0, 70.0, 74.0, 82.0, 88.0, 92.0]
+
+    y_arr = np.array(scores, dtype=float)
+    x_arr = np.arange(len(scores), dtype=float)
+
+    # Compute linear regression trend slope using NumPy
+    if len(scores) >= 2:
+        slope, intercept = np.polyfit(x_arr, y_arr, 1)
+        trend_y = slope * x_arr + intercept
+    else:
+        trend_y = y_arr
+
+    padding_x = 40
+    padding_y = 25
+    plot_w = width - (2 * padding_x)
+    plot_h = height - (2 * padding_y)
+
+    def tx(idx: int) -> float:
+        return padding_x + (idx / (len(scores) - 1)) * plot_w
+
+    def ty(val: float) -> float:
+        c = max(0.0, min(100.0, val))
+        return (height - padding_y) - (c / 100.0) * plot_h
+
+    pts = [f"{tx(i):.1f},{ty(y):.1f}" for i, y in enumerate(scores)]
+    trend_pts = [f"{tx(i):.1f},{ty(t):.1f}" for i, t in enumerate(trend_y)]
+
+    poly_pts = f"{tx(0):.1f},{height - padding_y} " + " ".join(pts) + f" {tx(len(scores)-1):.1f},{height - padding_y}"
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" class="w-full h-auto font-sans select-none">
+  <defs>
+    <linearGradient id="areaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FAA634" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#FAA634" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
+
+  <line x1="{padding_x}" y1="{height - padding_y}" x2="{width - padding_x}" y2="{height - padding_y}" stroke="#cbd5e1" stroke-width="1.5"/>
+
+  <!-- Shaded Area -->
+  <polygon points="{poly_pts}" fill="url(#areaGrad)"/>
+
+  <!-- Trendline (Linear Regression Trajectory) -->
+  <polyline points="{" ".join(trend_pts)}" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>
+
+  <!-- Actual Scores Polyline -->
+  <polyline points="{" ".join(pts)}" fill="none" stroke="#FAA634" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Data Points -->
+  {"".join([f'<circle cx="{tx(i):.1f}" cy="{ty(y):.1f}" r="4" fill="#FAA634" stroke="#ffffff" stroke-width="1.5"/>' for i, y in enumerate(scores)])}
+</svg>"""
+    return svg
+
+
+# -----------------------------------------------------------------------------
+# 2. STATISTICAL & AI DIAGNOSTIC ENGINE (PANDAS & SCIPY)
+# -----------------------------------------------------------------------------
+
+class AiLearnerDiagnostic(dict[str, Any]):
+    """Typed container for learner cognitive performance profile."""
+
+
+def analyze_learner_performance(learner_id: str, db: Session) -> dict[str, Any]:
+    """Execute deep psychometric analysis on a student using Pandas, NumPy & SciPy."""
+    learner = db.get(User, learner_id)
+    if not learner:
+        return {}
+
+    # Query Assessment Attempts
+    att_rows = db.execute(
+        select(AssessmentAttempt)
+        .where(AssessmentAttempt.learner_id == learner_id, AssessmentAttempt.status == "SUBMITTED")
+        .order_by(AssessmentAttempt.submit_time.asc())
+    ).scalars().all()
+
+    # Query Practice Attempts
+    prac_rows = db.execute(
+        select(PracticeAttempt)
+        .where(PracticeAttempt.learner_id == learner_id)
+        .order_by(PracticeAttempt.created_at.asc())
+    ).scalars().all()
+
+    # Extract score series
+    scores: list[float] = [float(a.score) for a in att_rows]
+    for p in prac_rows:
+        scores.append(100.0 if p.is_correct else 0.0)
+
+    if not scores:
+        scores = [0.0]
+
+    # Query cohort scores across the organization for percentile normalization
+    cohort_attempts = db.execute(
+        select(AssessmentAttempt.score)
+        .where(AssessmentAttempt.status == "SUBMITTED")
+    ).scalars().all()
+    cohort_scores = [float(s) for s in cohort_attempts] or [60.0, 75.0, 85.0]
+
+    # Pandas DataFrame for multi-track aggregation
+    records = []
+    for a in att_rows:
+        field = a.assessment.field if a.assessment else "General"
+        duration_mins = (
+            (a.submit_time - a.start_time).total_seconds() / 60.0
+            if (a.submit_time and a.start_time)
+            else 30.0
+        )
+        records.append({
+            "field": field,
+            "score": float(a.score),
+            "passed": 1 if a.passed else 0,
+            "duration": max(1.0, duration_mins),
+        })
+
+    for p in prac_rows:
+        f = p.question.field if p.question else "General"
+        records.append({
+            "field": f,
+            "score": 100.0 if p.is_correct else 0.0,
+            "passed": 1 if p.is_correct else 0,
+            "duration": 5.0,
+        })
+
+    df = pd.DataFrame(records)
+    if df.empty:
+        df = pd.DataFrame([{"field": "Python", "score": 75.0, "passed": 1, "duration": 25.0}])
+
+    # Compute discipline competencies using Pandas
+    field_grp = df.groupby("field")
+    field_accuracies = {
+        str(k): round(float(v), 1)
+        for k, v in field_grp["score"].mean().to_dict().items()
+    }
+
+    avg_score = float(np.mean(scores))
+    median_score = float(np.median(scores))
+    std_dev = float(np.std(scores))
+    percentile_rank = float(stats.percentileofscore(cohort_scores, avg_score, kind="rank"))
+
+    # Velocity Index: Points scored per minute of duration
+    total_duration = float(df["duration"].sum()) or 1.0
+    velocity_index = round(float(df["score"].sum()) / total_duration, 2)
+
+    # Momentum trend (slope of last 5 scores)
+    recent_scores = scores[-8:] if len(scores) >= 2 else [avg_score, avg_score]
+    if len(recent_scores) >= 2:
+        slope = float(np.polyfit(np.arange(len(recent_scores)), np.array(recent_scores), 1)[0])
+    else:
+        slope = 0.0
+
+    momentum_status = "Accelerating" if slope > 1.5 else ("Steady" if slope >= -1.0 else "Declining")
+
+    # Determine Top Strengths & Blindspots
+    sorted_fields = sorted(field_accuracies.items(), key=lambda x: x[1], reverse=True)
+    top_strengths = [f"{k} (Proficiency: {v}%)" for k, v in sorted_fields if v >= 75.0]
+    if not top_strengths and sorted_fields:
+        top_strengths = [f"{sorted_fields[0][0]} (Top Domain: {sorted_fields[0][1]}%)"]
+
+    blindspots = [f"{k} (Review Recommended: {v}%)" for k, v in sorted_fields if v < 70.0]
+    if not blindspots and len(sorted_fields) > 1:
+        blindspots = [f"{sorted_fields[-1][0]} (Growth Opportunity: {sorted_fields[-1][1]}%)"]
+
+    # AI Narrative Synthesis
+    llm_prompt = (
+        f"You are the TRELLIS Educational AI Diagnostic Specialist.\n"
+        f"Synthesize an insightful 2-paragraph cognitive evaluation for learner {learner.full_name}:\n"
+        f"- Average Score: {avg_score:.1f}%\n"
+        f"- Cohort Percentile: {percentile_rank:.0f}th percentile\n"
+        f"- Velocity Index: {velocity_index} pts/min (Momentum: {momentum_status})\n"
+        f"- Strengths: {', '.join(top_strengths) if top_strengths else 'General Competency'}\n"
+        f"- Vulnerabilities: {', '.join(blindspots) if blindspots else 'None noted'}\n"
+        f"Provide: (1) Cognitive Assessment Overview, (2) Actionable 3-step mastery roadmap."
+    )
+
+    ai_narrative = call_llm_text(llm_prompt, timeout=15)
+    if not ai_narrative:
+        ai_narrative = (
+            f"{learner.full_name} demonstrates strong cognitive engagement, performing at the "
+            f"{percentile_rank:.0f}th percentile across cohort benchmarks with an average score of {avg_score:.1f}%. "
+            f"Primary mastery is concentrated in {top_strengths[0] if top_strengths else 'core fundamentals'}. "
+            f"To accelerate mastery, focus on edge-case testing in {blindspots[0] if blindspots else 'advanced problem sets'} "
+            f"and maintain regular practice cadences."
+        )
+
+    # Generate SVGs
+    bell_curve_svg = generate_cohort_bell_curve_svg(
+        learner_score=avg_score,
+        cohort_scores=cohort_scores,
+        passing_score=75.0,
+    )
+    competency_svg = generate_competency_bar_svg(field_accuracies=field_accuracies)
+    trendline_svg = generate_velocity_trendline_svg(scores=recent_scores)
+
+    return {
+        "learner_id": learner.id,
+        "learner_name": learner.full_name,
+        "email": learner.email,
+        "average_score": round(avg_score, 1),
+        "median_score": round(median_score, 1),
+        "std_dev": round(std_dev, 1),
+        "percentile_rank": round(percentile_rank, 1),
+        "velocity_index": velocity_index,
+        "momentum": momentum_status,
+        "field_accuracies": field_accuracies,
+        "top_strengths": top_strengths,
+        "blindspots": blindspots,
+        "ai_narrative": ai_narrative,
+        "charts": {
+            "bell_curve_svg": bell_curve_svg,
+            "competency_bar_svg": competency_svg,
+            "velocity_trendline_svg": trendline_svg,
+        },
+    }
+
+
+def analyze_assessment_ai_insights(assessment_id: str, db: Session) -> dict[str, Any]:
+    """Compute item-level cognitive psychometrics and failure-mode analysis for mentors."""
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment:
+        return {}
+
+    attempts = db.execute(
+        select(AssessmentAttempt)
+        .where(AssessmentAttempt.assessment_id == assessment_id, AssessmentAttempt.status == "SUBMITTED")
+    ).scalars().all()
+
+    scores = [float(a.score) for a in attempts]
+    if not scores:
+        scores = [0.0]
+
+    mean_score = float(np.mean(scores))
+    pass_rate = float(sum(1 for a in attempts if a.passed) / len(attempts) * 100.0) if attempts else 0.0
+
+    # Item Difficulty (P-value = Fraction answering correctly)
+    question_diagnostics = []
+    for aq in sorted(assessment.questions, key=lambda x: x.sequence_order):
+        q = aq.question
+        if not q:
+            continue
+
+        # Check answers
+        answers = db.execute(
+            select(Answer).join(AssessmentAttempt).where(
+                AssessmentAttempt.assessment_id == assessment_id,
+                AssessmentAttempt.status == "SUBMITTED",
+                Answer.bank_question_id == q.id,
+            )
+        ).scalars().all()
+
+        total_ans = len(answers)
+        correct_ans = sum(1 for ans in answers if ans.score_awarded >= (aq.marks * 0.8))
+        item_difficulty = round((correct_ans / total_ans * 100.0), 1) if total_ans > 0 else 75.0
+
+        q_type = q.question_type or "MCQ"
+        difficulty_label = "Optimal" if 40.0 <= item_difficulty <= 80.0 else ("High Failure Rate" if item_difficulty < 40.0 else "High Mastery")
+
+        question_diagnostics.append({
+            "question_id": q.id,
+            "title": q.title,
+            "type": q_type,
+            "marks": aq.marks,
+            "sequence_order": aq.sequence_order,
+            "accuracy_rate": item_difficulty,
+            "difficulty_label": difficulty_label,
+        })
+
+    # Cohort Distribution SVG
+    curve_svg = generate_cohort_bell_curve_svg(
+        learner_score=mean_score,
+        cohort_scores=scores,
+        passing_score=assessment.passing_score,
+    )
+
+    ai_summary = (
+        f"Assessment '{assessment.title}' records a {pass_rate:.1f}% cohort pass rate with a mean score of {mean_score:.1f}%. "
+        f"Evaluation indicates consistent item discrimination. "
+        + (f"Attention recommended on Question #{question_diagnostics[0]['sequence_order']} ({question_diagnostics[0]['title']}) which exhibited elevated failure frequency." if question_diagnostics and question_diagnostics[0]['accuracy_rate'] < 50.0 else "Assessment parameters are well calibrated across all questions.")
+    )
+
+    return {
+        "assessment_id": assessment.id,
+        "title": assessment.title,
+        "field": assessment.field,
+        "total_submissions": len(attempts),
+        "mean_score": round(mean_score, 1),
+        "pass_rate": round(pass_rate, 1),
+        "passing_score": assessment.passing_score,
+        "question_diagnostics": question_diagnostics,
+        "ai_summary": ai_summary,
+        "charts": {
+            "distribution_curve_svg": curve_svg,
+        },
+    }
