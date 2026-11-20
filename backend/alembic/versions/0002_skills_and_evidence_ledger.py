@@ -115,7 +115,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("target_level", sa.Integer(), nullable=False),
-        sa.Column("is_mandatory", sa.Boolean(), server_default=sa.text("1"), nullable=False),
+        sa.Column("is_mandatory", sa.Boolean(), server_default=sa.true(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.UniqueConstraint(
@@ -148,7 +148,7 @@ def upgrade() -> None:
         sa.Column("weight", sa.Float(), server_default=sa.text("1.0"), nullable=False),
         sa.Column("raw_payload_json", sa.JSON(), nullable=True),
         sa.Column("key_id", sa.String(64), nullable=True),
-        sa.Column("is_shredded", sa.Boolean(), server_default=sa.text("0"), nullable=False),
+        sa.Column("is_shredded", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )

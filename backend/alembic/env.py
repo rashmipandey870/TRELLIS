@@ -20,7 +20,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Override URL with environment settings if available
-db_url = settings.DATABASE_MIGRATION_URL or settings.DATABASE_URL or "sqlite+aiosqlite:///:memory:"
+db_url = config.get_main_option("sqlalchemy.url") or settings.DATABASE_MIGRATION_URL or settings.DATABASE_URL or "sqlite+aiosqlite:///:memory:"
 config.set_main_option("sqlalchemy.url", db_url)
 
 
@@ -66,7 +66,23 @@ async def run_async_migrations() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    asyncio.run(run_async_migrations())
+    url = config.get_main_option("sqlalchemy.url") or ""
+    if (
+        url.startswith("sqlite://")
+        or url.startswith("mysql+pymysql://")
+        or url.startswith("postgresql+psycopg2://")
+        or (url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"))
+    ):
+        from sqlalchemy import create_engine
+        sync_url = url
+        if sync_url.startswith("postgresql://") and not sync_url.startswith("postgresql+"):
+            sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        connectable = create_engine(sync_url, poolclass=pool.NullPool)
+        with connectable.connect() as connection:
+            do_run_migrations(connection)
+        connectable.dispose()
+    else:
+        asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():

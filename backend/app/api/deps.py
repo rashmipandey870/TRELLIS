@@ -34,6 +34,12 @@ def get_sync_engine() -> Any:
             db_url = db_url.replace("mysql+asyncmy://", "mysql+pymysql://", 1)
         elif db_url.startswith("sqlite+aiosqlite://"):
             db_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+        elif db_url.startswith("postgresql+asyncpg://"):
+            db_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+        elif db_url.startswith("postgres://"):
+            db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+        elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
+            db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
         _sync_engine = create_engine(db_url, pool_pre_ping=True)
     return _sync_engine
