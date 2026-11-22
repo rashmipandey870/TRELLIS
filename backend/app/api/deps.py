@@ -19,10 +19,26 @@ from app.models import Base, User
 _sync_engine = None
 
 
+def warmup_database(engine: Any, max_retries: int = 3, initial_delay: float = 0.5) -> None:
+    """Warm up database connection with retry backoff for serverless/cold-start databases (e.g. Neon)."""
+    import time
+    from sqlalchemy import text
+    for attempt in range(1, max_retries + 1):
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return
+        except Exception:
+            if attempt == max_retries:
+                raise
+            time.sleep(initial_delay * (2 ** (attempt - 1)))
+
+
 def get_sync_engine() -> Any:
     """Return synchronous database engine.
     
     Alembic migrations are the sole schema source. Base.metadata.create_all and silent fallbacks are removed.
+    Configured with connection pooling, pool_pre_ping, pool_recycle, and Neon sslmode support.
     """
     global _sync_engine
     if _sync_engine is None:
@@ -41,7 +57,23 @@ def get_sync_engine() -> Any:
         elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
             db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 
-        _sync_engine = create_engine(db_url, pool_pre_ping=True)
+        engine_kwargs: dict[str, Any] = {
+            "pool_pre_ping": True,
+        }
+        if "sqlite" not in db_url:
+            engine_kwargs.update({
+                "pool_size": 10,
+                "max_overflow": 20,
+                "pool_recycle": 300,
+                "pool_timeout": 30,
+            })
+            if "postgresql" in db_url or "postgres" in db_url:
+                connect_args: dict[str, Any] = {}
+                if "sslmode" not in db_url:
+                    connect_args["sslmode"] = "require"
+                engine_kwargs["connect_args"] = connect_args
+
+        _sync_engine = create_engine(db_url, **engine_kwargs)
     return _sync_engine
 
 

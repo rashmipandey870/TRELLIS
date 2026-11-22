@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_sync_engine
 from app.core.security import hash_password
 from app.models import (
+    AlertAction,
     Answer,
     Assessment,
     AssessmentAttempt,
@@ -33,6 +34,7 @@ from app.models import (
     Base,
     Batch,
     CodingProblem,
+    Cohort,
     McqOption,
     Meeting,
     MeetingAttendance,
@@ -41,10 +43,15 @@ from app.models import (
     MentorRemark,
     Notification,
     Organisation,
+    PracticeAttempt,
+    PracticeQuestion,
     PracticeScore,
+    PracticeSession,
     QuestionBank,
     Role,
+    Submission,
     SystemSetting,
+    TalentAlert,
     TestCase,
     User,
 )
@@ -124,10 +131,23 @@ def seed_trellis(session: Session) -> dict[str, int]:
             session.flush()
         learners.append(l)
 
-    # 3. Batches
+    # 3. Cohorts & Batches
+    cohort = session.execute(select(Cohort).where(Cohort.code == "COHORT_2026")).scalar_one_or_none()
+    if not cohort:
+        cohort = Cohort(
+            org_id=org.id,
+            name="2026 Core Engineering Cohort",
+            code="COHORT_2026",
+            trainer_id=mentors[0].id,
+        )
+        session.add(cohort)
+        session.flush()
+
     batch_a = session.execute(select(Batch).where(Batch.code == "BATCH_ALPHA")).scalar_one_or_none()
     if not batch_a:
         batch_a = Batch(
+            org_id=org.id,
+            cohort_id=cohort.id,
             name="Batch Alpha (Cloud Platform Engineering)",
             code="BATCH_ALPHA",
             field="Cloud & DevOps",
@@ -140,6 +160,8 @@ def seed_trellis(session: Session) -> dict[str, int]:
     batch_b = session.execute(select(Batch).where(Batch.code == "BATCH_BETA")).scalar_one_or_none()
     if not batch_b:
         batch_b = Batch(
+            org_id=org.id,
+            cohort_id=cohort.id,
             name="Batch Beta (Full-Stack & Data Systems)",
             code="BATCH_BETA",
             field="Web & Data",
@@ -147,6 +169,7 @@ def seed_trellis(session: Session) -> dict[str, int]:
             max_learners=30,
         )
         session.add(batch_b)
+        session.flush()
         session.flush()
 
     # 4. Mentor-Learner Assignments
@@ -368,36 +391,157 @@ def seed_trellis(session: Session) -> dict[str, int]:
                     )
                 )
 
-    # 8. Practice Scores Seed
+    # 8. Practice Scores Seed (Idempotent)
     for l in learners:
-        session.add(
-            PracticeScore(
-                learner_id=l.id,
+        existing_score = session.execute(
+            select(PracticeScore).where(PracticeScore.learner_id == l.id, PracticeScore.field == "Python")
+        ).scalar_one_or_none()
+        if not existing_score:
+            session.add(
+                PracticeScore(
+                    learner_id=l.id,
+                    field="Python",
+                    active_days=l.streak_days,
+                    streak_days=l.streak_days,
+                    problems_attempted=18,
+                    problems_solved=15,
+                    acceptance_rate=83.3,
+                    weighted_accuracy=85.0,
+                    dedication_score=78.5,
+                    last_practiced_at=datetime.now(UTC),
+                )
+            )
+
+    # 9. Assessment Attempt Seed (Priya Sharma attempt on Python & Cloud Core Assessment)
+    if assessment and learners:
+        existing_attempt = session.execute(
+            select(AssessmentAttempt).where(
+                AssessmentAttempt.assessment_id == assessment.id,
+                AssessmentAttempt.learner_id == learners[0].id,
+            )
+        ).scalar_one_or_none()
+        if not existing_attempt:
+            att = AssessmentAttempt(
+                assessment_id=assessment.id,
+                learner_id=learners[0].id,
+                start_time=datetime.now(UTC) - timedelta(hours=2),
+                submit_time=datetime.now(UTC) - timedelta(hours=1, minutes=15),
+                score=60.0,
+                total_marks=60.0,
+                passed=True,
+                status="SUBMITTED",
+                grading_status="GRADED",
+            )
+            session.add(att)
+            session.flush()
+
+            # Seed answers for assessment questions
+            aq_list = session.execute(
+                select(AssessmentQuestion).where(AssessmentQuestion.assessment_id == assessment.id)
+            ).scalars().all()
+            for aq in aq_list:
+                session.add(
+                    Answer(
+                        attempt_id=att.id,
+                        bank_question_id=aq.bank_question_id,
+                        score_awarded=float(aq.marks),
+                        grading_status="GRADED",
+                    )
+                )
+
+    # 10. Practice History Seed (Practice Session, Question & Attempt)
+    if learners:
+        existing_ps = session.execute(
+            select(PracticeSession).where(
+                PracticeSession.learner_id == learners[0].id,
+                PracticeSession.field == "Python",
+            )
+        ).scalar_one_or_none()
+        if not existing_ps:
+            ps = PracticeSession(
+                learner_id=learners[0].id,
                 field="Python",
-                active_days=l.streak_days,
-                streak_days=l.streak_days,
-                problems_attempted=18,
-                problems_solved=15,
-                acceptance_rate=83.3,
-                weighted_accuracy=85.0,
-                dedication_score=78.5,
-                last_practiced_at=datetime.now(UTC),
+                difficulty="MEDIUM",
+                mode="PRACTICE",
+                completed_at=datetime.now(UTC) - timedelta(days=1),
+            )
+            session.add(ps)
+            session.flush()
+
+            pq = PracticeQuestion(
+                session_id=ps.id,
+                field="Python",
+                difficulty="MEDIUM",
+                mode="PRACTICE",
+                title="Fibonacci Number with Memoization",
+                question_data_json={
+                    "title": "Fibonacci Number with Memoization",
+                    "description": "Compute the Nth Fibonacci number efficiently using dynamic programming.",
+                    "starter_code": "def fib(n):\n    pass",
+                },
+                reference_solution="def fib(n):\n    if n <= 1: return n\n    a, b = 0, 1\n    for _ in range(n - 1):\n        a, b = b, a + b\n    return b",
+                verified=True,
+            )
+            session.add(pq)
+            session.flush()
+
+            session.add(
+                PracticeAttempt(
+                    question_id=pq.id,
+                    learner_id=learners[0].id,
+                    answer_json={"code": "def fib(n):\n    if n <= 1: return n\n    a, b = 0, 1\n    for _ in range(n-1):\n        a, b = b, a + b\n    return b"},
+                    is_correct=True,
+                    hints_used=0,
+                    ai_feedback="Optimal O(N) iterative solution with O(1) auxiliary space.",
+                    score=100.0,
+                )
+            )
+
+    # 11. Real Talent Spotlight Alert (Priya Sharma for Ananya Rao)
+    if learners and mentors:
+        existing_alert = session.execute(
+            select(TalentAlert).where(
+                TalentAlert.learner_id == learners[0].id,
+                TalentAlert.field == "Python",
+            )
+        ).scalar_one_or_none()
+        if not existing_alert:
+            session.add(
+                TalentAlert(
+                    learner_id=learners[0].id,
+                    mentor_id=mentors[0].id,
+                    field="Python",
+                    status="PENDING",
+                    evidence_json={
+                        "learner_name": "Priya Sharma",
+                        "streak_days": 14,
+                        "active_days": 14,
+                        "problems_solved": 15,
+                        "weighted_accuracy": 85.0,
+                        "dedication_score": 78.5,
+                        "top_skills": ["Python", "Algorithms", "AsyncIO"],
+                        "summary": "Priya has maintained a 14-day practice streak with 85% accuracy across 15 problems.",
+                    },
+                )
+            )
+
+    # 12. Global System Setting (Idempotent)
+    existing_setting = session.execute(
+        select(SystemSetting).where(SystemSetting.key == "talent_spotlight_thresholds")
+    ).scalar_one_or_none()
+    if not existing_setting:
+        session.add(
+            SystemSetting(
+                key="talent_spotlight_thresholds",
+                value_json={
+                    "min_active_days": 5,
+                    "min_weighted_accuracy": 65.0,
+                    "min_problems": 5,
+                    "cooldown_days": 14,
+                },
+                updated_by_id=admin.id,
             )
         )
-
-    # 9. Global System Setting
-    session.add(
-        SystemSetting(
-            key="talent_spotlight_thresholds",
-            value_json={
-                "min_active_days": 5,
-                "min_weighted_accuracy": 65.0,
-                "min_problems": 5,
-                "cooldown_days": 14,
-            },
-            updated_by_id=admin.id,
-        )
-    )
 
     session.commit()
     return {

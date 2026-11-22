@@ -1,5 +1,21 @@
 services:
-  # Primary Database Option: SQL Server (Enterprise Standard for CSM Technology)
+  # Primary Database: PostgreSQL 16 (Local Postgres or overridden by Neon via DATABASE_URL)
+  postgres:
+    image: postgres:16-alpine
+    container_name: trellis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-trellis_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-CSMTrellis2026!}
+      POSTGRES_DB: ${DB_NAME:-trellis}
+    ports:
+      - "5432:5432"
+    networks:
+      - trellis-internal
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Alternate Database Option: SQL Server (Enterprise Standard for CSM Technology)
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: trellis-mssql
@@ -33,6 +49,7 @@ services:
       - trellis-internal
     volumes:
       - mysql_data:/var/lib/mysql
+    profiles: ["mysql"]
 
   redis:
     image: redis:7.4-alpine
@@ -46,17 +63,28 @@ services:
     volumes:
       - redis_data:/data
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: trellis-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    networks:
+      - trellis-internal
+    volumes:
+      - ollama_data:/root/.ollama
+
   backend:
     build:
       context: ./backend
       dockerfile: ../docker/Dockerfile.backend
     container_name: trellis-backend
     restart: unless-stopped
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    command: sh -c "alembic upgrade head && python ../scripts/seed_trellis_data.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     environment:
       - TRELLIS_ENV=${TRELLIS_ENV:-dev}
-      - DATABASE_URL=mysql+asyncmy://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@mysql:3306/${DB_NAME:-trellis}
-      - DATABASE_MIGRATION_URL=mysql+pymysql://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@mysql:3306/${DB_NAME:-trellis}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@postgres:5432/${DB_NAME:-trellis}}
+      - DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL:-postgresql+psycopg2://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@postgres:5432/${DB_NAME:-trellis}}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-CSMTrellis2026!}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-trellis-secret-key-salt-2026}
       - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-qW7GZ9X_8K4jL2mN5pQ8rT1vX3zB6dF9hJ0lP2sU4wY=}
@@ -64,6 +92,7 @@ services:
       - AI_API_KEY=${AI_API_KEY:-}
       - CODE_RUNNER=${CODE_RUNNER:-local}
       - JUDGE0_URL=${JUDGE0_URL:-http://judge0:2358}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
     ports:
       - "8000:8000"
     volumes:
@@ -71,7 +100,7 @@ services:
     networks:
       - trellis-internal
     depends_on:
-      - mysql
+      - postgres
       - redis
 
   judge0:
@@ -98,7 +127,7 @@ services:
     command: celery -A app.core.celery_app worker --loglevel=info
     environment:
       - TRELLIS_ENV=${TRELLIS_ENV:-dev}
-      - DATABASE_URL=mysql+asyncmy://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@mysql:3306/${DB_NAME:-trellis}
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://${DB_USER:-trellis_user}:${DB_PASSWORD:-CSMTrellis2026!}@postgres:5432/${DB_NAME:-trellis}}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-CSMTrellis2026!}@redis:6379/0
     networks:
       - trellis-internal
@@ -124,6 +153,8 @@ networks:
     driver: bridge
 
 volumes:
+  postgres_data:
   mysql_data:
   mssql_data:
   redis_data:
+  ollama_data:

@@ -30,6 +30,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             "CRITICAL: DATABASE_URL is missing. Specify DATABASE_URL via environment variables or secret store."
         )
 
+    # Warm up database connection with retry backoff for serverless/cold-start databases (e.g. Neon)
+    if settings.TRELLIS_ENV not in ("dev", "test"):
+        from app.api.deps import get_sync_engine, warmup_database
+        try:
+            warmup_database(get_sync_engine())
+        except Exception as e:
+            print(f"Warning: Database warmup encountered error: {e}")
+
     # In production environments, verify isolated runner passes startup self-test
     if settings.TRELLIS_ENV != "dev":
         from app.services.code_runner import get_code_runner

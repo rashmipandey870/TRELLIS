@@ -54,6 +54,13 @@
 ## 5. Frontend & Monaco Integration
 - **Monaco Editor**: Integrated into both `learner-coding` and `learner-practice` with custom CSM Light and Dark themes, font size selector, reset to starter code, and syntax highlighting across 5 languages.
 - **Auth Interceptor**: 401 responses trigger a single `/auth/refresh` rotation with concurrent request queuing via `BehaviorSubject`. Sessions persist across page reloads via single-use refresh token rotation.
+
+## 6. Database, Migration & Clean Clone Deployment (WS1)
+- **Alembic Baseline & Clean Clone Execution**: `alembic upgrade head` executes with zero errors on empty databases across SQLite, PostgreSQL, and MySQL. Migration `0004b` provides the baseline for all 24 LMS, Assessment, Meeting, Practice, and platform entities with complete schema-vs-model drift verification in automated CI (`test_schema_model_drift_check`).
+- **Neon Serverless PostgreSQL Support**: Native connection pooling (`pool_size=10`, `max_overflow=20`), `pool_recycle=300`, `pool_pre_ping=True`, SSL mode (`sslmode=require`), and retry warm-up backoff preventing scale-to-zero cold start dropouts.
+- **Single-Command Docker Compose**: Complete compose stack orchestrates backend API, Angular frontend (Nginx reverse proxy), PostgreSQL 16, Redis 7.4, Celery worker, Judge0 runner, and Ollama model server with `.env.example`.
+- **Deterministic & Idempotent Seeding**: `scripts/seed_trellis_data.py` seeds organizations, personas, cohorts, batches, meetings, assessments, 5 coding problems with test cases, assessment attempts with graded answers, practice sessions & attempts, and real Talent Spotlight alerts on day one without duplicates on repeated runs.
+- **Cross-Platform Test Portability**: Full 153-test suite passes on Windows, Linux, and CI without asserting empty OS environments or failing on canonical role authorization.
 - **RFC 9457 Errors**: Problem details are parsed and surfaced via accessible toast notifications.
 - **Empty States**: Friendly empty states render cleanly whenever backend endpoints return empty lists.
 

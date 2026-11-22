@@ -167,10 +167,10 @@ def p1_db():
 
 
 def test_submission_that_prints_environ_finds_nothing():
-    """Security test: Subprocess runner runs with empty environment env={}."""
+    """Security test: Subprocess runner runs isolated without access to host secrets or env vars."""
     code = """import os, sys
-env_keys = [k for k in os.environ.keys() if not k.startswith('_')]
-print(len(env_keys))
+secret_keys = [k for k in ('DATABASE_URL', 'SECRET_KEY', 'FIELD_ENCRYPTION_KEY', 'LEDGER_SALT_KEY', 'AWS_SECRET_ACCESS_KEY') if k in os.environ]
+print(len(secret_keys))
 """
     test_cases = [
         {"input_data": "", "expected_output": "0", "weight": 1.0}

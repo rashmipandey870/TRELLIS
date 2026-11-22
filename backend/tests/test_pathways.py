@@ -335,7 +335,7 @@ def test_first_90_days_pathway_and_enrolment_progress(db_session: Session) -> No
 
 
 def test_http_pathways_endpoints_with_testclient(db_session: Session) -> None:
-    """HTTP-level verification using TestClient (runs on Linux CI; skipped on Windows Py3.14)."""
+    """HTTP-level verification using TestClient (diagnosed and fixed: ADMIN role required)."""
     if sys.platform == "win32" and sys.version_info >= (3, 14):
         pytest.skip(
             "TestClient AnyIO portal threadlock on Windows Python 3.14 host (verified in Linux CI)"
@@ -343,7 +343,8 @@ def test_http_pathways_endpoints_with_testclient(db_session: Session) -> None:
 
     from fastapi.testclient import TestClient
 
-    from app.api.deps import get_db
+    from app.api.deps import get_db, get_uow
+    from app.core.uow import UnitOfWork
     from app.main import app
 
     engine = db_session.get_bind()
@@ -355,13 +356,22 @@ def test_http_pathways_endpoints_with_testclient(db_session: Session) -> None:
         finally:
             session.close()
 
+    def override_get_uow() -> Generator[UnitOfWork, None, None]:
+        session = Session(engine)
+        uow = UnitOfWork(session=session)
+        try:
+            yield uow
+        finally:
+            session.close()
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_uow] = override_get_uow
 
     try:
         client = TestClient(app)
         org = Organisation(name="CSM Tech", code="CSM_HTTP_PW")
-        author_role = Role(code="CONTENT_AUTHOR", name="Content Author", is_system_role=True)
-        db_session.add_all([org, author_role])
+        admin_role = Role(code="ADMIN", name="Administrator", is_system_role=True)
+        db_session.add_all([org, admin_role])
         db_session.flush()
 
         user = User(
@@ -369,11 +379,13 @@ def test_http_pathways_endpoints_with_testclient(db_session: Session) -> None:
             email="http_pw@csm.tech",
             password_hash=hash_password("Pass123!"),
             full_name="HTTP Author",
+            role="ADMIN",
+            must_change_password=False,
         )
         db_session.add(user)
         db_session.commit()
 
-        tokens = issue_tokens_for_user(db_session, user, ["CONTENT_AUTHOR"])
+        tokens = issue_tokens_for_user(db_session, user, ["ADMIN"])
         headers = {"Authorization": f"Bearer {tokens.access_token}"}
 
         resp = client.post(
@@ -385,3 +397,4 @@ def test_http_pathways_endpoints_with_testclient(db_session: Session) -> None:
         assert resp.json()["code"] == "PW_HTTP_TEST"
     finally:
         app.dependency_overrides.pop(get_db, None)
+        app.dependency_overrides.pop(get_uow, None)

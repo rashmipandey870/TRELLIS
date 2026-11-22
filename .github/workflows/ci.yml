@@ -127,6 +127,39 @@ jobs:
           alembic downgrade base
           alembic upgrade head
 
+  clean-db-migration-seed-and-drift:
+    name: Clean DB Migration, Seed & Model Drift Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade "pip>=26.2.0"
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run Alembic Upgrade to Head on Empty Database
+        run: |
+          DATABASE_URL="sqlite:///ci_clean_test.db" alembic upgrade head
+
+      - name: Seed Database
+        run: |
+          DATABASE_URL="sqlite:///ci_clean_test.db" python ../scripts/seed_trellis_data.py
+
+      - name: Run Migration & Model Drift Check
+        run: |
+          pytest tests/test_migrations.py -v
+
   frontend-build:
     name: Frontend Compilation & DOMPurify Audit Check
     runs-on: ubuntu-latest

@@ -66,7 +66,10 @@ python -m venv venv
 # Install dependencies
 pip install -r requirements.txt
 
-# Run deterministic master seed script (Seeds Admin, 2 Mentors, 6 Learners, Batches, Tests)
+# Execute Alembic migrations to head (creates all 45 database tables)
+alembic upgrade head
+
+# Run deterministic, idempotent master seed script
 python ../scripts/seed_trellis_data.py
 
 # Launch FastAPI development server
@@ -89,13 +92,10 @@ npm start
 ```
 The application will be live at `http://localhost:4200` with the proxy forwarding `/api` calls to `http://localhost:8000`.
 
-### 3. Docker Compose Stack
+### 3. Docker Compose Stack (One Command from Clean Clone)
 ```bash
-# Run with MySQL default
+# Start full platform stack: API, Frontend (Nginx), PostgreSQL 16, Redis, Celery, Judge0, Ollama
 docker-compose up --build
-
-# Or run with SQL Server profile
-docker-compose --profile mssql up --build
 ```
 
 ---
@@ -118,8 +118,8 @@ All personas are seeded with the password: `CSMTrellis2026!`
 
 ## 🧪 Verification & Test Suite
 
-Run the full test suite verifying route Unit-of-Work declarations, database grants, Argon2 password verification, role boundaries, and sandboxed code execution:
+Run the full test suite verifying route Unit-of-Work declarations, database grants, migrations, role boundaries, code execution sandboxing, and security controls:
 ```powershell
 pytest -v
 ```
-All **88 tests** pass cleanly with 0 failures.
+All **153 tests** pass cleanly (148 passed, 5 skipped).

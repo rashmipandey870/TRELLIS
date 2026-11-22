@@ -52,11 +52,20 @@ def test_migration_0004_definition() -> None:
     assert hasattr(mod, "downgrade")
 
 
+def test_migration_0004b_definition() -> None:
+    """Verify Migration 0004b covers LMS & Assessment baseline tables and links to 0004."""
+    mod = load_migration_module("0004b_lms_and_assessments_baseline.py")
+    assert mod.revision == "0004b"
+    assert mod.down_revision == "0004"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+
+
 def test_migration_0005_definition() -> None:
-    """Verify Migration 0005 covers assessment audience and links to 0004."""
+    """Verify Migration 0005 covers assessment audience and links to 0004b."""
     mod = load_migration_module("0005_assessment_audience.py")
     assert mod.revision == "0005"
-    assert mod.down_revision == "0004"
+    assert mod.down_revision == "0004b"
     assert hasattr(mod, "upgrade")
     assert hasattr(mod, "downgrade")
 
@@ -73,8 +82,58 @@ def test_migration_0006_definition() -> None:
 def test_migration_0007_definition() -> None:
     """Verify Migration 0007 covers must_change_password and links to 0006."""
     mod = load_migration_module("0007_user_must_change_password.py")
-    assert mod.revision == "0007_user_must_change_password"
-    assert mod.down_revision == "0006_assessment_categories_and_reports"
+    assert mod.revision == "0007"
+    assert mod.down_revision == "0006"
     assert hasattr(mod, "upgrade")
     assert hasattr(mod, "downgrade")
+
+
+def test_alembic_upgrade_head_on_clean_database(tmp_path: Path) -> None:
+    """Verify that 'alembic upgrade head' runs successfully on an empty database."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect
+
+    db_path = tmp_path / "clean_alembic_test.db"
+    ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
+    cfg = Config(str(ini_path))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+
+    # Run upgrade head from scratch
+    command.upgrade(cfg, "head")
+
+    # Verify tables
+    engine = create_engine(f"sqlite:///{db_path}")
+    insp = inspect(engine)
+    tables = set(insp.get_table_names())
+    assert "users" in tables
+    assert "assessments" in tables
+    assert "question_bank" in tables
+    assert "meetings" in tables
+    assert "talent_alerts" in tables
+    assert "practice_scores" in tables
+    assert len(tables) >= 45
+
+
+def test_schema_model_drift_check(tmp_path: Path) -> None:
+    """Verify there is no schema drift between Base.metadata models and Alembic migrations."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect
+    from app.models import Base
+
+    db_path = tmp_path / "drift_check.db"
+    ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
+    cfg = Config(str(ini_path))
+    cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+    command.upgrade(cfg, "head")
+
+    engine = create_engine(f"sqlite:///{db_path}")
+    insp = inspect(engine)
+    db_tables = set(insp.get_table_names())
+    model_tables = set(Base.metadata.tables.keys())
+
+    # Every model table must exist in the migrated database
+    missing_from_db = model_tables - db_tables
+    assert not missing_from_db, f"Model tables missing from migration: {missing_from_db}"
 
