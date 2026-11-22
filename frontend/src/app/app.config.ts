@@ -14,6 +14,12 @@ export const routes: Routes = [
     pathMatch: 'full',
   },
   { path: 'login', component: LoginComponent },
+  {
+    path: 'change-password',
+    loadComponent: () =>
+      import('./features/auth/change-password.component').then((m) => m.ChangePasswordComponent),
+    canActivate: [authGuard],
+  },
 
   // ADMIN Routes (Governed by authGuard + roleGuard: ADMIN only)
   {

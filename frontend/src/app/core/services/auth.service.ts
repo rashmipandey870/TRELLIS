@@ -11,6 +11,7 @@ export interface CurrentUser {
   role: 'ADMIN' | 'MENTOR' | 'LEARNER' | string;
   orgId: string;
   avatarUrl?: string | null;
+  mustChangePassword?: boolean;
 }
 
 export interface LoginResponse {
@@ -29,6 +30,7 @@ export interface UserProfileResponse {
   avatar_url?: string | null;
   roles: string[];
   role: string;
+  must_change_password?: boolean;
   preferences_json?: Record<string, unknown> | null;
 }
 
@@ -144,6 +146,7 @@ export class AuthService {
           role: roleNormalized,
           orgId: user.org_id,
           avatarUrl: user.avatar_url,
+          mustChangePassword: !!user.must_change_password,
         });
       })
     );

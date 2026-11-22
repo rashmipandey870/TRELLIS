@@ -97,3 +97,24 @@ All audit items will be systematically resolved according to the 10-step roadmap
 - **Step 6**: Implement AI Practice with LLM schema generation, sandbox validation, adaptive difficulty, dedication score, and Talent Spotlight alerts.
 - **Step 7 & 8**: Comprehensive data model with migrations, configurable SQL Server/SQLite/Postgres/MySQL connection string, and updated seed script.
 - **Step 9 & 10**: Unit & integration test coverage, Docker Compose orchestration, and CSM Technologies visual design system (tokens, Montserrat typography, signature cut-corner cards, tone per role).
+
+---
+
+## 5. Verification & Resolution Sign-Off (November 2026)
+
+All identified audit issues, workstreams (WS0-WS3), and Phases (A through F) have been completely resolved and verified:
+1. **Security & History (Phase A / WS0)**: Leaked credentials purged from git history via `git filter-repo`. Mandatory password change enforced on first login via `must_change_password` and `/change-password` route. Admin OTP generation enforced.
+2. **AI Honesty & Gateway (WS2 / Phase A)**: Never-fail multi-provider ladder (Ollama primary, cloud secondary, DB pool fallback). Persisted `ai_question_pool` table. Truthful provenance tracking (`ollama` vs `procedural` vs `curated`).
+3. **Core Features (WS3 / Phase B)**:
+   - Multi-role chatbot (Learner, Mentor, Admin) with SSE streaming and tool calling.
+   - 7 CSM Enterprise Policy Categories with non-clinical disclaimer.
+   - Subjective AI rubric evaluation (`/mentor/assessments/attempts/{id}/answers/{ans_id}/ai-evaluate`).
+   - Secure file storage with signed download tokens.
+   - Vector ReportLab PDF Growth Ring report export.
+   - Topic mastery calculation and adaptive study plan generator.
+   - Mentor needs-attention queue.
+4. **Motion, Accessibility & Design (Phase C)**: Official CSM Technologies design tokens, Montserrat typography, shimmer skeleton loaders, reduced motion accessibility queries.
+5. **Enterprise Demo Data Pack (Phase D)**: 40+ users, 4 batches, 304 questions across 7 categories, 24 coding problems across 5 languages, 12 assessments across all lifecycle states, 160+ attempts, 570+ practice attempts, 4 talent alerts.
+6. **Authorization Matrix & Security Tests (Phase E)**: Strict 3-role matrix verified (`test_auth_matrix.py` 5/5 passed).
+7. **Release Gate Verification (Phase F)**: Clean DB baseline, migrations, seed, test suites, and frontend production build pass with 100% success (`RELEASE_REPORT.html`).
+

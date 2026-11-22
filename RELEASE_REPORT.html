@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TRELLIS Enterprise Release Verification Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
+    .container { max-width: 1000px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 2rem; border: 1px solid #334155; }
+    h1 { color: #008FBB; margin-top: 0; }
+    .badge-pass { background: #065f46; color: #34d399; padding: 4px 8px; border-radius: 6px; font-weight: bold; }
+    .badge-fail { background: #881337; color: #fb7185; padding: 4px 8px; border-radius: 6px; font-weight: bold; }
+    .summary-box { background: #0f172a; padding: 1rem; border-radius: 8px; margin: 1.5rem 0; border: 1px solid #334155; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
+    th { background: #0f172a; color: #94a3b8; }
+    pre { background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #cbd5e1; max-height: 250px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🌱 TRELLIS Enterprise Release Verification Report</h1>
+    <p>Official Verification Gate for CSM Technologies Learning &amp; Knowledge Portal</p>
+    
+    <div class="summary-box">
+      <strong>Overall Status:</strong> 
+      <span class="badge-pass">100% RELEASE READY (ALL GATES PASSED)</span><br>
+      <strong>Executed At:</strong> 2026-11-22T16:54:15.076604+00:00<br>
+      <strong>Git Branch:</strong> master (rashmipandey870/TRELLIS)
+    </div>
+
+    <h2>Verification Stages</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Verification Gate</th>
+          <th>Status</th>
+          <th>Duration</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <tr>
+          <td><strong>Clean DB Baseline & Demo Seed</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>3.43s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>🌱 Seeding TRELLIS Enterprise Demo Data Pack...
+✨ Demo Pack Seeding Complete! Summary:
+  • Users: 42
+  • Question_bank: 304
+  • Coding_problems: 24
+  • Assessments: 12
+  • Attempts: 161
+  • Practice_attempts: 1728
+  • Talent_alerts: 4
+  • Meetings: 6
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Backend Pytest Suite</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>9.80s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre> PASSED          [ 72%]
+tests/test_migrations.py::test_migration_0003_definition PASSED          [ 75%]
+tests/test_migrations.py::test_migration_0004_definition PASSED          [ 77%]
+tests/test_migrations.py::test_migration_0004b_definition PASSED         [ 80%]
+tests/test_migrations.py::test_migration_0005_definition PASSED          [ 83%]
+tests/test_migrations.py::test_migration_0006_definition PASSED          [ 86%]
+tests/test_migrations.py::test_migration_0007_definition PASSED          [ 88%]
+tests/test_migrations.py::test_migration_0008_definition PASSED          [ 91%]
+tests/test_migrations.py::test_migration_0009_definition PASSED          [ 94%]
+tests/test_migrations.py::test_alembic_upgrade_head_on_clean_database PASSED [ 97%]
+tests/test_migrations.py::test_schema_model_drift_check PASSED           [100%]
+
+============================== warnings summary ===============================
+tests/test_migrations.py::test_alembic_upgrade_head_on_clean_database
+tests/test_migrations.py::test_schema_model_drift_check
+  C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Lib\site-packages\alembic\config.py:572: DeprecationWarning: No path_separator found in configuration; falling back to legacy splitting on spaces/commas for version_locations.  Consider adding path_separator=os to Alembic config.
+    util.warn_deprecated(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 36 passed, 2 warnings in 7.94s ========================
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Frontend Production Build</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>10.90s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>unk-2IBlMHg-.js     | learner-assessments-component |  18.13 kB |                 4.58 kB
+chunk-DRbNb70-.js     | csm-landing-component         |  14.57 kB |                 3.36 kB
+chunk-ydrMC1gS.js     | admin-dashboard-component     |  13.72 kB |                 3.47 kB
+chunk-Dhla_a9-.js     | mentor-learners-component     |  12.98 kB |                 3.63 kB
+chunk-wAFF7xXi.js     | admin-users-component         |  12.78 kB |                 3.35 kB
+chunk-B4-JhM0P.js     | admin-learners-component      |  12.43 kB |                 3.40 kB
+chunk-CBDvcmOe.js     | mentor-meetings-component     |  11.77 kB |                 3.12 kB
+chunk-DPSIo8gZ.js     | admin-batches-component       |  11.48 kB |                 2.74 kB
+chunk-C4956C0u.js     | learner-results-component     |   9.80 kB |                 2.80 kB
+chunk-BZHjzZF0.js     | change-password-component     |   8.01 kB |                 2.37 kB
+chunk-DWUW9wKw.js     | -                             |   8.00 kB |                 2.60 kB
+...and 12 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [6.226 seconds] - 2026-11-22T16:54:14.280Z
+
+Output location: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\frontend\dist\frontend
+
+
+STDERR:
+Node.js version v25.2.1 detected.
+Prior to version 27, odd numbered Node.js versions will not enter LTS status and should not be used for production. For more information, please see https://nodejs.org/en/about/previous-releases/.
+</pre></details></td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

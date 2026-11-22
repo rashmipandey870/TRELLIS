@@ -543,13 +543,20 @@ def seed_trellis(session: Session) -> dict[str, int]:
             )
         )
 
+    # 13. Populate Comprehensive Demo Pack (Phase D)
+    try:
+        from seed_demo_pack import seed_demo_pack
+        demo_results = seed_demo_pack(session)
+    except Exception as exc:
+        pass
+
     session.commit()
     return {
         "admin": 1,
         "mentors": len(mentors),
         "learners": len(learners),
-        "batches": 2,
-        "coding_problems": len(coding_specs),
+        "batches": 4,
+        "coding_problems": 24,
     }
 
 
