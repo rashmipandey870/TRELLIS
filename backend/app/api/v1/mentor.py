@@ -12,9 +12,12 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlparse
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, HttpUrl
@@ -266,7 +269,19 @@ class CodingProblemCreateRequest(BaseModel):
     memory_limit_mb: int = 256
     starter_code: dict[str, str] = Field(default_factory=dict)
     reference_solution: str | None = None
-    test_cases: list[dict[str, Any]]  # [{"input_data": "...", "expected_output": "...", "is_hidden": bool, "weight": 1.0}]
+    test_cases: list[dict[str, Any]] = Field(default_factory=list)
+    rubric: dict[str, Any] | None = None
+    schema_ddl: str | None = None
+
+
+class AnswerGradeItem(BaseModel):
+    answer_id: str
+    score_awarded: float
+    feedback: str | None = None
+
+
+class GradeAttemptRequest(BaseModel):
+    grades: list[AnswerGradeItem]
 
 
 class RemarkCreateRequest(BaseModel):
@@ -327,6 +342,18 @@ class UnifiedQuestionCreateRequest(BaseModel):
     test_cases: list[dict[str, Any]] = Field(default_factory=list)
     time_limit_ms: int = 3000
     memory_limit_mb: int = 256
+    rubric: dict[str, Any] | None = None
+    schema_ddl: str | None = None
+
+
+class AnswerGradeItem(BaseModel):
+    answer_id: str
+    score_awarded: float
+    feedback: str | None = None
+
+
+class GradeAttemptRequest(BaseModel):
+    grades: list[AnswerGradeItem]
 
 
 # --- Mentor Dashboard ---
@@ -1220,7 +1247,7 @@ def create_question_unified(
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     q_type = (payload.type or payload.question_type or "MCQ").upper()
-    if q_type == "CODING" or payload.test_cases or payload.starter_code:
+    if q_type == "CODING" or (q_type == "SQL" and (payload.test_cases or payload.starter_code)):
         prob_payload = CodingProblemCreateRequest(
             title=payload.title,
             description=payload.description or payload.question_text or payload.title,
@@ -1230,11 +1257,48 @@ def create_question_unified(
             marks=payload.marks,
             time_limit_ms=payload.time_limit_ms,
             memory_limit_mb=payload.memory_limit_mb,
-            starter_code=payload.starter_code,
+            starter_code=payload.starter_code or ({"sql": "-- Write your SQL query here\n"} if q_type == "SQL" else {}),
             reference_solution=payload.reference_solution,
             test_cases=payload.test_cases,
         )
-        return add_coding_to_bank(prob_payload, db=db, mentor=mentor, _uow=_uow)
+        res = add_coding_to_bank(prob_payload, db=db, mentor=mentor, _uow=_uow)
+        if q_type == "SQL":
+            bq = db.get(QuestionBank, res["id"])
+            if bq:
+                bq.question_type = "SQL"
+                if bq.coding_problem:
+                    bq.coding_problem.problem_type = "SQL"
+                    bq.coding_problem.schema_ddl = payload.schema_ddl
+                db.commit()
+            res["type"] = "SQL"
+        return res
+    elif q_type in ("SHORT_ANSWER", "FILE_UPLOAD", "SCENARIO", "COMMUNICATION", "SQL"):
+        bank_q = QuestionBank(
+            author_id=mentor.id,
+            title=payload.title,
+            question_text=payload.question_text or payload.description or payload.title,
+            question_type=q_type,
+            field=payload.field,
+            topic=payload.topic,
+            difficulty=payload.difficulty.upper(),
+            tags_json=payload.tags,
+            explanation=payload.explanation,
+            rubric_json=payload.rubric or {},
+            is_active=True,
+        )
+        db.add(bank_q)
+        db.commit()
+        db.refresh(bank_q)
+        return {
+            "id": bank_q.id,
+            "title": bank_q.title,
+            "type": bank_q.question_type,
+            "field": bank_q.field,
+            "difficulty": bank_q.difficulty,
+            "tags": bank_q.tags_json or [],
+            "content": bank_q.question_text,
+            "message": f"{q_type} question added to Question Bank.",
+        }
     else:
         opts = payload.options
         if not opts:
@@ -1428,10 +1492,13 @@ def get_assessment_analysis(
         "learners": [
             {
                 "id": a.learner_id,
+                "attempt_id": a.id,
                 "name": a.learner.full_name if a.learner else "Learner",
                 "email": a.learner.email if a.learner else "",
                 "score": a.score,
                 "passed": a.passed,
+                "grading_status": getattr(a, "grading_status", "GRADED"),
+                "report_status": getattr(a, "report_status", "NONE"),
                 "submit_time": a.submit_time.isoformat() if a.submit_time else None,
             }
             for a in attempts
@@ -1459,6 +1526,168 @@ def get_assessment_ai_insights(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
     from app.services.ai_analytics_engine import analyze_assessment_ai_insights
     return analyze_assessment_ai_insights(assessment_id, db)
+
+
+@router.get("/assessments/{assessment_id}/submissions", summary="List attempts and grading statuses for an assessment")
+def list_assessment_submissions(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> list[dict[str, Any]]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment or assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    attempts = (
+        db.execute(
+            select(AssessmentAttempt)
+            .where(AssessmentAttempt.assessment_id == assessment.id, AssessmentAttempt.status == "SUBMITTED")
+            .order_by(AssessmentAttempt.submit_time.desc())
+        )
+        .scalars()
+        .all()
+    )
+
+    return [
+        {
+            "id": a.id,
+            "learner_id": a.learner_id,
+            "learner_name": a.learner.full_name if a.learner else "Learner",
+            "learner_email": a.learner.email if a.learner else "",
+            "score": float(a.score),
+            "total_marks": float(a.total_marks),
+            "passed": bool(a.passed),
+            "status": a.status,
+            "grading_status": getattr(a, "grading_status", "GRADED"),
+            "report_status": getattr(a, "report_status", "NONE"),
+            "submit_time": a.submit_time.isoformat() if a.submit_time else None,
+            "has_report": bool(a.report_json),
+        }
+        for a in attempts
+    ]
+
+
+@router.get("/assessments/attempts/{attempt_id}/answers", summary="Get answers for manual grading")
+def get_attempt_answers_for_grading(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> dict[str, Any]:
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
+
+    answers_data = []
+    for ans in attempt.answers:
+        bq = ans.question
+        aq = next((q for q in attempt.assessment.questions if q.bank_question_id == bq.id), None)
+        answers_data.append({
+            "answer_id": ans.id,
+            "question_id": bq.id,
+            "question_title": bq.title,
+            "question_text": bq.question_text,
+            "question_type": bq.question_type,
+            "marks": aq.marks if aq else 10.0,
+            "score_awarded": float(ans.score_awarded),
+            "grading_status": getattr(ans, "grading_status", "GRADED"),
+            "text_response": ans.text_response,
+            "file_url": ans.file_url,
+            "file_name": ans.file_name,
+            "mentor_feedback": ans.mentor_feedback,
+            "rubric": getattr(bq, "rubric_json", {}) or {},
+        })
+
+    return {
+        "attempt_id": attempt.id,
+        "assessment_id": attempt.assessment_id,
+        "assessment_title": attempt.assessment.title,
+        "learner_name": attempt.learner.full_name if attempt.learner else "Learner",
+        "score": float(attempt.score),
+        "total_marks": float(attempt.total_marks),
+        "passed": bool(attempt.passed),
+        "grading_status": getattr(attempt, "grading_status", "GRADED"),
+        "report_status": getattr(attempt, "report_status", "NONE"),
+        "answers": answers_data,
+    }
+
+
+@router.post("/assessments/attempts/{attempt_id}/grade", summary="Grade subjective answers manually")
+def grade_attempt_answers(
+    attempt_id: str,
+    payload: GradeAttemptRequest,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
+
+    grade_map = {g.answer_id: g for g in payload.grades}
+    for ans in attempt.answers:
+        if ans.id in grade_map:
+            item = grade_map[ans.id]
+            ans.score_awarded = float(item.score_awarded)
+            ans.mentor_feedback = item.feedback
+            ans.grading_status = "GRADED"
+
+    total_earned = sum(float(a.score_awarded) for a in attempt.answers)
+    attempt.score = total_earned
+    total_marks = attempt.total_marks or sum(q.marks for q in attempt.assessment.questions) or 100.0
+    percentage = (total_earned / total_marks) * 100.0 if total_marks > 0 else 0.0
+    attempt.passed = percentage >= attempt.assessment.passing_score
+
+    all_graded = all(getattr(a, "grading_status", "GRADED") == "GRADED" for a in attempt.answers)
+    attempt.grading_status = "GRADED" if all_graded else "PENDING_REVIEW"
+    db.commit()
+
+    try:
+        from app.services.ai_analytics_engine import generate_growth_ring_report
+        generate_growth_ring_report(attempt.id, db)
+    except Exception as e:
+        logger.warning(f"Could not re-generate growth ring report: {e}")
+
+    return {
+        "status": "success",
+        "attempt_id": attempt.id,
+        "score": float(attempt.score),
+        "passed": bool(attempt.passed),
+        "grading_status": attempt.grading_status,
+        "message": "Attempt graded successfully.",
+    }
+
+
+@router.post("/assessments/attempts/{attempt_id}/approve-report", summary="Approve AI Growth Ring report for learner")
+def approve_assessment_report(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
+
+    attempt.report_status = "APPROVED"
+    attempt.report_approved_at = datetime.now(UTC)
+    db.commit()
+    return {"status": "APPROVED", "attempt_id": attempt.id, "message": "Growth Ring report approved and released to learner."}
+
+
+@router.post("/assessments/attempts/{attempt_id}/reject-report", summary="Reject/Request revision on AI report")
+def reject_assessment_report(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
+
+    attempt.report_status = "REJECTED"
+    db.commit()
+    return {"status": "REJECTED", "attempt_id": attempt.id, "message": "Growth Ring report held for revision."}
 
 
 @router.get("/learners/{learner_id}/ai-diagnostic", summary="Get mentor AI diagnostic review for a learner")

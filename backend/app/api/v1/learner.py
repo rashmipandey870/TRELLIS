@@ -49,6 +49,16 @@ class SubmitAssessmentRequest(BaseModel):
     tab_switches: int = 0
 
 
+class ChatMessageItem(BaseModel):
+    role: str
+    content: str
+
+
+class ChatbotRequest(BaseModel):
+    message: str
+    history: list[ChatMessageItem] = Field(default_factory=list)
+
+
 # --- Dashboard ---
 @router.get("/dashboard", summary="Learner Comprehensive Dashboard")
 def get_learner_dashboard(
@@ -310,6 +320,7 @@ def _execute_assessment_submit(
     check_attempt_timer(db, attempt, assessment)
 
     earned_score = 0.0
+    has_pending_review = False
 
     for aq in assessment.questions:
         bq = aq.question
@@ -327,10 +338,11 @@ def _execute_assessment_submit(
                 bank_question_id=bq.id,
                 selected_option_ids_json=selected_ids,
                 score_awarded=q_score,
+                grading_status="GRADED",
             )
             db.add(ans)
 
-        elif bq.question_type == "CODING" and bq.coding_problem:
+        elif bq.question_type in ("CODING", "SQL") and bq.coding_problem:
             cp = bq.coding_problem
             best_sub = (
                 db.execute(
@@ -350,10 +362,38 @@ def _execute_assessment_submit(
                 q_score = (best_sub.score / 100.0) * aq.marks
             earned_score += q_score
 
+            code_text = user_ans.get("code") or (best_sub.code if best_sub else None)
             ans = Answer(
                 attempt_id=attempt.id,
                 bank_question_id=bq.id,
+                text_response=code_text,
                 score_awarded=q_score,
+                grading_status="GRADED",
+            )
+            db.add(ans)
+
+        elif bq.question_type == "FILE_UPLOAD":
+            has_pending_review = True
+            ans = Answer(
+                attempt_id=attempt.id,
+                bank_question_id=bq.id,
+                file_url=user_ans.get("file_url"),
+                file_name=user_ans.get("file_name"),
+                score_awarded=0.0,
+                grading_status="PENDING_REVIEW",
+            )
+            db.add(ans)
+
+        else:
+            # SHORT_ANSWER, SCENARIO, COMMUNICATION
+            has_pending_review = True
+            text_val = user_ans.get("text_response") or user_ans.get("answer") or ""
+            ans = Answer(
+                attempt_id=attempt.id,
+                bank_question_id=bq.id,
+                text_response=text_val,
+                score_awarded=0.0,
+                grading_status="PENDING_REVIEW",
             )
             db.add(ans)
 
@@ -363,9 +403,17 @@ def _execute_assessment_submit(
     attempt.score = earned_score
     attempt.passed = percentage >= assessment.passing_score
     attempt.status = "SUBMITTED"
+    attempt.grading_status = "PENDING_REVIEW" if has_pending_review else "GRADED"
     attempt.submit_time = datetime.now(UTC)
     attempt.tab_switch_count = tab_switches
     db.commit()
+
+    # Generate initial Growth Ring report
+    try:
+        from app.services.ai_analytics_engine import generate_growth_ring_report
+        generate_growth_ring_report(attempt.id, db)
+    except Exception:
+        pass
 
     return {
         "attempt_id": attempt.id,
@@ -793,3 +841,49 @@ def get_learner_ai_diagnostic(
 ) -> dict[str, Any]:
     from app.services.ai_analytics_engine import analyze_learner_performance
     return analyze_learner_performance(learner.id, db)
+
+
+@router.get("/results/{attempt_id}/report", summary="View AI Growth Ring Report for an assessment attempt")
+def get_learner_assessment_report(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    learner: User = Depends(require_learner),
+) -> dict[str, Any]:
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.learner_id != learner.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
+
+    if not attempt.report_json:
+        from app.services.ai_analytics_engine import generate_growth_ring_report
+        try:
+            generate_growth_ring_report(attempt.id, db)
+            db.refresh(attempt)
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to generate report: {e}") from e
+
+    return {
+        "status": getattr(attempt, "report_status", "NONE"),
+        "is_approved": getattr(attempt, "report_status", "NONE") == "APPROVED",
+        "approved_at": attempt.report_approved_at.isoformat() if attempt.report_approved_at else None,
+        "report": attempt.report_json,
+    }
+
+
+@router.post("/chatbot/chat", summary="Chat with The Gardener AI coach")
+def chat_with_the_gardener(
+    payload: ChatbotRequest,
+    db: Session = Depends(get_db),
+    learner: User = Depends(require_learner),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    from app.services.gardener_service import chat_with_gardener
+    history_dicts = [{"role": m.role, "content": m.content} for m in payload.history]
+    result = chat_with_gardener(
+        learner_id=learner.id,
+        user_message=payload.message,
+        db=db,
+        history=history_dicts,
+    )
+    if "error" in result and result["error"] == "RATE_LIMIT_EXCEEDED":
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=result["message"])
+    return result

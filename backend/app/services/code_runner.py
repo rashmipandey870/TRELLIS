@@ -110,6 +110,10 @@ class Judge0Runner(BaseCodeRunner):
         "c": 50,  # C (GCC 9.2.0)
         "cpp": 54,  # C++ (GCC 9.2.0)
         "c++": 54,
+        "sql": 82,  # SQL (SQLite)
+        "sqlite": 82,
+        "postgresql": 82,
+        "postgres": 82,
     }
 
     def __init__(self, base_url: str | None = None, api_key: str | None = None):
@@ -536,6 +540,8 @@ class LocalSubprocessRunner(BaseCodeRunner):
             return self._run_compiled_c(code, lang, test_cases, timeout_sec, memory_limit_mb, mask_hidden_inputs, is_custom_run)
         elif lang in {"java"}:
             return self._run_java(code, test_cases, timeout_sec, memory_limit_mb, mask_hidden_inputs, is_custom_run)
+        elif lang in {"sql", "sqlite", "postgresql", "postgres"}:
+            return self._run_sql(code, test_cases, timeout_sec, memory_limit_mb, mask_hidden_inputs, is_custom_run)
         else:
             return ExecutionResult(
                 verdict="COMPILATION_ERROR",
@@ -544,7 +550,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                 runtime_ms=0,
                 memory_mb=0,
                 score=0,
-                compile_error=f"Unsupported language '{language}'. Supported: Python, JavaScript, Java, C, C++.",
+                compile_error=f"Unsupported language '{language}'. Supported: Python, JavaScript, Java, C, C++, SQL.",
             )
 
     def _get_preexec_fn(self, timeout_sec: float, memory_limit_mb: int):
@@ -786,6 +792,125 @@ class LocalSubprocessRunner(BaseCodeRunner):
                 mask_hidden=mask_hidden,
                 is_custom_run=is_custom_run,
             )
+
+    def _run_sql(
+        self,
+        code: str,
+        test_cases: list[dict[str, Any]],
+        timeout_sec: float,
+        memory_limit_mb: int,
+        mask_hidden: bool,
+        is_custom_run: bool,
+    ) -> ExecutionResult:
+        import sqlite3
+
+        case_results: list[TestCaseResult] = []
+        passed_count = 0
+        earned_weight = 0.0
+        total_weight = sum(float(tc.get("weight", 1.0)) for tc in test_cases) or 1.0
+        overall_verdict = "ACCEPTED" if not is_custom_run else None
+        first_fail = None
+        custom_out = None
+        max_runtime = 0.0
+
+        for idx, tc in enumerate(test_cases):
+            schema_seed = tc.get("input_data", "")
+            expected_text = tc.get("expected_output", "")
+            is_hidden = tc.get("is_hidden", False)
+            weight = float(tc.get("weight", 1.0))
+
+            start_t = time.perf_counter()
+            err: str | None = None
+            try:
+                conn = sqlite3.connect(":memory:")
+                cursor = conn.cursor()
+                if schema_seed.strip():
+                    cursor.executescript(schema_seed)
+
+                # Execute query
+                cursor.execute(code.strip().rstrip(";"))
+                rows = cursor.fetchall()
+
+                actual_lines = ["|".join(str(val) for val in row) for row in rows]
+                actual_output = "\n".join(actual_lines)
+                conn.close()
+
+                elapsed_ms = (time.perf_counter() - start_t) * 1000.0
+                max_runtime = max(max_runtime, elapsed_ms)
+
+                if is_custom_run:
+                    verdict = None
+                    custom_out = actual_output
+                    err = None
+                else:
+                    actual_norm = normalize_output(actual_output)
+                    expected_norm = normalize_output(expected_text)
+                    if actual_norm == expected_norm:
+                        verdict = "ACCEPTED"
+                        passed_count += 1
+                        earned_weight += weight
+                        err = None
+                    else:
+                        verdict = "WRONG_ANSWER"
+                        err = None
+            except Exception as ex:
+                elapsed_ms = (time.perf_counter() - start_t) * 1000.0
+                max_runtime = max(max_runtime, elapsed_ms)
+                if is_custom_run:
+                    verdict = None
+                    custom_out = f"SQL Error: {ex}"
+                    err = str(ex)
+                else:
+                    verdict = "RUNTIME_ERROR"
+                    err = str(ex)
+                actual_output = f"SQL Error: {ex}"
+
+            if not is_custom_run and verdict != "ACCEPTED" and overall_verdict == "ACCEPTED":
+                overall_verdict = verdict
+
+            display_input = "[HIDDEN SCHEMA/SEED]" if (is_hidden and mask_hidden) else schema_seed
+            display_expected = "[HIDDEN EXPECTED OUTPUT]" if (is_hidden and mask_hidden) else expected_text
+            display_actual = "[HIDDEN ACTUAL OUTPUT]" if (is_hidden and mask_hidden) else actual_output
+
+            case_results.append(
+                TestCaseResult(
+                    case_index=idx + 1,
+                    is_hidden=is_hidden,
+                    verdict=verdict,
+                    input_data=display_input,
+                    expected_output=display_expected,
+                    actual_output=display_actual,
+                    runtime_ms=round(elapsed_ms, 2),
+                    memory_mb=4.0,
+                    error_message=err,
+                    is_custom=is_custom_run,
+                )
+            )
+
+            if not is_custom_run and verdict != "ACCEPTED" and first_fail is None:
+                first_fail = {
+                    "case_index": idx + 1,
+                    "is_hidden": is_hidden,
+                    "verdict": verdict,
+                    "input": display_input,
+                    "expected": display_expected,
+                    "actual": display_actual,
+                    "error": err,
+                }
+
+        final_score = (earned_weight / total_weight) * 100.0 if not is_custom_run else 0.0
+
+        return ExecutionResult(
+            verdict=overall_verdict,
+            passed_cases=passed_count,
+            total_cases=len(test_cases),
+            runtime_ms=round(max_runtime, 2),
+            memory_mb=4.0,
+            score=round(final_score, 2),
+            case_results=case_results,
+            first_failing_case=first_fail,
+            custom_output=custom_out,
+        )
 
     def _evaluate_cases(
         self,

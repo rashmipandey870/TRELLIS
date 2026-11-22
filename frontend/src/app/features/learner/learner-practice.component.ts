@@ -260,6 +260,83 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
         </div>
       </div>
 
+      <!-- Weekly AI Study Plan & Practice History -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Weekly AI Study Plan -->
+        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                Weekly AI Study Plan
+              </h3>
+              <p class="text-xs text-slate-400">
+                Personalized roadmap synthesized from your dedication scores and weak disciplines.
+              </p>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#1294C4] text-white">Adaptive</span>
+          </div>
+
+          @if (studyPlan(); as plan) {
+            <div class="space-y-3 text-xs">
+              <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl text-sky-900 dark:text-sky-200 font-medium">
+                {{ plan.advice }}
+              </div>
+              <div class="space-y-2">
+                @for (d of plan.schedule; track d.day) {
+                  <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                    <div>
+                      <strong class="text-slate-800 dark:text-slate-200 block">{{ d.day }} &bull; {{ d.focus_field }}</strong>
+                      <span class="text-[10px] text-slate-400">{{ d.recommended_topics.join(', ') }}</span>
+                    </div>
+                    <span class="text-[10px] font-mono font-bold text-slate-500">{{ d.estimated_minutes }} mins</span>
+                  </div>
+                }
+              </div>
+            </div>
+          } @else {
+            <div class="py-8 text-center text-xs text-slate-400">Loading personalized study plan...</div>
+          }
+        </div>
+
+        <!-- Recent Practice History -->
+        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                Practice Attempt History
+              </h3>
+              <p class="text-xs text-slate-400">
+                Recent problem submissions across all practice tracks.
+              </p>
+            </div>
+          </div>
+
+          <div class="space-y-2 max-h-80 overflow-y-auto text-xs">
+            @for (h of practiceHistory(); track h.id) {
+              <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                      [ngClass]="h.is_correct ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
+                      {{ h.is_correct ? 'PASSED' : 'RETRY' }}
+                    </span>
+                    <strong class="text-slate-800 dark:text-slate-200">{{ h.field }} ({{ h.difficulty }})</strong>
+                  </div>
+                  <span class="text-[10px] text-slate-400 block mt-0.5">{{ h.created_at | date:'short' }}</span>
+                </div>
+                <span class="font-mono font-bold" [ngClass]="h.is_correct ? 'text-emerald-600' : 'text-slate-400'">
+                  +{{ h.score }} pts
+                </span>
+              </div>
+            } @empty {
+              <div class="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                No historical practice attempts recorded yet.
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
     </div>
   `,
 })
@@ -288,6 +365,8 @@ export class LearnerPracticeComponent implements OnInit {
 
   readonly activeQuestion = signal<GeneratedPracticeQuestion | null>(null);
   readonly dedicationScores = signal<DedicationScoreSummary[]>([]);
+  readonly studyPlan = signal<any | null>(null);
+  readonly practiceHistory = signal<any[]>([]);
   selectedOptionId = '';
   codeSolution = 'def solve():\n    pass';
 
@@ -297,7 +376,23 @@ export class LearnerPracticeComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadDedicationScores();
+    this.loadStudyPlan();
+    this.loadPracticeHistory();
     this.generateNewQuestion();
+  }
+
+  loadStudyPlan(): void {
+    this.practiceService.getWeeklyStudyPlan().subscribe({
+      next: (data) => this.studyPlan.set(data),
+      error: () => {},
+    });
+  }
+
+  loadPracticeHistory(): void {
+    this.practiceService.getPracticeHistory().subscribe({
+      next: (data) => this.practiceHistory.set(data || []),
+      error: () => {},
+    });
   }
 
   loadDedicationScores(): void {

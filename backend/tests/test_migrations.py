@@ -51,3 +51,21 @@ def test_migration_0004_definition() -> None:
     assert hasattr(mod, "upgrade")
     assert hasattr(mod, "downgrade")
 
+
+def test_migration_0005_definition() -> None:
+    """Verify Migration 0005 covers assessment audience and links to 0004."""
+    mod = load_migration_module("0005_assessment_audience.py")
+    assert mod.revision == "0005"
+    assert mod.down_revision == "0004"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+
+
+def test_migration_0006_definition() -> None:
+    """Verify Migration 0006 covers 7 assessment categories, grading, reports, and links to 0005."""
+    mod = load_migration_module("0006_assessment_categories_and_reports.py")
+    assert mod.revision == "0006"
+    assert mod.down_revision == "0005"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+

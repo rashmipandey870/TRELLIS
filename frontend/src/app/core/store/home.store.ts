@@ -133,16 +133,20 @@ export class HomeStore {
         );
 
         // 6. Greenhouse Idea Spotlight (Phase 3 Upcoming)
-        this.greenhouseIdea.set({
-          id: dto.greenhouse_idea.id,
-          title: dto.greenhouse_idea.title,
-          summary: dto.greenhouse_idea.summary,
-          authorName: dto.greenhouse_idea.author_name,
-          authorRole: dto.greenhouse_idea.author_role,
-          upvotesCount: dto.greenhouse_idea.upvotes_count,
-          status: dto.greenhouse_idea.status,
-          tags: dto.greenhouse_idea.tags,
-        });
+        if (dto.greenhouse_idea) {
+          this.greenhouseIdea.set({
+            id: dto.greenhouse_idea.id,
+            title: dto.greenhouse_idea.title,
+            summary: dto.greenhouse_idea.summary,
+            authorName: dto.greenhouse_idea.author_name,
+            authorRole: dto.greenhouse_idea.author_role,
+            upvotesCount: dto.greenhouse_idea.upvotes_count,
+            status: dto.greenhouse_idea.status,
+            tags: dto.greenhouse_idea.tags,
+          });
+        } else {
+          this.greenhouseIdea.set(null);
+        }
 
         this.loading.set(false);
       },

@@ -92,4 +92,15 @@ export class LearnerService {
   getResultDetail(attemptId: string): Observable<any> {
     return this.http.get(`/api/v1/learner/results/${attemptId}`);
   }
+
+  getAssessmentReport(attemptId: string): Observable<any> {
+    return this.http.get(`/api/v1/learner/results/${attemptId}/report`);
+  }
+
+  chatWithGardener(message: string, history: Array<{ role: string; content: string }> = []): Observable<any> {
+    return this.http.post('/api/v1/learner/chatbot/chat', {
+      message,
+      history,
+    });
+  }
 }

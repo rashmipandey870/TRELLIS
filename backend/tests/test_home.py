@@ -30,6 +30,7 @@ from app.core.uow import UnitOfWork
 from app.models import AuditLog, EvidenceRecord, Organisation, Role, RoleRequirement, Skill, User
 from app.models.base import Base
 from app.models.curriculum import Cohort, Course, Enrolment, Module, Pathway
+from app.models.meetings import Meeting, MeetingAudience
 from app.services.auth_service import issue_tokens_for_user
 from app.services.home_service import (
     compute_evidence_label,
@@ -308,9 +309,62 @@ def test_get_home_dashboard_populated(db_session: Session) -> None:
     assert streak["has_activity_today"] is True
     assert len(streak["weekly_history"]) == 7
 
-    # 5. Sessions & Greenhouse checks
-    assert len(data["sessions"]) == 2
-    assert data["greenhouse_idea"]["status"] == "PHASE_3_PREVIEW"
+    # 5. Sessions & Greenhouse checks (empty by default, no fake demo data)
+    assert len(data["sessions"]) == 0
+    assert data["greenhouse_idea"] is None
+
+
+def test_get_home_dashboard_with_scheduled_meeting(db_session: Session) -> None:
+    """Verify get_home_data retrieves real scheduled meetings for the learner."""
+    org = Organisation(name="CSM Technology", code="CSM_TEST_MTG")
+    db_session.add(org)
+    db_session.flush()
+
+    mentor = User(
+        org_id=org.id,
+        email="mentor_mtg@csmtech.internal",
+        password_hash=hash_password("Pass123!"),
+        full_name="Mentor Anand",
+        pseudonym_salt="salt-mentor",
+    )
+    learner = User(
+        org_id=org.id,
+        email="learner_mtg@csmtech.internal",
+        password_hash=hash_password("Pass123!"),
+        full_name="Learner Sneha",
+        pseudonym_salt="salt-learner",
+    )
+    db_session.add_all([mentor, learner])
+    db_session.flush()
+
+    meeting = Meeting(
+        title="Weekly SRE Sync",
+        meeting_date="2026-11-25",
+        start_time="10:00",
+        end_time="11:00",
+        duration_minutes=60,
+        meeting_link="https://meet.google.com/abc-defg-hij",
+        mentor_id=mentor.id,
+        status="SCHEDULED",
+    )
+    db_session.add(meeting)
+    db_session.flush()
+
+    audience = MeetingAudience(
+        meeting_id=meeting.id,
+        learner_id=learner.id,
+    )
+    db_session.add(audience)
+    db_session.commit()
+
+    data = get_home_data(session=db_session, user_id=learner.id, org_id=org.id)
+    assert len(data["sessions"]) == 1
+    session_item = data["sessions"][0]
+    assert session_item["id"] == meeting.id
+    assert session_item["title"] == "Weekly SRE Sync"
+    assert session_item["trainer_name"] == "Mentor Anand"
+    assert session_item["meeting_link"] == "https://meet.google.com/abc-defg-hij"
+    assert session_item["session_type"] == "MEETING"
 
 
 def test_get_home_dashboard_empty_enrolment(db_session: Session) -> None:

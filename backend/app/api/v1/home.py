@@ -105,7 +105,7 @@ class HomeDashboardResponseSchema(BaseModel):
     skill_gaps: list[SkillGapSchema]
     streak: ClimbingStreakSchema
     sessions: list[AssignedSessionSchema]
-    greenhouse_idea: GreenhouseIdeaSchema
+    greenhouse_idea: GreenhouseIdeaSchema | None = None
 
 
 class FreezeStreakResponseSchema(BaseModel):

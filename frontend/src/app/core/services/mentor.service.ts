@@ -180,4 +180,24 @@ export class MentorService {
       notes,
     });
   }
+
+  getAssessmentSubmissions(assessmentId: string): Observable<any[]> {
+    return this.http.get<any[]>(`/api/v1/mentor/assessments/${assessmentId}/submissions`);
+  }
+
+  getAttemptAnswersForGrading(attemptId: string): Observable<any> {
+    return this.http.get<any>(`/api/v1/mentor/assessments/attempts/${attemptId}/answers`);
+  }
+
+  gradeAttemptAnswers(attemptId: string, grades: Array<{ answer_id: string; score_awarded: number; feedback?: string }>): Observable<any> {
+    return this.http.post<any>(`/api/v1/mentor/assessments/attempts/${attemptId}/grade`, { grades });
+  }
+
+  approveReport(attemptId: string): Observable<any> {
+    return this.http.post<any>(`/api/v1/mentor/assessments/attempts/${attemptId}/approve-report`, {});
+  }
+
+  rejectReport(attemptId: string): Observable<any> {
+    return this.http.post<any>(`/api/v1/mentor/assessments/attempts/${attemptId}/reject-report`, {});
+  }
 }

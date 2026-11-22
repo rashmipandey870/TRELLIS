@@ -177,7 +177,21 @@ interface TestCase {
                   (click)="studioTab.set('add_coding')"
                   [ngClass]="studioTab() === 'add_coding' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
                   class="pb-2 px-3 text-xs font-bold border-b-2 transition">
-                  + Add Coding Problem
+                  + Add Coding
+                </button>
+                <button 
+                  type="button"
+                  (click)="studioTab.set('add_sql')"
+                  [ngClass]="studioTab() === 'add_sql' ? 'border-sky-600 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                  class="pb-2 px-3 text-xs font-bold border-b-2 transition">
+                  + Add SQL
+                </button>
+                <button 
+                  type="button"
+                  (click)="studioTab.set('add_subjective')"
+                  [ngClass]="studioTab() === 'add_subjective' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+                  class="pb-2 px-3 text-xs font-bold border-b-2 transition">
+                  + Add Subjective / Project
                 </button>
                 <button 
                   type="button"
@@ -307,6 +321,18 @@ interface TestCase {
                       (click)="studioTab.set('add_coding')"
                       class="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-[11px]">
                       + New Coding
+                    </button>
+                    <button 
+                      type="button" 
+                      (click)="studioTab.set('add_sql')"
+                      class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-bold text-[11px]">
+                      + New SQL
+                    </button>
+                    <button 
+                      type="button" 
+                      (click)="studioTab.set('add_subjective')"
+                      class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px]">
+                      + New Subjective
                     </button>
                   </div>
                 </div>
@@ -507,6 +533,135 @@ interface TestCase {
               </form>
             }
 
+            <!-- Tab: Author New SQL Challenge -->
+            @if (studioTab() === 'add_sql') {
+              <form (ngSubmit)="submitNewSql()" class="space-y-4 text-xs">
+                <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl text-sky-800 dark:text-sky-300 font-medium">
+                  Author a relational SQL query challenge. Learner queries will be validated against in-memory schemas.
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Title *</label>
+                    <input type="text" [(ngModel)]="newSql.title" name="sql_title" required placeholder="e.g. Department Average Salary" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Marks *</label>
+                    <input type="number" [(ngModel)]="newSql.marks" name="sql_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Statement *</label>
+                  <textarea [(ngModel)]="newSql.question_text" name="sql_statement" rows="3" required placeholder="Write a query to calculate average salary per department..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Schema DDL (Tables &amp; Initial DDL) *</label>
+                  <textarea [(ngModel)]="newSql.schema_ddl" name="sql_ddl" rows="4" required class="w-full px-3 py-2 bg-slate-900 text-sky-300 font-mono text-xs rounded-xl" placeholder="CREATE TABLE employees (id INT, department VARCHAR(50), salary INT);"></textarea>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Reference Solution Query</label>
+                  <textarea [(ngModel)]="newSql.solution_query" name="sql_sol" rows="3" class="w-full px-3 py-2 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl" placeholder="SELECT department, AVG(salary) FROM employees GROUP BY department;"></textarea>
+                </div>
+
+                <!-- Test Cases -->
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="font-bold text-slate-700 dark:text-slate-300">Test Cases (Data Fixtures &amp; Expected Output)</label>
+                    <button type="button" (click)="addTestCaseToSql()" class="text-xs text-sky-600 font-bold">+ Add Fixture</button>
+                  </div>
+                  @for (tc of newSql.test_cases; track $index; let tcIdx = $index) {
+                    <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 space-y-2">
+                      <div class="flex items-center justify-between">
+                        <span class="font-bold font-mono text-[10px] uppercase">Fixture #{{ tcIdx + 1 }}</span>
+                        <div class="flex items-center gap-3">
+                          <label class="flex items-center gap-1.5 cursor-pointer text-[10px] font-bold">
+                            <input type="checkbox" [(ngModel)]="tc.is_hidden" [name]="'sql_tc_hid_' + tcIdx" />
+                            <span>Hidden</span>
+                          </label>
+                          @if (newSql.test_cases.length > 1) {
+                            <button type="button" (click)="removeTestCaseFromSql(tcIdx)" class="text-rose-500 font-bold">&times;</button>
+                          }
+                        </div>
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <span class="block text-[10px] text-slate-400">INSERT Statements (Seed Data)</span>
+                          <input type="text" [(ngModel)]="tc.input_data" [name]="'sql_tc_in_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" placeholder="INSERT INTO employees VALUES (1, 'Engineering', 80000);" />
+                        </div>
+                        <div>
+                          <span class="block text-[10px] text-slate-400">Expected Result Rows</span>
+                          <input type="text" [(ngModel)]="tc.expected_output" [name]="'sql_tc_out_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" placeholder="Engineering|80000.0" />
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Back</button>
+                  <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 text-xs font-bold text-white hover:bg-sky-700">Save &amp; Attach SQL Challenge</button>
+                </div>
+              </form>
+            }
+
+            <!-- Tab: Author Subjective / Scenario / Communication / File Upload -->
+            @if (studioTab() === 'add_subjective') {
+              <form (ngSubmit)="submitNewSubjective()" class="space-y-4 text-xs">
+                <div class="p-3 bg-teal-50 dark:bg-teal-950/40 rounded-xl text-teal-800 dark:text-teal-300 font-medium">
+                  Author a subjective, scenario-based, or file-upload assignment. Mentor evaluates submission with rubric scoring.
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Assessment Category *</label>
+                    <select [(ngModel)]="newSubjective.type" name="subj_type" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-bold">
+                      <option value="SHORT_ANSWER">SHORT ANSWER</option>
+                      <option value="SCENARIO">SCENARIO ANALYSIS</option>
+                      <option value="COMMUNICATION">COMMUNICATION</option>
+                      <option value="FILE_UPLOAD">FILE UPLOAD / PROJECT</option>
+                    </select>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Question / Challenge Title *</label>
+                    <input type="text" [(ngModel)]="newSubjective.title" name="subj_title" required placeholder="e.g. Distributed Consensus Design Proposal" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Statement / Prompt *</label>
+                  <textarea [(ngModel)]="newSubjective.question_text" name="subj_statement" rows="4" required placeholder="Describe the business scenario, constraints, and instructions for the learner..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Scoring Rubric &amp; Evaluation Criteria</label>
+                  <textarea [(ngModel)]="newSubjective.rubric_criteria" name="subj_rubric" rows="2" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" placeholder="e.g. Architecture clarity (40%), Failure handling (30%), Concise reasoning (30%)"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Marks Assigned *</label>
+                    <input type="number" [(ngModel)]="newSubjective.marks" name="subj_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                  </div>
+                  <div>
+                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Difficulty</label>
+                    <select [(ngModel)]="newSubjective.difficulty" name="subj_diff" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl">
+                      <option value="EASY">EASY</option>
+                      <option value="MEDIUM">MEDIUM</option>
+                      <option value="HARD">HARD</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Back</button>
+                  <button type="submit" class="px-4 py-2 rounded-xl bg-teal-600 text-xs font-bold text-white hover:bg-teal-700">Save &amp; Attach Question</button>
+                </div>
+              </form>
+            }
+
             <!-- Tab 5: Assessment Preview -->
             @if (studioTab() === 'preview' && activeStudioAssessment()) {
               <div class="space-y-4 text-xs">
@@ -624,17 +779,49 @@ interface TestCase {
               }
 
               <!-- Learner Attempts List -->
-              <div class="space-y-2 text-xs">
+              <div class="space-y-3 text-xs">
                 <span class="font-bold uppercase text-slate-400">Submitted Attempts</span>
-                @for (l of resultsData().learners; track l.id) {
-                  <div class="p-3 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-between">
-                    <div>
-                      <span class="font-bold text-slate-800 dark:text-slate-200">{{ l.name }}</span>
+                @for (l of resultsData().learners; track l.attempt_id || l.id) {
+                  <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-slate-800 dark:text-slate-200">{{ l.name }}</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                          [ngClass]="l.grading_status === 'GRADED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+                          {{ l.grading_status || 'GRADED' }}
+                        </span>
+                        @if (l.report_status && l.report_status !== 'NONE') {
+                          <span class="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                            [ngClass]="l.report_status === 'APPROVED' ? 'bg-sky-100 text-sky-800' : 'bg-purple-100 text-purple-800'">
+                            Report: {{ l.report_status }}
+                          </span>
+                        }
+                      </div>
                       <span class="text-[10px] text-slate-400 block">{{ l.email }}</span>
                     </div>
-                    <div class="text-right">
-                      <span class="font-mono font-bold" [ngClass]="l.passed ? 'text-emerald-600' : 'text-rose-500'">{{ l.score }}%</span>
-                      <span class="text-[10px] text-slate-400 block">{{ l.passed ? 'PASSED' : 'FAILED' }}</span>
+
+                    <div class="flex items-center gap-3">
+                      <div class="text-right">
+                        <span class="font-mono font-bold" [ngClass]="l.passed ? 'text-emerald-600' : 'text-rose-500'">{{ l.score }}%</span>
+                        <span class="text-[10px] text-slate-400 block">{{ l.passed ? 'PASSED' : 'FAILED' }}</span>
+                      </div>
+
+                      <div class="flex items-center gap-1.5">
+                        <button 
+                          type="button" 
+                          (click)="openGradingModal(l.attempt_id)"
+                          class="px-2.5 py-1.5 rounded-lg bg-[#008FBB] hover:bg-[#007499] text-white text-[10px] font-bold transition">
+                          Review &amp; Grade
+                        </button>
+                        @if (l.report_status === 'PENDING_APPROVAL') {
+                          <button 
+                            type="button" 
+                            (click)="approveReport(l.attempt_id)"
+                            class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold transition">
+                            Approve Report
+                          </button>
+                        }
+                      </div>
                     </div>
                   </div>
                 } @empty {
@@ -651,6 +838,164 @@ interface TestCase {
               <button (click)="selectedAssessmentForResults.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Manual Grading & Attempt Review Modal -->
+      @if (showGradingModal() && gradingData()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">Attempt Evaluation &amp; Grading</span>
+                <h3 class="text-base font-black text-slate-900 dark:text-white">
+                  {{ gradingData()?.learner_name }} &bull; {{ gradingData()?.assessment_title }}
+                </h3>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                    [ngClass]="gradingData()?.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
+                    Score: {{ gradingData()?.score }} / {{ gradingData()?.total_marks }} ({{ gradingData()?.passed ? 'PASSED' : 'NOT PASSED' }})
+                  </span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    Status: {{ gradingData()?.grading_status }}
+                  </span>
+                  @if (gradingData()?.report_status && gradingData()?.report_status !== 'NONE') {
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800">
+                      Growth Ring: {{ gradingData()?.report_status }}
+                    </span>
+                  }
+                </div>
+              </div>
+              <button (click)="closeGradingModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <!-- List of Answers for this Attempt -->
+            <div class="space-y-4 text-xs">
+              @for (ans of gradingData()?.answers; track ans.id; let qIdx = $index) {
+                <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 space-y-3">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono font-bold text-slate-400">#{{ qIdx + 1 }}</span>
+                      <span class="px-2 py-0.5 rounded text-[9px] font-bold uppercase"
+                        [ngClass]="{
+                          'bg-sky-100 text-sky-800': ans.question_type === 'MCQ',
+                          'bg-purple-100 text-purple-800': ans.question_type === 'CODING',
+                          'bg-indigo-100 text-indigo-800': ans.question_type === 'SQL',
+                          'bg-teal-100 text-teal-800': ans.question_type === 'SHORT_ANSWER' || ans.question_type === 'SCENARIO' || ans.question_type === 'COMMUNICATION',
+                          'bg-amber-100 text-amber-800': ans.question_type === 'FILE_UPLOAD'
+                        }">
+                        {{ ans.question_type }}
+                      </span>
+                      <h4 class="font-bold text-slate-800 dark:text-slate-200">{{ ans.question_title }}</h4>
+                    </div>
+                    <span class="font-mono text-xs font-bold text-slate-500">Max {{ ans.marks }} Marks</span>
+                  </div>
+
+                  <!-- MCQ Details -->
+                  @if (ans.question_type === 'MCQ') {
+                    <div class="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                      <div class="flex items-center justify-between text-[11px]">
+                        <span>Selected Option: <strong>{{ ans.selected_option_id || 'No selection' }}</strong></span>
+                        <span class="font-mono font-bold" [ngClass]="ans.is_correct ? 'text-emerald-600' : 'text-rose-500'">
+                          {{ ans.is_correct ? 'Correct (+ ' + ans.score_awarded + ')' : 'Incorrect (0 marks)' }}
+                        </span>
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Coding / SQL Details -->
+                  @if (ans.question_type === 'CODING' || ans.question_type === 'SQL') {
+                    <div class="space-y-1.5">
+                      <span class="text-[10px] uppercase font-bold text-slate-400">Submitted Solution</span>
+                      <pre class="p-3 bg-slate-900 text-slate-100 font-mono text-[11px] rounded-lg overflow-x-auto">{{ ans.source_code || '-- No code submitted --' }}</pre>
+                      <div class="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                        <span>Execution Status: <strong>{{ ans.grading_status || 'Auto-evaluated' }}</strong></span>
+                        <span class="font-mono font-bold text-emerald-600">Awarded: {{ ans.score_awarded }} / {{ ans.marks }}</span>
+                      </div>
+                    </div>
+                  }
+
+                  <!-- Subjective Written Answers (Short Answer, Scenario, Communication) -->
+                  @if (ans.question_type === 'SHORT_ANSWER' || ans.question_type === 'SCENARIO' || ans.question_type === 'COMMUNICATION') {
+                    <div class="space-y-2">
+                      <span class="text-[10px] uppercase font-bold text-slate-400">Learner's Written Response</span>
+                      <p class="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                        {{ ans.text_response || 'No written response submitted.' }}
+                      </p>
+                      @if (ans.rubric && ans.rubric.criteria) {
+                        <div class="p-2 rounded bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[10px]">
+                          <strong>Rubric:</strong> {{ ans.rubric.criteria }}
+                        </div>
+                      }
+                      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        <div>
+                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Score Awarded (Max {{ ans.marks }})</label>
+                          <input type="number" [(ngModel)]="ans.score_awarded" min="0" [max]="ans.marks" class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold" />
+                        </div>
+                        <div class="sm:col-span-2">
+                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Mentor Feedback</label>
+                          <input type="text" [(ngModel)]="ans.mentor_feedback" placeholder="Constructive guidance and notes..." class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" />
+                        </div>
+                      </div>
+                    </div>
+                  }
+
+                  <!-- File Upload Deliverables -->
+                  @if (ans.question_type === 'FILE_UPLOAD') {
+                    <div class="space-y-2">
+                      <span class="text-[10px] uppercase font-bold text-slate-400">Uploaded Deliverable</span>
+                      <div class="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between">
+                        <div>
+                          <span class="font-bold text-slate-800 dark:text-slate-200 block">{{ ans.file_name || 'Project Asset' }}</span>
+                          <a [href]="ans.file_url" target="_blank" rel="noopener noreferrer" class="text-[#008FBB] underline text-[11px]">
+                            {{ ans.file_url || 'No file URL provided' }}
+                          </a>
+                        </div>
+                        <span class="text-xs text-slate-400 font-bold">&DownArrow; Download / Open</span>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        <div>
+                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Score Awarded (Max {{ ans.marks }})</label>
+                          <input type="number" [(ngModel)]="ans.score_awarded" min="0" [max]="ans.marks" class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold" />
+                        </div>
+                        <div class="sm:col-span-2">
+                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Mentor Feedback</label>
+                          <input type="text" [(ngModel)]="ans.mentor_feedback" placeholder="Feedback on project deliverable..." class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" />
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+
+            <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div>
+                @if (gradingData()?.report_status === 'PENDING_APPROVAL') {
+                  <button 
+                    type="button" 
+                    (click)="approveReport(gradingData()?.attempt_id)"
+                    class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition">
+                    &check; Approve Growth Ring Report
+                  </button>
+                }
+              </div>
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  (click)="closeGradingModal()" 
+                  class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs">
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  (click)="submitGrades()" 
+                  class="px-4 py-2 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-white font-bold text-xs shadow-sm transition">
+                  Save All Grades &amp; Re-generate Report
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -779,7 +1124,10 @@ export class MentorAssessmentsComponent {
 
   readonly activeStudioAssessment = signal<AssessmentItem | null>(null);
   readonly stagedQuestions = signal<any[]>([]);
-  readonly studioTab = signal<'details' | 'questions' | 'add_mcq' | 'add_coding' | 'preview'>('details');
+  readonly studioTab = signal<'details' | 'questions' | 'add_mcq' | 'add_coding' | 'add_sql' | 'add_subjective' | 'preview'>('details');
+
+  readonly showGradingModal = signal<boolean>(false);
+  readonly gradingData = signal<any>(null);
 
   readonly mentorBatches = signal<any[]>([]);
   readonly mentorLearners = signal<any[]>([]);
@@ -831,6 +1179,29 @@ export class MentorAssessmentsComponent {
       { input_data: '1 2 3', expected_output: '6', is_hidden: false },
       { input_data: '4 5 6', expected_output: '15', is_hidden: true },
     ] as TestCase[],
+  };
+
+  newSql = {
+    title: '',
+    question_text: '',
+    field: 'SQL',
+    difficulty: 'MEDIUM',
+    marks: 15,
+    schema_ddl: 'CREATE TABLE employees (\n  id INT PRIMARY KEY,\n  name VARCHAR(50),\n  department VARCHAR(50),\n  salary INT\n);',
+    solution_query: 'SELECT department, AVG(salary) FROM employees GROUP BY department;',
+    test_cases: [
+      { input_data: "INSERT INTO employees VALUES (1, 'Alice', 'Engineering', 90000), (2, 'Bob', 'Engineering', 80000);", expected_output: "Engineering|85000.0", is_hidden: false }
+    ] as TestCase[],
+  };
+
+  newSubjective = {
+    type: 'SHORT_ANSWER',
+    title: '',
+    question_text: '',
+    field: 'Architecture',
+    difficulty: 'MEDIUM',
+    marks: 10,
+    rubric_criteria: 'Clarity (40%), Technical correctness (40%), Completeness (20%)',
   };
 
   ngOnInit(): void {
@@ -1133,6 +1504,172 @@ export class MentorAssessmentsComponent {
         });
       },
       error: (err) => this.showToast(err.error?.detail || 'Failed to author coding question in bank.', 'error'),
+    });
+  }
+
+  addTestCaseToSql(): void {
+    this.newSql.test_cases.push({
+      input_data: '',
+      expected_output: '',
+      is_hidden: false,
+    });
+  }
+
+  removeTestCaseFromSql(index: number): void {
+    if (this.newSql.test_cases.length > 1) {
+      this.newSql.test_cases.splice(index, 1);
+    }
+  }
+
+  submitNewSql(): void {
+    const current = this.activeStudioAssessment();
+    if (!current) return;
+
+    const payload = {
+      title: this.newSql.title,
+      question_text: this.newSql.question_text,
+      type: 'SQL',
+      field: current.field || this.newSql.field,
+      difficulty: this.newSql.difficulty,
+      marks: this.newSql.marks,
+      schema_ddl: this.newSql.schema_ddl,
+      solution_query: this.newSql.solution_query,
+      starter_code: {
+        sql: '-- Enter your query here\n',
+      },
+      test_cases: this.newSql.test_cases.map((tc) => ({
+        input: tc.input_data,
+        expected_output: tc.expected_output,
+        is_hidden: tc.is_hidden,
+      })),
+    };
+
+    this.mentorService.addQuestionToBank(payload).subscribe({
+      next: (createdBankItem) => {
+        this.mentorService.attachQuestionToAssessment(current.id, {
+          question_id: createdBankItem.id,
+          marks: this.newSql.marks,
+        }).subscribe({
+          next: () => {
+            this.showToast(`SQL Challenge "${createdBankItem.title}" attached to assessment!`);
+            this.newSql = {
+              title: '',
+              question_text: '',
+              field: 'SQL',
+              difficulty: 'MEDIUM',
+              marks: 15,
+              schema_ddl: '',
+              solution_query: '',
+              test_cases: [
+                { input_data: '', expected_output: '', is_hidden: false },
+              ],
+            };
+            this.loadStagedQuestions(current.id);
+            this.studioTab.set('questions');
+            this.loadAssessments();
+          },
+          error: (err) => this.showToast(err.error?.detail || 'Failed to attach SQL question.', 'error'),
+        });
+      },
+      error: (err) => this.showToast(err.error?.detail || 'Failed to author SQL question in bank.', 'error'),
+    });
+  }
+
+  submitNewSubjective(): void {
+    const current = this.activeStudioAssessment();
+    if (!current) return;
+
+    const payload = {
+      title: this.newSubjective.title,
+      question_text: this.newSubjective.question_text,
+      type: this.newSubjective.type,
+      field: current.field || this.newSubjective.field,
+      difficulty: this.newSubjective.difficulty,
+      marks: this.newSubjective.marks,
+      rubric: {
+        criteria: this.newSubjective.rubric_criteria,
+      },
+    };
+
+    this.mentorService.addQuestionToBank(payload).subscribe({
+      next: (createdBankItem) => {
+        this.mentorService.attachQuestionToAssessment(current.id, {
+          question_id: createdBankItem.id,
+          marks: this.newSubjective.marks,
+        }).subscribe({
+          next: () => {
+            this.showToast(`Question "${createdBankItem.title}" attached to assessment!`);
+            this.newSubjective = {
+              type: 'SHORT_ANSWER',
+              title: '',
+              question_text: '',
+              field: current.field || 'Architecture',
+              difficulty: 'MEDIUM',
+              marks: 10,
+              rubric_criteria: '',
+            };
+            this.loadStagedQuestions(current.id);
+            this.studioTab.set('questions');
+            this.loadAssessments();
+          },
+          error: (err) => this.showToast(err.error?.detail || 'Failed to attach question.', 'error'),
+        });
+      },
+      error: (err) => this.showToast(err.error?.detail || 'Failed to author question in bank.', 'error'),
+    });
+  }
+
+  openGradingModal(attemptId: string): void {
+    this.mentorService.getAttemptAnswersForGrading(attemptId).subscribe({
+      next: (data) => {
+        this.gradingData.set(data);
+        this.showGradingModal.set(true);
+      },
+      error: (err) => this.showToast(err.error?.detail || 'Failed to load attempt answers.', 'error'),
+    });
+  }
+
+  closeGradingModal(): void {
+    this.showGradingModal.set(false);
+    this.gradingData.set(null);
+  }
+
+  submitGrades(): void {
+    const data = this.gradingData();
+    if (!data) return;
+
+    const gradesPayload = (data.answers || []).map((ans: any) => ({
+      answer_id: ans.id,
+      score_awarded: Number(ans.score_awarded) || 0,
+      feedback: ans.mentor_feedback || '',
+    }));
+
+    this.mentorService.gradeAttemptAnswers(data.attempt_id, gradesPayload).subscribe({
+      next: () => {
+        this.showToast('Grades saved successfully!');
+        this.closeGradingModal();
+        const a = this.selectedAssessmentForResults();
+        if (a) {
+          this.openResultsAnalysis(a);
+        }
+      },
+      error: (err) => this.showToast(err.error?.detail || 'Failed to submit grades.', 'error'),
+    });
+  }
+
+  approveReport(attemptId: string): void {
+    this.mentorService.approveReport(attemptId).subscribe({
+      next: () => {
+        this.showToast('Growth Ring report approved and released to learner!');
+        if (this.gradingData() && this.gradingData().attempt_id === attemptId) {
+          this.gradingData.update((d: any) => d ? ({ ...d, report_status: 'APPROVED' }) : null);
+        }
+        const a = this.selectedAssessmentForResults();
+        if (a) {
+          this.openResultsAnalysis(a);
+        }
+      },
+      error: (err) => this.showToast(err.error?.detail || 'Failed to approve report.', 'error'),
     });
   }
 

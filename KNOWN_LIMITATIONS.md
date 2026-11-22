@@ -12,11 +12,25 @@
 - **Supported Languages**: Python 3, Node.js (JavaScript), Java 21, and GCC/G++ (C/C++).
 - **Simulated Execution**: Simulated or fake passes have been completely removed. Missing compilers or runtime errors return real internal/runner unavailable errors, never an ACCEPTED verdict.
 
-## 2. Assessment Engine & Integrity
+## 2. Assessment Engine & 7 Question Categories
 - **Audience Enforcement**: Only learners belonging to an assessment's assigned batch or explicit audience table (`AssessmentAudience`) can access, start, autosave, or submit assessments.
 - **Server-Side Timer**: Server-side start timestamps and durations are strictly enforced. Submissions after expiration are rejected with 400 and flagged as `EXPIRED`.
-- **Coding Question Grading**: Assessments grade coding problems automatically by executing stored submissions against test cases and weighting by marks.
-- **Zero Mock Data**: Endpoints return `[]` when no assessments or results exist; hardcoded fallback records (`a1`, `res1`, `qb_1`) have been eliminated.
+- **7 Question Types Supported**: Full schema, validation, runner, and UI support for:
+  1. `MCQ` (Auto-graded single/multi-choice)
+  2. `CODING` (Sandboxed runner with test cases, execution time, and memory metrics)
+  3. `SQL` (In-memory SQLite isolated sandbox with custom DDL schemas, fixture seeding, and output row diffing)
+  4. `SHORT_ANSWER` (Subjective written answers evaluated against mentor rubrics)
+  5. `SCENARIO` (Case-study analysis with rubric-guided criteria)
+  6. `COMMUNICATION` (Technical writing and architectural proposals)
+  7. `FILE_UPLOAD` (Deliverable artifacts and documents verified via URL assets)
+- **Hybrid Auto + Manual Grading**: MCQs and Code/SQL are evaluated instantly upon submission. Subjective categories are flagged as `PENDING_REVIEW` with scores updated dynamically through the Mentor Review & Grading Studio (`POST /mentor/assessments/attempts/{id}/grade`).
+- **Zero Mock Data**: Endpoints return `[]` when no assessments or results exist; hardcoded fallback records (`a1`, `att_demo`, `res1`, `qb_1`, `ses-live-401`, `idea-featured-01`) have been completely eradicated. Empty states render with clean UI prompts.
+
+## 3. AI Growth Ring Reports & Gardener Chatbot
+- **Growth Ring Report Service**: Automatically synthesized on attempt submission and manual grade finalization via `generate_growth_ring_report()`. Computes proficiency across categories, cohort percentile rank, strengths, gap areas, and a concrete 3-step action roadmap.
+- **Dynamic Radar Chart SVG**: Generates a self-contained multi-dimensional SVG radar chart mathematically projected via trigonometric polygon points with grid levels and branded accents (`#008FBB`, `#FAA634`).
+- **Report Approval Lifecycle**: Reports transition through `NONE` -> `PENDING_APPROVAL` -> `APPROVED`. Mentors review and release reports using `POST /mentor/assessments/attempts/{id}/approve-report`. Learners can view their interactive dossier upon release.
+- **Gardener AI Coach**: Personalized learning companion (`POST /learner/chatbot/chat`) grounded in the learner's enrolled pathway, milestone progress, daily practice streaks, and recent assessment performances with sliding-window rate limiting (30 requests/hour/user).
 
 ## 3. Mentor & Meeting Validation
 - **Meeting Links**: Link URLs are strictly validated using `urllib.parse` for `https://` schemes and must match allow-listed meeting hosts (`teams.microsoft.com`, `meet.google.com`, `zoom.us`, `*.csm.tech`).

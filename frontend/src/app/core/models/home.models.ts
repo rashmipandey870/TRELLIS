@@ -160,7 +160,7 @@ export interface HomeDashboardDto {
     upvotes_count: number;
     status: string;
     tags: string[];
-  };
+  } | null;
 }
 
 export interface FreezeStreakResponseDto {

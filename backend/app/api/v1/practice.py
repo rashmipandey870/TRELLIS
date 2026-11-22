@@ -281,6 +281,70 @@ def get_practice_dedication(
     return _serialize_scores(db, user)
 
 
+@router.get("/study-plan", summary="Generate personalized weekly AI study plan")
+def get_weekly_study_plan(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    scores = db.execute(
+        select(PracticeScore).where(PracticeScore.learner_id == user.id)
+    ).scalars().all()
+
+    weaknesses = [s.field for s in sorted(scores, key=lambda s: s.weighted_accuracy) if s.weighted_accuracy < 75]
+    if not weaknesses:
+        weaknesses = ["Python", "SQL", "Cloud"]
+
+    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    schedule = []
+    for idx, day in enumerate(days):
+        field_target = weaknesses[idx % len(weaknesses)]
+        schedule.append({
+            "day": day,
+            "focus_field": field_target,
+            "target_problems": 3,
+            "estimated_minutes": 45,
+            "recommended_topics": [f"{field_target} Fundamentals", f"{field_target} Practical Lab"],
+        })
+
+    return {
+        "learner_id": user.id,
+        "week_label": datetime.now(UTC).strftime("Week of %B %d, %Y"),
+        "primary_focus": weaknesses[0],
+        "schedule": schedule,
+        "advice": f"Maintain your {user.streak_days}-day climbing streak by completing at least 1 practice problem daily.",
+    }
+
+
+@router.get("/history", summary="Get historical practice attempt progression")
+def get_practice_history(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    attempts = (
+        db.execute(
+            select(PracticeAttempt)
+            .where(PracticeAttempt.learner_id == user.id)
+            .order_by(PracticeAttempt.created_at.desc())
+            .limit(20)
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": a.id,
+            "field": a.question.field if a.question else "General",
+            "type": a.question.question_type if a.question else "MCQ",
+            "difficulty": a.question.difficulty if a.question else "MEDIUM",
+            "is_correct": a.is_correct,
+            "score": a.score,
+            "time_spent_seconds": a.time_spent_seconds,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in attempts
+    ]
+
+
 # --- Role-Guarded LLM Assistant ---
 @router.post("/assistant", summary="Role-aware intelligent assistant with strict data access guardrails")
 def chat_with_assistant(

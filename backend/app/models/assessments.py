@@ -38,6 +38,7 @@ class QuestionBank(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     topic: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     difficulty: Mapped[str] = mapped_column(String(32), default="MEDIUM", nullable=False)  # EASY, MEDIUM, HARD
     tags_json: Mapped[list[str] | None] = mapped_column(JSON, default=list, nullable=True)
+    rubric_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict, nullable=True)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
@@ -87,6 +88,8 @@ class CodingProblem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     examples_json: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
     starter_code_json: Mapped[dict[str, str] | None] = mapped_column(JSON, default=dict, nullable=True)
     reference_solution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    problem_type: Mapped[str] = mapped_column(String(32), default="CODING", nullable=False)
+    schema_ddl: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     bank_question: Mapped["QuestionBank | None"] = relationship("QuestionBank", back_populates="coding_problem")
@@ -212,6 +215,14 @@ class AssessmentAttempt(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )  # IN_PROGRESS, SUBMITTED, EXPIRED
     tab_switch_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     autosave_state_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=dict, nullable=True)
+    grading_status: Mapped[str] = mapped_column(
+        String(32), default="GRADED", nullable=False
+    )  # GRADED, PENDING_REVIEW
+    report_json: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None, nullable=True)
+    report_status: Mapped[str] = mapped_column(
+        String(32), default="NONE", nullable=False
+    )  # NONE, PENDING_APPROVAL, APPROVED, REJECTED
+    report_approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="attempts")
@@ -236,6 +247,13 @@ class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         String(36), ForeignKey("question_bank.id", ondelete="CASCADE"), index=True, nullable=False
     )
     selected_option_ids_json: Mapped[list[str] | None] = mapped_column(JSON, default=list, nullable=True)
+    text_response: Mapped[str | None] = mapped_column(Text, nullable=True)
+    file_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    file_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mentor_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    grading_status: Mapped[str] = mapped_column(
+        String(32), default="GRADED", nullable=False
+    )  # GRADED, PENDING_REVIEW
     is_flagged: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     score_awarded: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
 

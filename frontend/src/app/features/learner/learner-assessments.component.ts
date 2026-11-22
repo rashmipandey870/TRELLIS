@@ -37,7 +37,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                 </div>
 
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                  {{ a.instructions || 'Proctored assessment covering architecture, MCQ fundamentals, and algorithmic coding.' }}
+                  {{ a.instructions || 'Proctored assessment covering architecture, fundamentals, and real-world problems.' }}
                 </p>
 
                 <div class="pt-2">
@@ -48,6 +48,12 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                     Start Timed Assessment &rarr;
                   </button>
                 </div>
+              </div>
+            } @empty {
+              <div class="col-span-full p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+                <span class="text-3xl block">📋</span>
+                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">No Assessments Assigned</h4>
+                <p class="text-xs text-slate-500 dark:text-slate-400">You currently have no pending formal examinations scheduled for your cohort.</p>
               </div>
             }
           </div>
@@ -181,19 +187,56 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                 </div>
               }
 
-              <!-- Coding Editor Area -->
-              @if (currentQuestion()?.question_type === 'CODING') {
+              <!-- Coding / SQL Editor Area -->
+              @if (currentQuestion()?.question_type === 'CODING' || currentQuestion()?.question_type === 'SQL') {
                 <div class="space-y-3">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-400 uppercase">Solution Implementation (Python)</span>
+                    <span class="text-xs font-bold text-slate-400 uppercase">
+                      {{ currentQuestion()?.question_type === 'SQL' ? 'SQL Query Execution' : 'Code Implementation (Python / JS)' }}
+                    </span>
                     <span class="text-[10px] text-emerald-500 font-bold">&bull; Isolated Sandboxed Execution</span>
                   </div>
                   <textarea 
                     [(ngModel)]="codingSolution" 
-                    (ngModelChange)="triggerAutosave()"
+                    (ngModelChange)="onCodeChanged()"
                     rows="10" 
-                    placeholder="def solve(nums):&#10;    # Write your solution here&#10;    pass"
+                    [placeholder]="currentQuestion()?.question_type === 'SQL' ? 'SELECT * FROM table_name WHERE ...' : 'def solve():\n    pass'"
                     class="w-full font-mono text-xs p-4 bg-slate-950 text-slate-100 border border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
+                </div>
+              }
+
+              <!-- Written / Subjective / Scenario / Communication Area -->
+              @if (currentQuestion()?.question_type === 'SHORT_ANSWER' || currentQuestion()?.question_type === 'SCENARIO' || currentQuestion()?.question_type === 'COMMUNICATION') {
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-400 uppercase">Written Response</span>
+                    <span class="text-[10px] text-[#008FBB] font-bold">&bull; Mentor Reviewed</span>
+                  </div>
+                  <textarea 
+                    [(ngModel)]="textSolution" 
+                    (ngModelChange)="onTextChanged()"
+                    rows="8" 
+                    placeholder="Enter your detailed response or explanation here..."
+                    class="w-full text-xs p-4 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB] leading-relaxed"></textarea>
+                </div>
+              }
+
+              <!-- File Upload Area -->
+              @if (currentQuestion()?.question_type === 'FILE_UPLOAD') {
+                <div class="space-y-3 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
+                  <span class="text-xs font-bold text-slate-700 dark:text-slate-300 block">Deliverable Document / Asset URL</span>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="fileUrl" 
+                    (ngModelChange)="onFileChanged()"
+                    placeholder="https://drive.google.com/... or internal storage URL"
+                    class="w-full text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
+                  <input 
+                    type="text" 
+                    [(ngModel)]="fileName" 
+                    (ngModelChange)="onFileChanged()"
+                    placeholder="Document Name (e.g., architecture_v1.pdf)"
+                    class="w-full text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
                 </div>
               }
 
@@ -229,16 +272,7 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   private readonly learnerService = inject(LearnerService);
   private readonly router = inject(Router);
 
-  readonly assignedList = signal<any[]>([
-    {
-      id: 'a1',
-      title: 'Full-Stack Foundation Assessment',
-      field: 'Python & Web Architecture',
-      duration_minutes: 60,
-      passing_score: 75,
-      instructions: 'Proctored timed assessment. Auto-submit will trigger when timer expires.',
-    },
-  ]);
+  readonly assignedList = signal<any[]>([]);
 
   readonly activeAttempt = signal<ActiveAssessmentAttempt | null>(null);
   readonly currentQuestionIndex = signal<number>(0);
@@ -249,6 +283,9 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   readonly answers = signal<Record<string, any>>({});
   readonly flagged = signal<Set<string>>(new Set());
   codingSolution = '';
+  textSolution = '';
+  fileUrl = '';
+  fileName = '';
 
   private timerInterval: any = null;
   private tabListener: any = null;
@@ -256,9 +293,7 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.learnerService.getAssessments().subscribe({
       next: (list) => {
-        if (list && list.length > 0) {
-          this.assignedList.set(list);
-        }
+        this.assignedList.set(list || []);
       },
       error: () => {},
     });
@@ -285,45 +320,8 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   startTest(assessmentId: string): void {
     this.learnerService.startAssessment(assessmentId).subscribe({
       next: (attempt) => this.initAttempt(attempt),
-      error: () => {
-        // Fallback demo attempt
-        this.initAttempt({
-          attempt_id: 'att_demo',
-          assessment_id: assessmentId,
-          title: 'Full-Stack Foundation Assessment',
-          field: 'Python',
-          duration_minutes: 60,
-          remaining_seconds: 3600,
-          started_at: new Date().toISOString(),
-          questions: [
-            {
-              id: 'q1',
-              question_type: 'MCQ',
-              title: 'FastAPI Concurrency Paradigms',
-              content: 'Which ASGI server is officially recommended for executing FastAPI applications with uvloop in production?',
-              marks: 10,
-              options: [
-                { id: 'opt1', option_text: 'Uvicorn with Gunicorn process workers' },
-                { id: 'opt2', option_text: 'NodeJS Express worker proxy' },
-                { id: 'opt3', option_text: 'Werkzeug dev server' },
-                { id: 'opt4', option_text: 'Apache mod_php' },
-              ],
-            },
-            {
-              id: 'q2',
-              question_type: 'CODING',
-              title: 'Two Sum Algorithmic Lookup',
-              content: 'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\nAssume each input has exactly one solution.',
-              marks: 20,
-              coding_details: {
-                starter_code: { python: 'def two_sum(nums, target):\n    # Write logic\n    pass' },
-                constraints: '2 <= len(nums) <= 10^4',
-                sample_cases: [{ input: '[2,7,11,15], 9', output: '[0, 1]' }],
-              },
-            },
-          ],
-          existing_answers: {},
-        });
+      error: (err) => {
+        alert(err?.error?.detail || 'Unable to start assessment. Please ensure it is published and within the active window.');
       },
     });
   }
@@ -333,6 +331,7 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
     this.remainingSeconds.set(attempt.remaining_seconds || attempt.duration_minutes * 60);
     this.currentQuestionIndex.set(0);
     this.answers.set(attempt.existing_answers || {});
+    this.jumpToQuestion(0);
 
     this.timerInterval = setInterval(() => {
       this.remainingSeconds.update((s) => {
@@ -356,9 +355,47 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   jumpToQuestion(idx: number): void {
     this.currentQuestionIndex.set(idx);
     const q = this.currentQuestion();
-    if (q && q.question_type === 'CODING') {
-      this.codingSolution = this.answers()[q.id]?.source_code || '';
+    if (q) {
+      const existing = this.answers()[q.id] || {};
+      if (q.question_type === 'CODING' || q.question_type === 'SQL') {
+        this.codingSolution = existing.source_code || '';
+      } else if (q.question_type === 'SHORT_ANSWER' || q.question_type === 'SCENARIO' || q.question_type === 'COMMUNICATION') {
+        this.textSolution = existing.text_response || '';
+      } else if (q.question_type === 'FILE_UPLOAD') {
+        this.fileUrl = existing.file_url || '';
+        this.fileName = existing.file_name || '';
+      }
     }
+  }
+
+  onCodeChanged(): void {
+    const q = this.currentQuestion();
+    if (!q) return;
+    this.answers.update((ans) => ({
+      ...ans,
+      [q.id]: { ...(ans[q.id] || {}), source_code: this.codingSolution },
+    }));
+    this.triggerAutosave();
+  }
+
+  onTextChanged(): void {
+    const q = this.currentQuestion();
+    if (!q) return;
+    this.answers.update((ans) => ({
+      ...ans,
+      [q.id]: { ...(ans[q.id] || {}), text_response: this.textSolution },
+    }));
+    this.triggerAutosave();
+  }
+
+  onFileChanged(): void {
+    const q = this.currentQuestion();
+    if (!q) return;
+    this.answers.update((ans) => ({
+      ...ans,
+      [q.id]: { ...(ans[q.id] || {}), file_url: this.fileUrl, file_name: this.fileName },
+    }));
+    this.triggerAutosave();
   }
 
   nextQuestion(): void {
@@ -377,7 +414,7 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   selectOption(optId: string): void {
     const q = this.currentQuestion();
     if (!q) return;
-    this.answers.update((ans) => ({ ...ans, [q.id]: { selected_option_id: optId } }));
+    this.answers.update((ans) => ({ ...ans, [q.id]: { ...(ans[q.id] || {}), selected_option_id: optId } }));
     this.triggerAutosave();
   }
 
@@ -411,11 +448,9 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
     const q = this.currentQuestion();
     const att = this.activeAttempt();
     if (q && att) {
-      if (q.question_type === 'CODING') {
-        this.answers.update((ans) => ({ ...ans, [q.id]: { source_code: this.codingSolution } }));
-      }
+      const payload = this.answers()[q.id] || {};
       this.autosaveStatus.set('Saving...');
-      this.learnerService.saveAnswer(att.attempt_id, q.id, this.answers()[q.id]).subscribe({
+      this.learnerService.saveAnswer(att.attempt_id, q.id, payload).subscribe({
         next: () => this.autosaveStatus.set('Autosaved'),
         error: () => this.autosaveStatus.set('Saved locally'),
       });
@@ -434,10 +469,8 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
         this.activeAttempt.set(null);
         this.router.navigate(['/learner/results']);
       },
-      error: () => {
-        alert('Assessment submitted successfully.');
-        this.activeAttempt.set(null);
-        this.router.navigate(['/learner/results']);
+      error: (err) => {
+        alert(err?.error?.detail || 'Failed to submit assessment.');
       },
     });
   }

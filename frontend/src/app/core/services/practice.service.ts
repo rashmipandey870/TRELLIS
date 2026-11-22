@@ -90,4 +90,12 @@ export class PracticeService {
       context,
     });
   }
+
+  getWeeklyStudyPlan(): Observable<any> {
+    return this.http.get<any>('/api/v1/practice/study-plan');
+  }
+
+  getPracticeHistory(): Observable<any[]> {
+    return this.http.get<any[]>('/api/v1/practice/history');
+  }
 }

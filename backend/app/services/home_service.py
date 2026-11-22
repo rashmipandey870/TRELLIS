@@ -14,12 +14,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.uow import UnitOfWork
 from app.models import AuditLog, EvidenceRecord, RoleRequirement, Skill, User
+from app.models.batches import Batch, MentorLearnerAssignment
 from app.models.curriculum import Cohort, Course, Enrolment, Module, Pathway
+from app.models.meetings import Meeting, MeetingAudience
 
 
 def compute_evidence_label(sample_size: int) -> tuple[str, str]:
@@ -245,52 +247,67 @@ def get_home_data(session: Session, user_id: str, org_id: str) -> dict[str, Any]
         "weekly_history": weekly_history,
     }
 
-    # 5. Upcoming Cohort Calendar Sessions
-    sessions_data: list[dict[str, Any]] = []
+    # 5. Upcoming Cohort Calendar Sessions (Queried from real DB state)
     if enrolment and enrolment.cohort_id:
         cohort = session.get(Cohort, enrolment.cohort_id)
-        cohort_name = cohort.name if cohort else "Cohort Nova 2026"
+        default_cohort_name = cohort.name if cohort else "General"
     else:
-        cohort_name = "Cohort Nova (Nov 2026)"
+        default_cohort_name = "General"
 
-    # Live scheduled sessions
-    sessions_data = [
-        {
-            "id": "ses-live-401",
-            "title": "Fault Injection Lab: Chaos Engineering with Litmus",
-            "cohort_name": cohort_name,
-            "trainer_name": "Anand Kumar (Principal Architect)",
-            "starts_at": (now + timedelta(days=1, hours=2)).isoformat(),
-            "duration_minutes": 90,
-            "meeting_link": "https://meet.csmtech.internal/cohort-nova-lab",
-            "session_type": "LAB",
-        },
-        {
-            "id": "ses-live-402",
-            "title": "1-on-1 Mentorship & Growth Ring Review",
-            "cohort_name": cohort_name,
-            "trainer_name": "Devika Ray (Lead SRE)",
-            "starts_at": (now + timedelta(days=3, hours=4)).isoformat(),
-            "duration_minutes": 45,
-            "meeting_link": "https://meet.csmtech.internal/priya-devika-sync",
-            "session_type": "MENTOR_1ON1",
-        },
-    ]
+    # Determine learner's batch if assigned
+    assignment = (
+        session.execute(
+            select(MentorLearnerAssignment).where(MentorLearnerAssignment.learner_id == user.id)
+        )
+        .scalars()
+        .first()
+    )
+    user_batch_id = assignment.batch_id if assignment else None
 
-    # 6. Greenhouse Spotlight (Disabled as Phase 3 Upcoming per Requirement 4)
-    greenhouse_data = {
-        "id": "idea-featured-01",
-        "title": "Automated Canary Rollouts with eBPF Latency Telemetry",
-        "summary": (
-            "Proposing dynamic service mesh filters correlating Prometheus p99 latency spikes "
-            "during canary deployment stages to automatically halt promotion before user impact."
-        ),
-        "author_name": "Rohan Verma",
-        "author_role": "Senior SRE, Infrastructure Team",
-        "upvotes_count": 42,
-        "status": "PHASE_3_PREVIEW",
-        "tags": ["eBPF", "Canary", "SRE", "Observability"],
-    }
+    meeting_conditions = [MeetingAudience.learner_id == user.id]
+    if user_batch_id:
+        meeting_conditions.append(MeetingAudience.batch_id == user_batch_id)
+        meeting_conditions.append(Meeting.batch_id == user_batch_id)
+
+    db_meetings = (
+        session.execute(
+            select(Meeting)
+            .outerjoin(MeetingAudience, MeetingAudience.meeting_id == Meeting.id)
+            .where(
+                Meeting.status == "SCHEDULED",
+                or_(*meeting_conditions),
+            )
+            .distinct()
+            .order_by(Meeting.meeting_date.asc(), Meeting.start_time.asc())
+            .limit(5)
+        )
+        .scalars()
+        .all()
+    )
+
+    sessions_data: list[dict[str, Any]] = []
+    for m in db_meetings:
+        batch_name = m.batch.name if m.batch else default_cohort_name
+        starts_at_str = (
+            f"{m.meeting_date}T{m.start_time}:00"
+            if "T" not in m.meeting_date
+            else m.meeting_date
+        )
+        sessions_data.append(
+            {
+                "id": m.id,
+                "title": m.title,
+                "cohort_name": batch_name,
+                "trainer_name": m.mentor.full_name if m.mentor else "TBD",
+                "starts_at": starts_at_str,
+                "duration_minutes": m.duration_minutes,
+                "meeting_link": m.meeting_link,
+                "session_type": "MEETING",
+            }
+        )
+
+    # 6. Greenhouse Spotlight (None until Phase 3)
+    greenhouse_data = None
 
     return {
         "profile": profile_data,
