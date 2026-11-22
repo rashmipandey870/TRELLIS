@@ -31,7 +31,8 @@ from app.models.practice import (
 )
 from app.models.settings import SystemSetting
 from app.models.user import User
-from app.services.ai_question_generator import compute_question_hash, generate_ai_practice_problem
+from app.services.ai_question_generator import compute_question_hash
+from app.ai.gateway import ai_gateway
 from app.services.code_runner import CodeRunner
 
 # Supported Practice Fields
@@ -434,35 +435,14 @@ def generate_practice_question(
             if h:
                 seen_hashes.add(h)
 
-    # 1. Generate problem dynamically using AI generator (Live LLM or Procedural Engine)
-    try:
-        selected_tmpl = generate_ai_practice_problem(
-            field=target_field,
-            difficulty=target_diff,
-            mode=target_mode,
-            seen_hashes=seen_hashes,
-        )
-    except Exception:
-        # Fallback to verified template library if generation encountered an unexpected exception
-        templates = VERIFIED_TEMPLATES.get(target_field, VERIFIED_TEMPLATES["Python"]).get(target_mode, [])
-        if not templates:
-            templates = VERIFIED_TEMPLATES["Python"][target_mode]
-        selected_tmpl = next((t for t in templates if t.get("difficulty") == target_diff), templates[0])
-
-    # If Coding problem, verify reference solution through sandbox before saving
-    if target_mode == "CODING" and selected_tmpl.get("reference_solution") and selected_tmpl.get("test_cases"):
-        ref_code = selected_tmpl["reference_solution"]
-        test_cases = selected_tmpl["test_cases"]
-        code_lang = selected_tmpl.get("language") or "python"
-        exec_res = CodeRunner.execute(
-            code=ref_code,
-            language=code_lang,
-            test_cases=test_cases,
-            time_limit_ms=3000,
-            mask_hidden_inputs=False,
-        )
-        if exec_res.verdict != "ACCEPTED":
-            raise RuntimeError(f"Sandbox verification failed for generated problem: {exec_res.verdict}")
+    # 1. Generate problem dynamically using AI Gateway never-fail ladder
+    selected_tmpl = ai_gateway.generate_practice_problem(
+        field=target_field,
+        difficulty=target_diff,
+        mode=target_mode,
+    )
+    if "source" not in selected_tmpl:
+        selected_tmpl["source"] = selected_tmpl.get("provenance", {}).get("served_from", "llm")
 
     # Create session if not active
     practice_session = PracticeSession(

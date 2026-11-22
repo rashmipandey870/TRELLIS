@@ -170,4 +170,32 @@ export class AdminService {
   getTalentSpotlight(): Observable<any[]> {
     return this.http.get<any[]>('/api/v1/admin/talent-spotlight');
   }
+
+  getAIHealth(): Observable<AIHealthData> {
+    return this.http.get<AIHealthData>('/api/v1/admin/ai/health');
+  }
+
+  manageCircuitBreaker(action: 'trip' | 'reset'): Observable<any> {
+    return this.http.post('/api/v1/admin/ai/circuit-breaker', { action });
+  }
+
+  refillAIPool(): Observable<any> {
+    return this.http.post('/api/v1/admin/ai/pool/refill', {});
+  }
+}
+
+export interface AIHealthData {
+  status: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+  primary_provider: string;
+  active_instruct_model: string;
+  active_code_model: string;
+  circuit_breaker_state: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+  total_requests: number;
+  success_rate_percent: number;
+  validation_pass_rate_percent: number;
+  pool_counts: Record<string, number>;
+  queue_depth: number;
+  alerts: string[];
 }

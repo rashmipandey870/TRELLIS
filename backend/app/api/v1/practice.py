@@ -132,7 +132,24 @@ def generate_question(
             else None
         )
 
-        source_label = data.get("source", "template")
+        source_label = "llm" if data.get("provenance") or data.get("source") == "llm" else data.get("source", "llm")
+
+        # Determine proper starter code matching field/language
+        lang_key = (data.get("language") or ("sql" if "sql" in pq.field.lower() else "python")).lower()
+        default_starter = (
+            {"sql": "-- Write your SQL query here\nSELECT "}
+            if lang_key in ("sql", "sqlite", "postgresql")
+            else (
+                {"java": "import java.util.Scanner;\n\npublic class Solution {\n    public static void main(String[] args) {\n    }\n}"}
+                if lang_key == "java"
+                else (
+                    {"javascript": "function solve() {\n}"}
+                    if lang_key in ("javascript", "js")
+                    else {"python": "def solve():\n    pass"}
+                )
+            )
+        )
+        starter_code = data.get("starter_code") or default_starter
 
         # Explicitly omit 'explanation' and 'correct_answer' from generation response
         return {
@@ -155,16 +172,18 @@ def generate_question(
             "options": formatted_options,
             "constraints": data.get("constraints"),
             "examples": data.get("examples"),
-            "starter_code": data.get("starter_code", {"python": "def solve():\n    pass"}),
+            "starter_code": starter_code,
             "sample_cases": sample_cases,
+            "provenance": data.get("provenance"),
             "question_data": {
                 "question": data.get("question") or data.get("statement"),
                 "options": formatted_options if pq.mode == "MCQ" else None,
                 "constraints": data.get("constraints"),
                 "examples": data.get("examples"),
-                "starter_code": data.get("starter_code"),
+                "starter_code": starter_code,
                 "sample_cases": sample_cases,
                 "source": source_label,
+                "provenance": data.get("provenance"),
             },
         }
     except HTTPException:

@@ -32,6 +32,7 @@ from app.models.meetings import Meeting, MeetingAttendance
 from app.models.practice import PracticeAttempt, PracticeScore, TalentAlert
 from app.models.settings import SystemSetting
 from app.models.user import User
+from app.ai.gateway import ai_gateway
 
 router = APIRouter(prefix="/admin", tags=["Admin Portal"])
 
@@ -773,3 +774,49 @@ def update_setting_by_key(
 
     db.commit()
     return {"message": "Setting updated.", "key": key, "value": payload.value}
+
+
+# --- AI Health, Circuit Breaker & Pool Endpoints ---
+
+class CircuitBreakerPayload(BaseModel):
+    action: str  # "trip" or "reset"
+
+
+@router.get("/ai/health", summary="Real-time AI gateway health, latency and pool metrics")
+def get_ai_health_metrics(
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    """Retrieve operational telemetry and circuit breaker state for TRELLIS AI."""
+    metrics = ai_gateway.get_health_metrics()
+    return metrics.model_dump()
+
+
+@router.post("/ai/circuit-breaker", summary="Manually trip or reset the AI circuit breaker")
+def manage_ai_circuit_breaker(
+    payload: CircuitBreakerPayload,
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    act = payload.action.lower().strip()
+    if act == "trip":
+        ai_gateway.circuit_breaker.trip()
+    elif act == "reset":
+        ai_gateway.circuit_breaker.reset()
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Allowed: 'trip', 'reset'.")
+    return {
+        "message": f"Circuit breaker state updated via operator action: {act}",
+        "state": ai_gateway.circuit_breaker.state,
+    }
+
+
+@router.post("/ai/pool/refill", summary="Trigger background replenishment of question pools")
+def trigger_ai_pool_refill(
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    ai_gateway.pool.refill_all()
+    return {
+        "message": "Question pool replenishment triggered.",
+        "pool_counts": ai_gateway.pool.get_pool_counts(),
+    }
