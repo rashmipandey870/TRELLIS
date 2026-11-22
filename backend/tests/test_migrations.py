@@ -69,3 +69,12 @@ def test_migration_0006_definition() -> None:
     assert hasattr(mod, "upgrade")
     assert hasattr(mod, "downgrade")
 
+
+def test_migration_0007_definition() -> None:
+    """Verify Migration 0007 covers must_change_password and links to 0006."""
+    mod = load_migration_module("0007_user_must_change_password.py")
+    assert mod.revision == "0007_user_must_change_password"
+    assert mod.down_revision == "0006_assessment_categories_and_reports"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+

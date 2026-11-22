@@ -246,7 +246,11 @@ def login_flow(
     tokens = issue_tokens_for_user(
         session, user, roles, device_info, ip_address, request_id=request_id
     )
-    return LoginResponse(mfa_required=False, tokens=tokens)
+    return LoginResponse(
+        mfa_required=False,
+        must_change_password=getattr(user, "must_change_password", False),
+        tokens=tokens,
+    )
 
 
 def issue_tokens_for_user(

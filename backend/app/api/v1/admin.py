@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import csv
 import io
+import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -121,13 +122,15 @@ def create_user(
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Email '{payload.email}' already exists.")
 
+    one_time_pwd = payload.password or secrets.token_urlsafe(12)
     new_user = User(
         org_id=admin.org_id,
         email=payload.email,
-        password_hash=hash_password(payload.password),
+        password_hash=hash_password(one_time_pwd),
         full_name=payload.full_name,
         role=payload.role.upper(),
         is_active=True,
+        must_change_password=True,
     )
     db.add(new_user)
     db.commit()
@@ -138,6 +141,8 @@ def create_user(
         "full_name": new_user.full_name,
         "role": new_user.role,
         "is_active": new_user.is_active,
+        "must_change_password": True,
+        "one_time_password": one_time_pwd,
     }
 
 
@@ -210,8 +215,8 @@ def bulk_import_users(
     reader = csv.DictReader(io.StringIO(content))
 
     created_count = 0
+    created_users = []
     errors = []
-    default_hash = hash_password("CSMTrellis2026!")
 
     for row_idx, row in enumerate(reader, start=1):
         email = row.get("email", "").strip()
@@ -229,19 +234,22 @@ def bulk_import_users(
             errors.append(f"Row {row_idx}: email '{email}' already registered")
             continue
 
+        one_time_pwd = secrets.token_urlsafe(12)
         u = User(
             org_id=admin.org_id,
             email=email,
-            password_hash=default_hash,
+            password_hash=hash_password(one_time_pwd),
             full_name=name,
             role=role,
             is_active=True,
+            must_change_password=True,
         )
         db.add(u)
         created_count += 1
+        created_users.append({"email": email, "one_time_password": one_time_pwd})
 
     db.commit()
-    return {"created_count": created_count, "errors": errors}
+    return {"created_count": created_count, "users": created_users, "errors": errors}
 
 
 # --- Batch Management Endpoints ---

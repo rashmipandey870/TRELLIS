@@ -8,9 +8,15 @@
 
 ## 1. Code Execution & Sandboxing
 - **Production Mode (`TRELLIS_ENV != dev`)**: The backend strictly refuses to start if no isolated code runner is configured. Supported isolated runners are `Judge0Runner` (via self-hosted Judge0 instance) and `DockerRunner` (`docker run --network none --memory 256m --cpus 1.0 --read-only --pids-limit 64`).
+- **Runner Startup Self-Test & Queue Concurrency**: All runners implement `startup_self_test()`. An in-process concurrency limiter (`BoundedSemaphore(10)`) rejects excess runs with `QUEUE_LIMIT_EXCEEDED` to ensure background workers and API threads are never starved.
 - **Development Mode (`TRELLIS_ENV = dev`)**: `LocalSubprocessRunner` runs locally in isolated temporary directories with an empty environment (`env={}`) and CPU/memory/process limits via `resource.setrlimit`.
 - **Supported Languages**: Python 3, Node.js (JavaScript), Java 21, and GCC/G++ (C/C++).
 - **Simulated Execution**: Simulated or fake passes have been completely removed. Missing compilers or runtime errors return real internal/runner unavailable errors, never an ACCEPTED verdict.
+
+## 2. Platform Security & Integrity Controls (WS0)
+- **Credential Hygiene & Secret Zero-Default**: Default database credentials (`DATABASE_URL`, `DATABASE_MIGRATION_URL`) have been completely purged from source configuration. The server fails fast on startup if `DATABASE_URL` is omitted. CI secret scanning (Gitleaks) and pre-commit hooks protect against accidental leaks.
+- **Manual Grading Bounds & Override Audit**: Manual grade submissions (`POST /mentor/assessments/attempts/{id}/grade`) strictly enforce `0 <= score_awarded <= question marks` (HTTP 422 on out-of-bounds). Any modification or override of an auto-graded or previously recorded score requires a non-empty `override_reason` (HTTP 400 if missing) and logs an immutable `GRADE_OVERRIDE` record in the `AuditLog`.
+- **Forced Password Change Lifecycle**: User creation and bulk user import generate unique cryptographically random one-time passwords (`secrets.token_urlsafe(12)`) and flag `must_change_password=True`. Users cannot access protected APIs until completing `POST /api/v1/auth/change-password` (enforced via 403 `MUST_CHANGE_PASSWORD` dependency guards). No shared default passwords exist anywhere in the application.
 
 ## 2. Assessment Engine & 7 Question Categories
 - **Audience Enforcement**: Only learners belonging to an assessment's assigned batch or explicit audience table (`AssessmentAudience`) can access, start, autosave, or submit assessments.

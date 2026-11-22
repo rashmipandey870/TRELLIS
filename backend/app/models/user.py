@@ -27,6 +27,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     role: Mapped[str] = mapped_column(String(32), default="LEARNER", index=True, nullable=False)  # ADMIN, MENTOR, LEARNER
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Per-employee cryptographic salt for Evidence Ledger pseudonymisation (DPDP Crypto-Shredding)
     pseudonym_salt: Mapped[str | None] = mapped_column(String(64), nullable=True)

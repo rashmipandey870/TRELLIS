@@ -278,6 +278,7 @@ class AnswerGradeItem(BaseModel):
     answer_id: str
     score_awarded: float
     feedback: str | None = None
+    override_reason: str | None = None
 
 
 class GradeAttemptRequest(BaseModel):
@@ -350,6 +351,7 @@ class AnswerGradeItem(BaseModel):
     answer_id: str
     score_awarded: float
     feedback: str | None = None
+    override_reason: str | None = None
 
 
 class GradeAttemptRequest(BaseModel):
@@ -1624,9 +1626,53 @@ def grade_attempt_answers(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attempt not found.")
 
     grade_map = {g.answer_id: g for g in payload.grades}
+    q_marks_map = {q.bank_question_id: float(q.marks) for q in attempt.assessment.questions}
+
     for ans in attempt.answers:
         if ans.id in grade_map:
             item = grade_map[ans.id]
+            qid = getattr(ans, "bank_question_id", getattr(ans, "question_id", None))
+            max_marks = q_marks_map.get(qid, float(getattr(getattr(ans, "question", None), "marks", 10.0)))
+            
+            # 0.2 Bounds validation: 0 <= score_awarded <= question marks
+            if item.score_awarded < 0 or item.score_awarded > max_marks:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Score awarded ({item.score_awarded}) for answer '{ans.id}' must be between 0 and maximum question marks ({max_marks}).",
+                )
+
+            # 0.2 Audit logging for overrides of auto-graded scores
+            was_auto_graded = getattr(ans, "grading_status", None) == "GRADED" and ans.score_awarded is not None
+            if was_auto_graded and float(ans.score_awarded) != float(item.score_awarded):
+                reason = (item.override_reason or item.feedback or "").strip()
+                if not reason:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Overriding auto-graded score for answer '{ans.id}' requires an override reason.",
+                    )
+                audit = AuditLog(
+                    org_id=mentor.org_id,
+                    actor_id=mentor.id,
+                    action="GRADE_OVERRIDE",
+                    resource="assessment_answers",
+                    resource_id=ans.id,
+                    reason=reason,
+                    before_state_json={
+                        "attempt_id": attempt.id,
+                        "question_id": qid,
+                        "old_score": float(ans.score_awarded),
+                        "grading_status": ans.grading_status,
+                    },
+                    after_state_json={
+                        "attempt_id": attempt.id,
+                        "question_id": qid,
+                        "new_score": float(item.score_awarded),
+                        "grading_status": "GRADED",
+                        "override_reason": reason,
+                    },
+                )
+                db.add(audit)
+
             ans.score_awarded = float(item.score_awarded)
             ans.mentor_feedback = item.feedback
             ans.grading_status = "GRADED"

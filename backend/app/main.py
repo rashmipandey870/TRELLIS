@@ -24,7 +24,19 @@ from app.core.config import settings
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager handling startup and shutdown events."""
-    # Startup
+    # Startup validation
+    if not settings.DATABASE_URL:
+        raise RuntimeError(
+            "CRITICAL: DATABASE_URL is missing. Specify DATABASE_URL via environment variables or secret store."
+        )
+
+    # In production environments, verify isolated runner passes startup self-test
+    if settings.TRELLIS_ENV != "dev":
+        from app.services.code_runner import get_code_runner
+        runner = get_code_runner()
+        if hasattr(runner, "startup_self_test"):
+            runner.startup_self_test()
+
     print(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} [{settings.TRELLIS_ENV}]")
     print(f"Tagline: {settings.TAGLINE}")
     yield

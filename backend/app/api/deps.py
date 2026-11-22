@@ -99,6 +99,7 @@ def get_current_user_claims(
 
 
 def get_current_user(
+    request: Request,
     claims: dict[str, Any] = Depends(get_current_user_claims),
     db: Session = Depends(get_db),
 ) -> User:
@@ -116,6 +117,16 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or account is deactivated.",
         )
+
+    # Invariant: Enforce password change at initial login
+    if getattr(user, "must_change_password", False):
+        path = request.url.path
+        allowed_paths = {"/api/v1/auth/change-password", "/api/v1/auth/logout", "/api/v1/auth/me"}
+        if path not in allowed_paths:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="MUST_CHANGE_PASSWORD: You must update your temporary password before accessing platform resources.",
+            )
 
     return user
 

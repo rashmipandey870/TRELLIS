@@ -32,13 +32,9 @@ class Settings(BaseSettings):
     def ENVIRONMENT(self, val: str) -> None:
         self.TRELLIS_ENV = val
 
-    # Database Configuration (Defaults to shared Neon Serverless PostgreSQL Cloud Database)
-    DATABASE_URL: str = (
-        "postgresql+psycopg2://neondb_owner:REDACTED_PASSWORD@ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-    )
-    DATABASE_MIGRATION_URL: str = (
-        "postgresql+psycopg2://neondb_owner:REDACTED_PASSWORD@ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-    )
+    # Database Configuration (Secrets must be provided via environment variables or secret store)
+    DATABASE_URL: str = ""
+    DATABASE_MIGRATION_URL: str = ""
 
     # Redis Cache & Message Broker
     REDIS_URL: str = "redis://127.0.0.1:6379/0"

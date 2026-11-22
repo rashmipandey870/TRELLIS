@@ -5,10 +5,11 @@ from typing import Any
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, get_current_user_claims, get_db
-from app.core.security import get_jwks
-from app.models import User
+from app.api.deps import get_current_user, get_current_user_claims, get_db, get_uow
+from app.core.security import get_jwks, hash_password, verify_password
+from app.models import AuditLog, User
 from app.schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
     MfaChallengeRequest,
@@ -150,8 +151,38 @@ def get_me(
         avatar_url=current_user.avatar_url,
         roles=roles,
         role=primary_role,
+        must_change_password=getattr(current_user, "must_change_password", False),
         preferences_json=current_user.preferences_json,
     )
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK, summary="Change user password")
+def change_password(
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    """Force or voluntary user password update."""
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password incorrect.")
+    if payload.new_password == payload.current_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="New password cannot be identical to current password.")
+
+    current_user.password_hash = hash_password(payload.new_password)
+    current_user.must_change_password = False
+
+    audit = AuditLog(
+        org_id=current_user.org_id,
+        actor_id=current_user.id,
+        action="PASSWORD_CHANGE",
+        resource="users",
+        resource_id=current_user.id,
+        reason="User updated password.",
+    )
+    db.add(audit)
+    db.commit()
+    return {"message": "Password updated successfully."}
 
 
 @router.get("/sessions", response_model=list[SessionInfoResponse], status_code=status.HTTP_200_OK)

@@ -261,6 +261,10 @@ class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     attempt: Mapped["AssessmentAttempt"] = relationship("AssessmentAttempt", back_populates="answers")
     question: Mapped["QuestionBank"] = relationship("QuestionBank")
 
+    @property
+    def question_id(self) -> str:
+        return self.bank_question_id
+
 
 class Submission(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Code submission executed and evaluated against test cases."""

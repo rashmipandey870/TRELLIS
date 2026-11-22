@@ -1,0 +1,18 @@
+title = "TRELLIS Gitleaks Secret Scanner Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlists for harmless test strings and non-sensitive hashes"
+paths = [
+    '''backend/tests/.*''',
+    '''frontend/test-results/.*''',
+    '''backend/\.env\.example''',
+    '''docker-compose\.yml''',
+]
+regexes = [
+    '''gAAAAABnhX-dummy-fernet-key-32bytes-base64-dev-only=''',
+    '''trellis-secret-key-salt-2026''',
+    '''trellis-ledger-pseudonym-salt-2026''',
+]

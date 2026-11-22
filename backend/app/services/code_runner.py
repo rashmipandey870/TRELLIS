@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -95,6 +96,11 @@ class BaseCodeRunner(ABC):
         """Execute source code against test cases within resource constraints."""
         pass
 
+    @abstractmethod
+    def startup_self_test(self) -> bool:
+        """Verify runner availability and isolation constraints on startup."""
+        pass
+
 
 class Judge0Runner(BaseCodeRunner):
     """Production isolated execution via self-hosted or cloud Judge0 instance."""
@@ -119,6 +125,21 @@ class Judge0Runner(BaseCodeRunner):
     def __init__(self, base_url: str | None = None, api_key: str | None = None):
         self.base_url = (base_url or settings.JUDGE0_URL).rstrip("/")
         self.api_key = api_key or settings.JUDGE0_API_KEY
+
+    def startup_self_test(self) -> bool:
+        """Verify Judge0 connectivity and healthy isolated execution environment."""
+        url = self.base_url
+        headers = {"User-Agent": "TRELLIS-CodeRunner/1.0"}
+        if self.api_key:
+            headers["X-Auth-Token"] = self.api_key
+        try:
+            req = urllib.request.Request(f"{url}/about", headers=headers)
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    return True
+                raise RuntimeError(f"Judge0 health endpoint returned HTTP {resp.status}")
+        except Exception as e:
+            raise RuntimeError(f"FATAL: Production isolated runner self-test failed (Judge0 at {url}): {e}") from e
 
     def execute(
         self,
@@ -309,6 +330,19 @@ class DockerRunner(BaseCodeRunner):
         "cpp": "gcc:13-alpine",
         "c++": "gcc:13-alpine",
     }
+
+    def startup_self_test(self) -> bool:
+        """Verify Docker daemon is active and accessible for isolated execution."""
+        docker_bin = shutil.which("docker")
+        if not docker_bin:
+            raise RuntimeError("FATAL: Production isolated runner self-test failed: 'docker' CLI not found on system PATH.")
+        try:
+            res = subprocess.run([docker_bin, "info"], capture_output=True, timeout=5.0)
+            if res.returncode != 0:
+                raise RuntimeError(f"Docker daemon not running: {res.stderr.decode('utf-8', errors='ignore')}")
+            return True
+        except Exception as e:
+            raise RuntimeError(f"FATAL: Production isolated runner self-test failed: {e}") from e
 
     def execute(
         self,
@@ -517,6 +551,12 @@ class LocalSubprocessRunner(BaseCodeRunner):
             "SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. "
             "Never use in production (TRELLIS_ENV != dev)!"
         )
+
+    def startup_self_test(self) -> bool:
+        """Verify dev execution constraints."""
+        if getattr(settings, "TRELLIS_ENV", "dev") != "dev":
+            raise RuntimeError("FATAL: LocalSubprocessRunner is strictly prohibited outside TRELLIS_ENV=dev.")
+        return True
 
     def execute(
         self,
@@ -1052,6 +1092,9 @@ class LocalSubprocessRunner(BaseCodeRunner):
         )
 
 
+_RUNNER_SEMAPHORE = threading.BoundedSemaphore(int(os.getenv("MAX_CONCURRENT_CODE_RUNS", "10")))
+
+
 class CodeRunner:
     """Public gateway and factory for Sandboxed Code Execution."""
 
@@ -1078,6 +1121,12 @@ class CodeRunner:
             return LocalSubprocessRunner()
 
     @classmethod
+    def startup_self_test(cls) -> bool:
+        """Run startup self-test against configured runner."""
+        runner = cls.get_runner()
+        return runner.startup_self_test()
+
+    @classmethod
     def execute(
         cls,
         code: str,
@@ -1088,14 +1137,33 @@ class CodeRunner:
         mask_hidden_inputs: bool = False,
         is_custom_run: bool = False,
     ) -> ExecutionResult:
-        """Execute code using the configured runner."""
-        runner = cls.get_runner()
-        return runner.execute(
-            code=code,
-            language=language,
-            test_cases=test_cases,
-            time_limit_ms=time_limit_ms,
-            memory_limit_mb=memory_limit_mb,
-            mask_hidden_inputs=mask_hidden_inputs,
-            is_custom_run=is_custom_run,
-        )
+        """Execute code using the configured runner with concurrency and queue controls."""
+        acquired = _RUNNER_SEMAPHORE.acquire(timeout=10.0)
+        if not acquired:
+            return ExecutionResult(
+                verdict="QUEUE_LIMIT_EXCEEDED",
+                passed_cases=0,
+                total_cases=len(test_cases),
+                runtime_ms=0,
+                memory_mb=0,
+                score=0,
+                compile_error="Code execution queue is saturated. Concurrency limit reached; please retry shortly.",
+            )
+        try:
+            runner = cls.get_runner()
+            return runner.execute(
+                code=code,
+                language=language,
+                test_cases=test_cases,
+                time_limit_ms=time_limit_ms,
+                memory_limit_mb=memory_limit_mb,
+                mask_hidden_inputs=mask_hidden_inputs,
+                is_custom_run=is_custom_run,
+            )
+        finally:
+            _RUNNER_SEMAPHORE.release()
+
+
+def get_code_runner() -> BaseCodeRunner:
+    """Module-level factory returning configured runner."""
+    return CodeRunner.get_runner()

@@ -30,9 +30,17 @@ class LoginResponse(BaseModel):
 
     mfa_required: bool = False
     mfa_enrolment_required: bool = False
+    must_change_password: bool = False
     mfa_ticket: str | None = None
     tokens: TokenResponse | None = None
     message: str | None = None
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload to update password upon forced change or voluntary reset."""
+
+    current_password: str
+    new_password: str = Field(..., min_length=8)
 
 
 class MfaChallengeRequest(BaseModel):
@@ -88,4 +96,5 @@ class UserMeResponse(BaseModel):
     avatar_url: str | None = None
     roles: list[str]
     role: str = "LEARNER"
+    must_change_password: bool = False
     preferences_json: dict[str, Any] | None = None
