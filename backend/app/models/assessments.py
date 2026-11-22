@@ -91,6 +91,10 @@ class CodingProblem(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     reference_solution: Mapped[str | None] = mapped_column(Text, nullable=True)
     problem_type: Mapped[str] = mapped_column(String(32), default="CODING", nullable=False)
     schema_ddl: Mapped[str | None] = mapped_column(Text, nullable=True)
+    entry_point: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    argument_schema: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, default=list, nullable=True)
+    wrong_stub: Mapped[str | None] = mapped_column(Text, nullable=True)
+    complexity_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
     bank_question: Mapped["QuestionBank | None"] = relationship("QuestionBank", back_populates="coding_problem")

@@ -13,7 +13,7 @@
     table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     th, td { padding: 12px; text-align: left; border-bottom: 1px solid #334155; }
     th { background: #0f172a; color: #94a3b8; }
-    pre { background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #cbd5e1; max-height: 250px; }
+    pre { background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #cbd5e1; max-height: 300px; }
   </style>
 </head>
 <body>
@@ -24,8 +24,8 @@
     <div class="summary-box">
       <strong>Overall Status:</strong> 
       <span class="badge-pass">100% RELEASE READY (ALL GATES PASSED)</span><br>
-      <strong>Executed At:</strong> 2026-11-22T16:54:15.076604+00:00<br>
-      <strong>Git Branch:</strong> master (rashmipandey870/TRELLIS)
+      <strong>Executed At:</strong> 2026-11-22T20:46:47.143979+00:00<br>
+      <strong>Target Repository:</strong> rashmipandey870/TRELLIS
     </div>
 
     <h2>Verification Stages</h2>
@@ -40,73 +40,170 @@
       <tbody>
 
         <tr>
-          <td><strong>Clean DB Baseline & Demo Seed</strong></td>
+          <td><strong>Clean DB Baseline & Enterprise Demo Seed</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>3.43s</td>
+          <td>20.59s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>🌱 Seeding TRELLIS Enterprise Demo Data Pack...
-✨ Demo Pack Seeding Complete! Summary:
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>Ensuring database at sqlite:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/release_gate_test.db is migrated to Alembic head...
+Database schema is at head.
+Seeding TRELLIS Enterprise Demo Data Pack...
+Demo Pack Seeding Complete! Summary:
   • Users: 42
-  • Question_bank: 304
+  • Question_bank: 352
   • Coding_problems: 24
   • Assessments: 12
-  • Attempts: 161
-  • Practice_attempts: 1728
+  • Attempts: 164
+  • Submissions: 468
+  • Practice_attempts: 900
   • Talent_alerts: 4
-  • Meetings: 6
+  • Meetings: 20
+  • Notifications: 211
+
+STDERR:
+INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001, Migration 0001: Core Tenancy, Identity, Consents & Immutable Audit
+INFO  [alembic.runtime.migration] Running upgrade 0001 -> 0002, Migration 0002: Skills Taxonomy & Cryptographic Evidence Ledger
+INFO  [alembic.runtime.migration] Running upgrade 0002 -> 0003, Migration 0003: Pathways, Courses, Modules, Cohorts, and Enrolments (Slice 1.6).
+INFO  [alembic.runtime.migration] Running upgrade 0003 -> 0004, Migration 0004: User Pseudonym Salt and Climbing Streak Tracking.
+INFO  [alembic.runtime.migration] Running upgrade 0004 -> 0004b, Migration 0004b: LMS, Assessments, Meetings, Practice & Platform Baseline.
+INFO  [alembic.runtime.migration] Running upgrade 0004b -> 0005, Migration 0005: Assessment Audience for Batch and Selected Learners.
+INFO  [alembic.runtime.migration] Running upgrade 0005 -> 0006, Migration 0006: Assessment Categories (7 Types), Manual Grading, and Growth Ring Reports.
+INFO  [alembic.runtime.migration] Running upgrade 0006 -> 0007, Add must_change_password to users.
+INFO  [alembic.runtime.migration] Running upgrade 0007 -> 0008, Add category to question_bank.
+INFO  [alembic.runtime.migration] Running upgrade 0008 -> 0009, Create ai_question_pool table for database-persisted verified question pool.
+INFO  [alembic.runtime.migration] Running upgrade 0009 -> 0010, Add judge format columns to coding_problems table.
 </pre></details></td>
         </tr>
 
         <tr>
-          <td><strong>Backend Pytest Suite</strong></td>
+          <td><strong>Demo Data Integrity Verification</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>9.80s</td>
+          <td>0.05s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre> PASSED          [ 72%]
-tests/test_migrations.py::test_migration_0003_definition PASSED          [ 75%]
-tests/test_migrations.py::test_migration_0004_definition PASSED          [ 77%]
-tests/test_migrations.py::test_migration_0004b_definition PASSED         [ 80%]
-tests/test_migrations.py::test_migration_0005_definition PASSED          [ 83%]
-tests/test_migrations.py::test_migration_0006_definition PASSED          [ 86%]
-tests/test_migrations.py::test_migration_0007_definition PASSED          [ 88%]
-tests/test_migrations.py::test_migration_0008_definition PASSED          [ 91%]
-tests/test_migrations.py::test_migration_0009_definition PASSED          [ 94%]
-tests/test_migrations.py::test_alembic_upgrade_head_on_clean_database PASSED [ 97%]
-tests/test_migrations.py::test_schema_model_drift_check PASSED           [100%]
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>  • users                 :    42 records (min required:   40) [PASS]
+  • question_bank         :   353 records (min required:  300) [PASS]
+  • coding_problems       :    24 records (min required:   20) [PASS]
+  • assessments           :    12 records (min required:   10) [PASS]
+  • assessment_attempts   :   164 records (min required:  150) [PASS]
+  • submissions           :   468 records (min required:  400) [PASS]
+  • practice_attempts     :   900 records (min required:  600) [PASS]
+  • meetings              :    20 records (min required:   18) [PASS]
+  • notifications         :   211 records (min required:  150) [PASS]</pre></details></td>
+        </tr>
 
-============================== warnings summary ===============================
+        <tr>
+          <td><strong>Coding Pack Verification Gate</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>32.80s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>bprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in production (TRELLIS_ENV != dev)!
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Answer-Key Distribution & Likert Tests</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>2.97s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.5.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 2 items
+
+tests/test_answer_key_distribution.py::test_mcq_answer_key_distribution_is_balanced PASSED [ 50%]
+tests/test_answer_key_distribution.py::test_psychometric_likert_dimensions_and_rubrics PASSED [100%]
+
+============================== 2 passed in 1.45s ==============================
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Full Backend Pytest Suite</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>71.03s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>=================
+..\..\fresh_venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_code_runner_security_abuse.py::test_manual_grading_bounds_validation
+  C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend\tests\test_code_runner_security_abuse.py:237: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    grade_attempt_answers(
+
+tests/test_code_runner_security_abuse.py::test_manual_grading_bounds_validation
+  C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend\tests\test_code_runner_security_abuse.py:251: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    grade_attempt_answers(
+
+tests/test_key_rotation.py::test_asymmetric_key_rotation_multiple_jwks_and_backwards_compatibility
+  C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Lib\site-packages\jwt\api_jwt.py:149: InsecureKeyLengthWarning: The HMAC key is 12 bytes long, which is below the minimum recommended length of 32 bytes for SHA256. See RFC 7518 Section 3.2.
+    return self._jws.encode(
+
 tests/test_migrations.py::test_alembic_upgrade_head_on_clean_database
 tests/test_migrations.py::test_schema_model_drift_check
   C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Lib\site-packages\alembic\config.py:572: DeprecationWarning: No path_separator found in configuration; falling back to legacy splitting on spaces/commas for version_locations.  Consider adding path_separator=os to Alembic config.
     util.warn_deprecated(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================= 36 passed, 2 warnings in 7.94s ========================
+============ 179 passed, 5 skipped, 6 warnings in 67.26s (0:01:07) ============
 </pre></details></td>
         </tr>
 
         <tr>
-          <td><strong>Frontend Production Build</strong></td>
+          <td><strong>Frontend Production Build (Angular 22)</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>10.90s</td>
+          <td>19.09s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>unk-2IBlMHg-.js     | learner-assessments-component |  18.13 kB |                 4.58 kB
-chunk-DRbNb70-.js     | csm-landing-component         |  14.57 kB |                 3.36 kB
-chunk-ydrMC1gS.js     | admin-dashboard-component     |  13.72 kB |                 3.47 kB
-chunk-Dhla_a9-.js     | mentor-learners-component     |  12.98 kB |                 3.63 kB
-chunk-wAFF7xXi.js     | admin-users-component         |  12.78 kB |                 3.35 kB
-chunk-B4-JhM0P.js     | admin-learners-component      |  12.43 kB |                 3.40 kB
-chunk-CBDvcmOe.js     | mentor-meetings-component     |  11.77 kB |                 3.12 kB
-chunk-DPSIo8gZ.js     | admin-batches-component       |  11.48 kB |                 2.74 kB
-chunk-C4956C0u.js     | learner-results-component     |   9.80 kB |                 2.80 kB
-chunk-BZHjzZF0.js     | change-password-component     |   8.01 kB |                 2.37 kB
-chunk-DWUW9wKw.js     | -                             |   8.00 kB |                 2.60 kB
-...and 12 more lazy chunks files. Use "--verbose" to show all the files.
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>499.24 kB |               121.17 kB
 
-Application bundle generation complete. [6.226 seconds] - 2026-11-22T16:54:14.280Z
+Lazy chunk files      | Names                         |  Raw size | Estimated transfer size
+chunk-Dh_rcRSD.js     | mentor-assessments-component  |  82.39 kB |                14.10 kB
+chunk-xDT-mAMW.js     | -                             |  26.28 kB |                 6.32 kB
+chunk-B5E92DCP.js     | learner-practice-component    |  21.83 kB |                 5.55 kB
+chunk-Dtp6mrwI.js     | learner-coding-component      |  18.91 kB |                 4.96 kB
+chunk-CbCDENeX.js     | learner-assessments-component |  18.13 kB |                 4.60 kB
+chunk-B18uM-K4.js     | csm-landing-component         |  14.57 kB |                 3.38 kB
+chunk-DFbYgzyN.js     | admin-dashboard-component     |  13.72 kB |                 3.49 kB
+chunk-CTGOsgFz.js     | mentor-learners-component     |  12.98 kB |                 3.63 kB
+chunk-DQ5jyH0W.js     | admin-users-component         |  12.78 kB |                 3.33 kB
+chunk-BBvBTO6T.js     | admin-learners-component      |  12.43 kB |                 3.40 kB
+chunk-ZO4nODrT.js     | mentor-meetings-component     |  11.77 kB |                 3.12 kB
+chunk-D_4EF5Tt.js     | admin-batches-component       |  11.48 kB |                 2.74 kB
+chunk-C4956C0u.js     | learner-results-component     |   9.80 kB |                 2.80 kB
+chunk-Cp05CPvk.js     | change-password-component     |   8.01 kB |                 2.36 kB
+chunk-C4-_a4KM.js     | -                             |   8.00 kB |                 2.60 kB
+...and 11 more lazy chunks files. Use "--verbose" to show all the files.
+
+Application bundle generation complete. [14.388 seconds] - 2026-11-22T20:46:45.691Z
 
 Output location: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\frontend\dist\frontend
 

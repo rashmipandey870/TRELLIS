@@ -1,16 +1,19 @@
-"""TRELLIS Release Gate Verification Script (Phase F).
+"""TRELLIS Enterprise Release Gate Verification Script (Phase 1.5).
 
-Executes end-to-end verification of the TRELLIS platform:
-1. Clean Database Migrations (Empty SQLite DB -> Alembic upgrade head -> 46+ tables)
-2. Enterprise Demo Pack Seeding (40 users, 304 questions, 24 coding problems, 12 assessments, 160+ attempts)
-3. Backend Portable Test Suite (Phase A, B, WS1, WS2, and Auth Matrix)
-4. Frontend Angular Production Build (npm run build)
-5. Generates RELEASE_REPORT.html with verifiable audit evidence.
+Cross-platform verification suite:
+1. Clean Database Migrations & Enterprise Demo Seed (Alembic upgrade head -> Seed 42 users, 304 questions, 24 coding problems, 400+ submissions, 19 meetings)
+2. Coding Pack Verification Gate (runs every reference solution & stub through judge harness)
+3. Answer-Key Distribution & Psychometric Likert Validation (<35% position bias, 8 dimensions)
+4. Full Portable Backend Pytest Suite (184 test items across security, auth, UoW, grading bounds)
+5. Data Integrity Checks (ensures required counts for manager-readiness)
+6. Frontend Angular Production Build (npm run build cross-platform)
+7. Generates comprehensive RELEASE_REPORT.html with verifiable audit evidence.
 """
 
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -18,30 +21,68 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 
-def run_step(step_name: str, cmd: list[str], cwd: Path | None = None) -> tuple[bool, str, float]:
+def run_step(step_name: str, cmd: list[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> tuple[bool, str, float]:
     print(f"\n=======================================================")
     print(f"▶ RUNNING: {step_name}")
-    print(f"  Command: {' '.join(cmd)}")
+    print(f"  Command: {' '.join(str(c) for c in cmd)}")
     print(f"=======================================================")
     start = time.time()
     try:
         proc = subprocess.run(
             cmd,
             cwd=str(cwd) if cwd else None,
+            env=env,
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=300,
         )
         duration = time.time() - start
         output = proc.stdout + ("\nSTDERR:\n" + proc.stderr if proc.stderr else "")
         success = (proc.returncode == 0)
         status_str = "✅ PASSED" if success else "❌ FAILED"
         print(f"{status_str} in {duration:.2f}s")
+        if not success:
+            print(f"Error summary: {output[-500:]}")
         return success, output, duration
     except Exception as exc:
         duration = time.time() - start
         print(f"❌ ERROR: {exc}")
         return False, str(exc), duration
+
+
+def check_data_integrity(db_path: Path) -> tuple[bool, str]:
+    import sqlite3
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+        
+        tables = [
+            ("users", 40),
+            ("question_bank", 300),
+            ("coding_problems", 20),
+            ("assessments", 10),
+            ("assessment_attempts", 150),
+            ("submissions", 400),
+            ("practice_attempts", 600),
+            ("meetings", 18),
+            ("notifications", 150),
+        ]
+        
+        report = []
+        all_ok = True
+        for table, min_expected in tables:
+            cursor.execute(f"SELECT COUNT(*) FROM {table}")
+            cnt = cursor.fetchone()[0]
+            status = "PASS" if cnt >= min_expected else "FAIL"
+            if cnt < min_expected:
+                all_ok = False
+            report.append(f"  • {table:<22}: {cnt:>5} records (min required: {min_expected:>4}) [{status}]")
+        
+        conn.close()
+        summary = "\n".join(report)
+        return all_ok, summary
+    except Exception as e:
+        return False, f"Data integrity query error: {e}"
 
 
 def main():
@@ -53,41 +94,54 @@ def main():
     print(f"🚀 TRELLIS Enterprise Release Gate Initiated")
     print(f"  Repository Root: {repo_root}")
     print(f"  Python Binary:   {python_exe}")
+    print(f"  Platform:        {sys.platform}")
     print(f"  Timestamp:       {datetime.now(UTC).isoformat()}\n")
 
     report_entries = []
     all_passed = True
 
-    # 1. Clean Database Migrations & Seed
+    # 1. Clean Database Migrations & Enterprise Demo Seed
     temp_db = repo_root / "release_gate_test.db"
     if temp_db.exists():
         temp_db.unlink()
 
     env_overrides = os.environ.copy()
-    env_overrides["DATABASE_URL"] = f"sqlite:///{temp_db}"
+    env_overrides["DATABASE_URL"] = f"sqlite:///{temp_db.as_posix()}"
 
-    # Seed demo pack (runs migrations automatically if needed)
     seed_cmd = [python_exe, "scripts/seed_demo_pack.py"]
-    ok, out, dur = run_step("Clean DB Baseline & Enterprise Demo Seed", seed_cmd, cwd=repo_root)
-    report_entries.append(("Clean DB Baseline & Demo Seed", ok, dur, out))
+    ok, out, dur = run_step("Clean DB Baseline & Enterprise Demo Seed", seed_cmd, cwd=repo_root, env=env_overrides)
+    report_entries.append(("Clean DB Baseline & Enterprise Demo Seed", ok, dur, out))
     if not ok: all_passed = False
 
-    # 2. Backend Test Suites
-    test_files = [
-        "tests/test_auth_matrix.py",
-        "tests/test_phase_b_features.py",
-        "tests/test_ai_gateway.py",
-        "tests/test_migrations.py",
-    ]
-    pytest_cmd = [python_exe, "-m", "pytest"] + test_files + ["-v"]
-    ok, out, dur = run_step("Backend Portable Pytest Suite", pytest_cmd, cwd=backend_dir)
-    report_entries.append(("Backend Pytest Suite", ok, dur, out))
+    # 2. Data Integrity Checks
+    ok_int, out_int = check_data_integrity(temp_db)
+    report_entries.append(("Demo Data Integrity Verification", ok_int, 0.05, out_int))
+    print(f"{'✅ PASSED' if ok_int else '❌ FAILED'} Data Integrity Verification:\n{out_int}")
+    if not ok_int: all_passed = False
+
+    # 3. Coding Pack Verification Gate
+    verify_pack_cmd = [python_exe, "scripts/verify_coding_pack.py"]
+    ok, out, dur = run_step("Coding Pack Judge Harness Gate", verify_pack_cmd, cwd=repo_root)
+    report_entries.append(("Coding Pack Verification Gate", ok, dur, out))
     if not ok: all_passed = False
 
-    # 3. Frontend Angular Production Build
-    build_cmd = ["cmd.exe", "/c", "npm", "run", "build"]
+    # 4. Answer-Key Distribution & Psychometric Likert
+    dist_cmd = [python_exe, "-m", "pytest", "tests/test_answer_key_distribution.py", "-v"]
+    ok, out, dur = run_step("Answer-Key Distribution & Likert Tests", dist_cmd, cwd=backend_dir)
+    report_entries.append(("Answer-Key Distribution & Likert Tests", ok, dur, out))
+    if not ok: all_passed = False
+
+    # 5. Full Backend Portable Pytest Suite
+    full_pytest_cmd = [python_exe, "-m", "pytest", "-v"]
+    ok, out, dur = run_step("Full Backend Pytest Suite", full_pytest_cmd, cwd=backend_dir)
+    report_entries.append(("Full Backend Pytest Suite", ok, dur, out))
+    if not ok: all_passed = False
+
+    # 6. Frontend Production Build (Cross-platform npm execution)
+    npm_bin = shutil.which("npm.cmd" if sys.platform == "win32" else "npm") or "npm"
+    build_cmd = [npm_bin, "run", "build"]
     ok, out, dur = run_step("Frontend Production Build (Angular 22)", build_cmd, cwd=frontend_dir)
-    report_entries.append(("Frontend Production Build", ok, dur, out))
+    report_entries.append(("Frontend Production Build (Angular 22)", ok, dur, out))
     if not ok: all_passed = False
 
     # Clean up test database
@@ -97,7 +151,7 @@ def main():
         except Exception:
             pass
 
-    # 4. Generate RELEASE_REPORT.html
+    # 7. Generate RELEASE_REPORT.html
     report_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -113,7 +167,7 @@ def main():
     table {{ width: 100%; border-collapse: collapse; margin-top: 1rem; }}
     th, td {{ padding: 12px; text-align: left; border-bottom: 1px solid #334155; }}
     th {{ background: #0f172a; color: #94a3b8; }}
-    pre {{ background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #cbd5e1; max-height: 250px; }}
+    pre {{ background: #0f172a; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px; color: #cbd5e1; max-height: 300px; }}
   </style>
 </head>
 <body>
@@ -123,9 +177,9 @@ def main():
     
     <div class="summary-box">
       <strong>Overall Status:</strong> 
-      <span class="{'badge-pass' if all_passed else 'badge-fail'}">{'100% RELEASE READY (ALL GATES PASSED)' if all_passed else 'GATES FAILED'}</span><br>
+      <span class="{'badge-pass' if all_passed else 'badge-fail'}">{'100% RELEASE READY (ALL GATES PASSED)' if all_passed else 'RELEASE GATES FAILED'}</span><br>
       <strong>Executed At:</strong> {datetime.now(UTC).isoformat()}<br>
-      <strong>Git Branch:</strong> master (rashmipandey870/TRELLIS)
+      <strong>Target Repository:</strong> rashmipandey870/TRELLIS
     </div>
 
     <h2>Verification Stages</h2>
@@ -148,7 +202,7 @@ def main():
           <td>{dur:.2f}s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>{out[-1500:] if len(out) > 1500 else out}</pre></details></td>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>{out[-2000:] if len(out) > 2000 else out}</pre></details></td>
         </tr>
 """
     report_html += """

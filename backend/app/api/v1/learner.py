@@ -343,6 +343,20 @@ def _execute_assessment_submit(
             )
             db.add(ans)
 
+        elif bq.question_type == "LIKERT":
+            selected_ids = user_ans.get("selected_options", [])
+            q_score = aq.marks if selected_ids else 0.0
+            earned_score += q_score
+
+            ans = Answer(
+                attempt_id=attempt.id,
+                bank_question_id=bq.id,
+                selected_option_ids_json=selected_ids,
+                score_awarded=q_score,
+                grading_status="GRADED",
+            )
+            db.add(ans)
+
         elif bq.question_type in ("CODING", "SQL") and bq.coding_problem:
             cp = bq.coding_problem
             best_sub = (
@@ -542,10 +556,21 @@ def start_assessment(
             "order": aq.sequence_order,
         }
         if bq.question_type == "MCQ":
+            import hashlib
+            import random
+            seed_int = int(hashlib.sha256(f"{attempt.id}:{bq.id}".encode()).hexdigest()[:8], 16)
+            opts_list = list(bq.options)
+            random.Random(seed_int).shuffle(opts_list)
+            q_item["options"] = [
+                {"id": opt.id, "text": opt.option_text, "order": idx + 1}
+                for idx, opt in enumerate(opts_list)
+            ]
+        elif bq.question_type == "LIKERT":
             q_item["options"] = [
                 {"id": opt.id, "text": opt.option_text, "order": opt.sequence_order}
-                for opt in bq.options
+                for opt in sorted(bq.options, key=lambda o: o.sequence_order)
             ]
+            q_item["rubric"] = bq.rubric_json or {}
         elif bq.question_type == "CODING" and bq.coding_problem:
             cp = bq.coding_problem
             # Show only sample test cases

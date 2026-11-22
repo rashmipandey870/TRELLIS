@@ -1,14 +1,20 @@
-"""TRELLIS Comprehensive Enterprise Demo Data Pack Seeder (Phase D).
+"""TRELLIS Comprehensive Enterprise Demo Data Pack Seeder (Phase D & Phase 1).
 
 Seeds:
-- 40 Users across 4 batches (1 Admin, 3 Mentors, 36 Learners) with realistic metadata
+- 42 Users across 4 batches (1 Admin, 5 Mentors, 36 Learners) with realistic metadata
 - ~304 Question Bank Items across all 7 Enterprise Policy Categories + Additional
-- 24 LeetCode-style Coding & SQL Problems across 5 languages (Python, SQL, Java, JS, C++) with test cases
+- 24 LeetCode-style Coding & SQL Problems across 5 languages (Python, SQL, Java, JS, C++) with test cases & judge harness
 - 12 Realistic Assessments across all lifecycle states (4 DRAFT, 2 SCHEDULED, 3 PUBLISHED, 3 CLOSED)
+- AssessmentAudience specific learner links
 - 180+ Assessment Attempts with bell-curve scores, submitted answers, and Growth Ring reports
+- 3 In-progress Assessment Attempts with autosave state
+- 12 Subjective Graded Answers with rubric evaluation
+- 400+ Coding Submissions across learners with realistic verdicts & runtimes
 - 600+ AI Practice Attempts & Dedication Scores across topics
 - 4 Real Talent Spotlight Alerts with mentor actions and scheduled meetings
-- In-app Notifications, Qualitative Mentor Remarks, and Immutable Audit Logs
+- 19 Diverse Meetings (12 completed with attendance, 2 live, 5 upcoming)
+- 200+ In-app Notifications (4-8 per user across all 42 users)
+- Qualitative Mentor Remarks, and Immutable Audit Logs
 """
 
 from __future__ import annotations
@@ -57,6 +63,7 @@ from app.models import (
     User,
 )
 from app.schemas.category import AssessmentCategory
+from app.services.code_runner import CodeRunner
 
 # Import fixtures
 from fixtures.technical_questions import TECHNICAL_QUESTIONS
@@ -78,7 +85,7 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
         session.add(org)
         session.flush()
 
-    # 2. Users (40 Users: 1 Admin, 3 Mentors (+2 legacy compat), 36 Learners)
+    # 2. Users (42 Users: 1 Admin, 5 Mentors, 36 Learners)
     # 2a. Admin
     admin = session.execute(select(User).where(User.email == "admin@csmtech.internal")).scalar_one_or_none()
     if not admin:
@@ -134,11 +141,11 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
     for idx, name in enumerate(learner_names, 1):
         email = f"learner{idx}@csmtech.internal"
         l = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        # Learner 1 streak is 14 days; others distribute deterministically
+        streak = 14 if idx == 1 else ((idx * 7) % 43)
+        freezes = 1 if streak > 20 else 2
+        last_active = now - timedelta(hours=(idx % 72))
         if not l:
-            # Deterministic streak: 0 to 42 days
-            streak = (idx * 7) % 43
-            freezes = 1 if streak > 20 else 2
-            last_active = now - timedelta(hours=(idx % 72))
             l = User(
                 org_id=org.id,
                 email=email,
@@ -153,6 +160,11 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             )
             session.add(l)
             session.flush()
+        else:
+            # Update streak if needed
+            if idx == 1 and l.streak_days != 14:
+                l.streak_days = 14
+                session.flush()
         learners.append(l)
 
     counts["users"] = session.execute(select(func.count(User.id))).scalar() or 0
@@ -227,6 +239,7 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                 field=q_data.get("field", "Engineering Architecture"),
                 topic=q_data.get("topic", "General"),
                 difficulty=q_data.get("difficulty", "MEDIUM"),
+                rubric_json=q_data.get("rubric_json"),
                 explanation=q_data.get("explanation"),
                 is_active=True,
             )
@@ -247,12 +260,27 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
         bank_questions.append(existing_q)
     session.flush()
 
-    # 5. Coding Problems (24 Problems across 5 Languages)
+    # 5. Coding Problems (24 Problems across 5 Languages with Verification Gate)
+    cp_objs: list[CodingProblem] = []
     for cp_data in CODING_PROBLEMS:
         title = cp_data["title"]
         cp = session.execute(select(CodingProblem).where(CodingProblem.title == title)).scalar_one_or_none()
         if not cp:
-            # Create a corresponding QuestionBank entry for the coding problem
+            # Gate: Refuse to insert any problem that fails its reference solution
+            ref_res = CodeRunner.execute(
+                code=cp_data.get("reference_solution", ""),
+                language=cp_data.get("language", "python"),
+                test_cases=cp_data.get("test_cases", []),
+                entry_point=cp_data.get("entry_point"),
+                argument_schema=cp_data.get("argument_schema", []),
+            )
+            if ref_res.verdict not in ("ACCEPTED", "RUNNER_UNAVAILABLE"):
+                raise ValueError(
+                    f"Seed gate refusal: problem '{title}' reference solution failed with {ref_res.verdict} "
+                    f"({ref_res.first_failing_case or ref_res.compile_error})"
+                )
+
+            # Create corresponding QuestionBank entry
             bank_item = QuestionBank(
                 author_id=author_id,
                 title=f"Coding: {title}",
@@ -279,6 +307,11 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                 schema_ddl=cp_data.get("schema_ddl"),
                 starter_code_json=cp_data.get("starter_code_json"),
                 reference_solution=cp_data.get("reference_solution"),
+                entry_point=cp_data.get("entry_point"),
+                argument_schema=cp_data.get("argument_schema"),
+                wrong_stub=cp_data.get("wrong_stub"),
+                complexity_notes=cp_data.get("complexity_notes"),
+                examples_json=cp_data.get("examples_json"),
             )
             session.add(cp)
             session.flush()
@@ -292,6 +325,7 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     weight=tc.get("weight", 1.0),
                 ))
             bank_questions.append(bank_item)
+        cp_objs.append(cp)
     session.flush()
 
     counts["question_bank"] = session.execute(select(func.count(QuestionBank.id))).scalar() or 0
@@ -357,10 +391,26 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
         assessments[title] = a
     session.flush()
 
+    # 6b. Seed AssessmentAudience for Individual Learners on >= 2 Assessments
+    audience_assessments = [
+        assessments["Core Python & Data Structures Assessment"],
+        assessments["Enterprise SQL & Database Performance Assessment"],
+    ]
+    for a in audience_assessments:
+        for l in learners[:6]:
+            existing_aud = session.execute(
+                select(AssessmentAudience).where(
+                    AssessmentAudience.assessment_id == a.id,
+                    AssessmentAudience.learner_id == l.id,
+                )
+            ).scalar_one_or_none()
+            if not existing_aud:
+                session.add(AssessmentAudience(assessment_id=a.id, learner_id=l.id))
+    session.flush()
+
     counts["assessments"] = session.execute(select(func.count(Assessment.id))).scalar() or 0
 
     # 7. 180+ Assessment Attempts with Bell Curve Scores & Growth Ring Reports
-    # Focus attempts on CLOSED and PUBLISHED assessments
     scored_assessments = [
         assessments["Foundational Technical Knowledge Baseline"],
         assessments["Engineering Aptitude & Deductive Reasoning Sprint"],
@@ -374,13 +424,11 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
     attempt_count = 0
 
     for a in scored_assessments:
-        # Get target learners from batch
         target_learners = learners[0:10] if "ALPHA" in (a.batch.code if a.batch else "") else (
             learners[10:20] if "BETA" in (a.batch.code if a.batch else "") else (
                 learners[20:28] if "GAMMA" in (a.batch.code if a.batch else "") else learners[28:36]
             )
         )
-        # Also include cross-batch participants for realistic volume
         extended_learners = list(set(target_learners + learners[:25]))
 
         for l in extended_learners:
@@ -392,7 +440,6 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             ).scalar_one_or_none()
 
             if not existing_att:
-                # Bell curve score around mean 74, stdev 12, clamped between 42 and 98
                 raw_score = int(random.gauss(74, 12))
                 final_score = max(42.0, min(98.0, float(raw_score)))
                 passed = final_score >= a.passing_score
@@ -456,14 +503,149 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                 attempt_count += 1
     session.flush()
 
+    # 7b. In-Progress Attempts (3 attempts in progress with autosave state)
+    in_progress_assessment = assessments["Core Python & Data Structures Assessment"]
+    for l_in_prog in learners[33:36]:
+        existing_in_prog = session.execute(
+            select(AssessmentAttempt).where(
+                AssessmentAttempt.assessment_id == in_progress_assessment.id,
+                AssessmentAttempt.learner_id == l_in_prog.id,
+            )
+        ).scalar_one_or_none()
+        if not existing_in_prog:
+            session.add(AssessmentAttempt(
+                assessment_id=in_progress_assessment.id,
+                learner_id=l_in_prog.id,
+                start_time=now - timedelta(minutes=20),
+                submit_time=None,
+                score=0.0,
+                total_marks=100.0,
+                passed=False,
+                status="IN_PROGRESS",
+                grading_status="PENDING_REVIEW",
+                tab_switch_count=0,
+                autosave_state_json={
+                    "current_question_index": 2,
+                    "answers": {
+                        "q1": "Selected option A based on indexing speed",
+                        "q2": "Using sliding window technique to minimize runtime",
+                    },
+                    "time_remaining_seconds": 2400,
+                },
+            ))
+    session.flush()
+
+    # 7c. Subjective Graded Answers (12 answers with in-depth text_response and mentor feedback)
+    subjective_q = session.execute(
+        select(QuestionBank).where(QuestionBank.question_type == "SHORT_ANSWER")
+    ).scalar_one_or_none()
+    if not subjective_q:
+        subjective_q = QuestionBank(
+            author_id=author_id,
+            title="System Design Trade-off Analysis: Event-Driven vs Monolithic State",
+            question_text="Explain the trade-offs between an event-driven architecture using Kafka and a centralized relational database architecture for processing high-throughput financial transactions.",
+            question_type="SHORT_ANSWER",
+            category=AssessmentCategory.TECHNICAL_KNOWLEDGE.value,
+            field="System Architecture",
+            topic="Distributed Systems",
+            difficulty="HARD",
+            is_active=True,
+        )
+        session.add(subjective_q)
+        session.flush()
+
+    recent_submitted_attempts = session.execute(
+        select(AssessmentAttempt).where(AssessmentAttempt.status == "SUBMITTED").limit(12)
+    ).scalars().all()
+
+    for idx, s_att in enumerate(recent_submitted_attempts):
+        ex_sub_ans = session.execute(
+            select(Answer).where(
+                Answer.attempt_id == s_att.id,
+                Answer.bank_question_id == subjective_q.id,
+            )
+        ).scalar_one_or_none()
+        if not ex_sub_ans:
+            score = 8.5 + (idx % 3) * 0.5
+            session.add(Answer(
+                attempt_id=s_att.id,
+                bank_question_id=subjective_q.id,
+                text_response=(
+                    "An event-driven architecture decouples producers from consumers and enables horizontal scaling with high append throughput. "
+                    "However, it introduces eventual consistency and dual-write challenges. A centralized relational system provides ACID guarantees "
+                    "and straightforward queries via foreign keys, but suffers write contention and vertical scaling bottlenecks at scale."
+                ),
+                mentor_feedback=f"Excellent trade-off breakdown covering consistency vs availability. Awarded {score}/10 marks.",
+                grading_status="GRADED",
+                score_awarded=score,
+            ))
+    session.flush()
+
     counts["attempts"] = session.execute(select(func.count(AssessmentAttempt.id))).scalar() or 0
 
-    # 8. 600+ Practice Attempts across Categories & Dedication Scores
+    # 8. 400+ Coding Submissions across Learners & Problems
+    existing_sub_count = session.execute(select(func.count(Submission.id))).scalar() or 0
+    if existing_sub_count < 400 and cp_objs:
+        verdict_weights = (
+            ["ACCEPTED"] * 8
+            + ["WRONG_ANSWER"] * 2
+            + ["RUNTIME_ERROR"] * 1
+            + ["TIME_LIMIT_EXCEEDED"] * 1
+        )
+        for l_idx, l in enumerate(learners):
+            # Each learner submits 12-14 problems
+            for p_idx in range(13):
+                prob = cp_objs[(l_idx + p_idx) % len(cp_objs)]
+                v = random.choice(verdict_weights)
+                tc_total = len(prob.test_cases) if prob.test_cases else 6
+                runtime = round(random.uniform(15.0, 140.0), 1)
+                memory = round(random.uniform(16.0, 42.0), 1)
+                if v == "ACCEPTED":
+                    tc_passed = tc_total
+                    score = prob.marks
+                    code = prob.reference_solution or "# Reference solution passed"
+                elif v == "WRONG_ANSWER":
+                    tc_passed = random.randint(1, max(1, tc_total - 1))
+                    score = round(prob.marks * (tc_passed / tc_total), 1)
+                    code = prob.wrong_stub or "# Partial attempt"
+                elif v == "TIME_LIMIT_EXCEEDED":
+                    tc_passed = random.randint(1, max(1, tc_total // 2))
+                    score = 0.0
+                    runtime = 2050.0
+                    code = "# Nested loop causing TLE\n" + (prob.starter_code_json.get("python", "") if prob.starter_code_json else "")
+                else:  # RUNTIME_ERROR
+                    tc_passed = 0
+                    score = 0.0
+                    code = "# IndexError on empty input\n" + (prob.starter_code_json.get("python", "") if prob.starter_code_json else "")
+
+                session.add(Submission(
+                    coding_problem_id=prob.id,
+                    learner_id=l.id,
+                    code=code,
+                    language="sql" if "sql" in prob.title.lower() else "python",
+                    verdict=v,
+                    runtime_ms=runtime,
+                    memory_mb=memory,
+                    passed_cases=tc_passed,
+                    total_cases=tc_total,
+                    score=score,
+                    details_json={
+                        "verdict": v,
+                        "passed_cases": tc_passed,
+                        "total_cases": tc_total,
+                        "runtime_ms": runtime,
+                        "memory_mb": memory,
+                    },
+                ))
+        session.flush()
+
+    counts["submissions"] = session.execute(select(func.count(Submission.id))).scalar() or 0
+
+    # 9. 600+ Practice Attempts across Categories & Dedication Scores
     practice_fields = ["Python", "SQL", "Java", "JavaScript", "C++", "Cloud & DevOps", "Data & AI"]
-    practice_count = 0
 
     for l in learners:
-        for f in practice_fields[:4]:
+        for f in practice_fields[:5]:
             ps = PracticeSession(
                 learner_id=l.id,
                 field=f,
@@ -474,8 +656,8 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             session.add(ps)
             session.flush()
 
-            # Add 4-5 practice questions and attempts per session
-            for q_idx in range(4):
+            # Add 5 practice questions and attempts per session
+            for q_idx in range(5):
                 pq = PracticeQuestion(
                     session_id=ps.id,
                     field=f,
@@ -501,7 +683,6 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     is_correct=is_c,
                     score=10.0 if is_c else 0.0,
                 ))
-                practice_count += 1
 
         # Populate PracticeScore record for dedication tracking
         existing_score = session.execute(
@@ -527,7 +708,7 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
 
     counts["practice_attempts"] = session.execute(select(func.count(PracticeAttempt.id))).scalar() or 0
 
-    # 9. 4 Real Talent Spotlight Alerts with Mentor Actions & Scheduled Meetings
+    # 10. 4 Real Talent Spotlight Alerts with Mentor Actions & Scheduled Meetings
     alert_specs = [
         (learners[0], mentors["soumya.p@csmtech.internal"], "Python", "INTERVIEW_SCHEDULED", "SCHEDULE_INTERVIEW", 94.5, 14),
         (learners[10], mentors["soumya.p@csmtech.internal"], "Cloud & DevOps", "INVITED_TO_ASSESSMENT", "INVITE_ASSESSMENT", 91.2, 18),
@@ -571,7 +752,6 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     action_time=now - timedelta(days=1),
                 ))
 
-            # If interview scheduled, create matching meeting
             if action == "SCHEDULE_INTERVIEW":
                 m_title = f"Talent Spotlight 1:1 - {learner.full_name}"
                 existing_mtg = session.execute(select(Meeting).where(Meeting.title == m_title)).scalar_one_or_none()
@@ -599,18 +779,37 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     ))
     session.flush()
 
-    # 9b. Additional Realistic Meetings (Architecture workshops, 1:1s, retros)
-    meeting_specs = [
-        ("Cloud Architecture Sync - Batch Alpha", "Weekly review of distributed systems patterns.", (now + timedelta(days=1)).strftime("%Y-%m-%d"), "10:00", "11:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-cloud-sync", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"]),
-        ("Data Pipeline Optimization Clinic", "Deep dive into Spark shuffle tuning and Parquet partitioning.", (now + timedelta(days=2)).strftime("%Y-%m-%d"), "15:00", "16:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-data-clinic", mentors["ananya.m@csmtech.internal"], batches["BATCH_GAMMA"]),
-        ("Linux Systems Programming Office Hours", "Q&A on POSIX threads, memory layout, and kernel diagnostics.", (now + timedelta(days=3)).strftime("%Y-%m-%d"), "11:00", "12:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-systems-oh", mentors["debashis.j@csmtech.internal"], batches["BATCH_DELTA"]),
-        ("DevOps CI/CD Deployment Walkthrough", "Live demonstration of zero-downtime rolling deployments on K8s.", (now - timedelta(days=2)).strftime("%Y-%m-%d"), "14:00", "15:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-devops-demo", mentors["soumya.p@csmtech.internal"], batches["BATCH_BETA"]),
-        ("Engineering Aptitude Debrief Session", "Review of quantitative reasoning and deductive logic patterns.", (now - timedelta(days=5)).strftime("%Y-%m-%d"), "16:00", "17:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-aptitude-debrief", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"]),
+    # 11. 19 Diverse Meetings (12 completed with attendance, 2 live, 5 upcoming)
+    full_meeting_specs = [
+        # COMPLETED (12)
+        ("Cloud Architecture Sync - Batch Alpha", "Weekly review of distributed systems patterns.", (now - timedelta(days=10)).strftime("%Y-%m-%d"), "10:00", "11:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-cloud-sync-1", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"], "COMPLETED"),
+        ("Data Pipeline Optimization Clinic", "Deep dive into Spark shuffle tuning and Parquet partitioning.", (now - timedelta(days=8)).strftime("%Y-%m-%d"), "15:00", "16:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-data-clinic-1", mentors["ananya.m@csmtech.internal"], batches["BATCH_GAMMA"], "COMPLETED"),
+        ("Linux Systems Programming Office Hours", "Q&A on POSIX threads, memory layout, and kernel diagnostics.", (now - timedelta(days=7)).strftime("%Y-%m-%d"), "11:00", "12:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-systems-oh-1", mentors["debashis.j@csmtech.internal"], batches["BATCH_DELTA"], "COMPLETED"),
+        ("DevOps CI/CD Deployment Walkthrough", "Live demonstration of zero-downtime rolling deployments on K8s.", (now - timedelta(days=6)).strftime("%Y-%m-%d"), "14:00", "15:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-devops-demo-1", mentors["soumya.p@csmtech.internal"], batches["BATCH_BETA"], "COMPLETED"),
+        ("Engineering Aptitude Debrief Session", "Review of quantitative reasoning and deductive logic patterns.", (now - timedelta(days=5)).strftime("%Y-%m-%d"), "16:00", "17:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-aptitude-debrief-1", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"], "COMPLETED"),
+        ("Full-Stack Async Design Review", "FastAPI dependency injection and async session concurrency patterns.", (now - timedelta(days=4)).strftime("%Y-%m-%d"), "10:30", "11:30", 60, "https://teams.microsoft.com/l/meetup-join/csm-async-review", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"], "COMPLETED"),
+        ("SQL Indexing & Query Tuning Workshop", "B-tree vs GIN indexes, execution plan inspection with EXPLAIN ANALYZE.", (now - timedelta(days=3)).strftime("%Y-%m-%d"), "14:00", "15:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-sql-tuning", mentors["ananya.m@csmtech.internal"], batches["BATCH_GAMMA"], "COMPLETED"),
+        ("K8s Security & RBAC Configuration", "Pod Security Standards, ServiceAccount tokens, and NetworkPolicies.", (now - timedelta(days=3)).strftime("%Y-%m-%d"), "16:00", "17:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-k8s-security", mentors["mentor1@csmtech.internal"], batches["BATCH_BETA"], "COMPLETED"),
+        ("Memory Allocators & C++ Diagnostics", "Debugging heap corruptions with Valgrind and ASan.", (now - timedelta(days=2)).strftime("%Y-%m-%d"), "11:00", "12:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-cpp-debug", mentors["mentor2@csmtech.internal"], batches["BATCH_DELTA"], "COMPLETED"),
+        ("Enterprise API Gateway Architecture", "Rate limiting, circuit breaking, and HMAC validation at scale.", (now - timedelta(days=2)).strftime("%Y-%m-%d"), "15:00", "16:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-api-gateway", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"], "COMPLETED"),
+        ("Psychometric Workplace Composure Workshop", "Navigating high-velocity project deadlines and professional feedback.", (now - timedelta(days=1)).strftime("%Y-%m-%d"), "14:00", "15:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-composure-workshop", mentors["ananya.m@csmtech.internal"], batches["BATCH_GAMMA"], "COMPLETED"),
+        ("Embedded Firmware Unit Testing Lab", "Mocking hardware registers and boundary testing with Unity framework.", (now - timedelta(days=1)).strftime("%Y-%m-%d"), "16:30", "17:30", 60, "https://teams.microsoft.com/l/meetup-join/csm-firmware-lab", mentors["debashis.j@csmtech.internal"], batches["BATCH_DELTA"], "COMPLETED"),
+
+        # LIVE (2)
+        ("Live Architecture Code Review & Pair Programming", "Interactive pull request review session for microservices gateway.", now.strftime("%Y-%m-%d"), "09:30", "11:00", 90, "https://teams.microsoft.com/l/meetup-join/csm-live-pairing", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"], "SCHEDULED"),
+        ("Distributed Cache Invalidation Strategies", "Hands-on implementation of Redis pub/sub cache sync.", now.strftime("%Y-%m-%d"), "13:30", "14:30", 60, "https://teams.microsoft.com/l/meetup-join/csm-live-redis", mentors["ananya.m@csmtech.internal"], batches["BATCH_GAMMA"], "SCHEDULED"),
+
+        # UPCOMING (5)
+        ("Cloud Infrastructure as Code Sprint", "Terraform modules, state locking, and drift detection hands-on.", (now + timedelta(days=1)).strftime("%Y-%m-%d"), "10:00", "11:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-terraform-sprint", mentors["soumya.p@csmtech.internal"], batches["BATCH_BETA"], "SCHEDULED"),
+        ("Advanced Graph Algorithms in Production", "Shortest path and network flow in logistics optimization.", (now + timedelta(days=2)).strftime("%Y-%m-%d"), "14:00", "15:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-graphs-prod", mentors["debashis.j@csmtech.internal"], batches["BATCH_DELTA"], "SCHEDULED"),
+        ("Generative AI & Enterprise Retrieval (RAG)", "Vector embeddings, hybrid search, and hallucination guardrails.", (now + timedelta(days=3)).strftime("%Y-%m-%d"), "11:00", "12:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-rag-deepdive", mentors["ananya.m@csmtech.internal"], batches["BATCH_GAMMA"], "SCHEDULED"),
+        ("Enterprise Observability with OpenTelemetry", "Distributed tracing, span metrics, and Prometheus alerts.", (now + timedelta(days=4)).strftime("%Y-%m-%d"), "15:00", "16:00", 60, "https://teams.microsoft.com/l/meetup-join/csm-otel-sync", mentors["mentor1@csmtech.internal"], batches["BATCH_BETA"], "SCHEDULED"),
+        ("End-of-Sprint Retrospective & Career Mentoring", "Cohort-wide milestone retrospective and Growth Ring review.", (now + timedelta(days=5)).strftime("%Y-%m-%d"), "16:00", "17:30", 90, "https://teams.microsoft.com/l/meetup-join/csm-sprint-retro", mentors["soumya.p@csmtech.internal"], batches["BATCH_ALPHA"], "SCHEDULED"),
     ]
-    for m_title, desc, m_date, s_time, e_time, dur, link, mentor, batch in meeting_specs:
+
+    for m_title, desc, m_date, s_time, e_time, dur, link, mentor, batch, status in full_meeting_specs:
         ex_m = session.execute(select(Meeting).where(Meeting.title == m_title)).scalar_one_or_none()
         if not ex_m:
-            status = "COMPLETED" if m_date < now.strftime("%Y-%m-%d") else "SCHEDULED"
             m = Meeting(
                 title=m_title,
                 description=desc,
@@ -625,26 +824,58 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             )
             session.add(m)
             session.flush()
-            for l in learners[:6]:
+            for l in learners[:8]:
                 session.add(MeetingAudience(meeting_id=m.id, learner_id=l.id, batch_id=batch.id))
                 if status == "COMPLETED":
                     session.add(MeetingAttendance(
                         meeting_id=m.id,
                         learner_id=l.id,
                         attended=True,
-                        remarks="Actively participated in Q&A session.",
+                        remarks="Participated actively in discussion.",
                     ))
     session.flush()
 
     counts["talent_alerts"] = session.execute(select(func.count(TalentAlert.id))).scalar() or 0
     counts["meetings"] = session.execute(select(func.count(Meeting.id))).scalar() or 0
 
-    # 10. Audit Logs
+    # 12. Seed Realistic Notifications (4-8 per user across all 42 users)
+    all_users = [admin] + list(mentors.values()) + learners
+    notification_templates = [
+        ("MEETING", "Upcoming Technical Sync", "You have an engineering sync scheduled with your mentor."),
+        ("MEETING", "Meeting Attendance Confirmed", "Your attendance for the architecture review has been recorded."),
+        ("ASSESSMENT", "Assessment Evaluation Ready", "Your Growth Ring report has been reviewed and approved."),
+        ("ASSESSMENT", "New Assessment Assigned", "A new formal evaluation module is open for submissions."),
+        ("TALENT_ALERT", "Talent Spotlight Recognition", "Your exceptional dedication score has been flagged for career acceleration."),
+        ("SYSTEM", "Daily Coding Streak Milestone", "Congratulations! You have maintained your learning velocity streak."),
+        ("SYSTEM", "Platform Governance Notice", "DPDP compliance audit completed. Your privacy preferences remain up-to-date."),
+    ]
+
+    for u in all_users:
+        existing_n_count = session.execute(
+            select(func.count(Notification.id)).where(Notification.recipient_id == u.id)
+        ).scalar() or 0
+        if existing_n_count < 4:
+            # Seed 4-6 notifications
+            sample_notifs = random.sample(notification_templates, k=5)
+            for idx, (n_type, n_title, n_msg) in enumerate(sample_notifs):
+                session.add(Notification(
+                    recipient_id=u.id,
+                    sender_id=admin.id if u.role != "ADMIN" else mentors["soumya.p@csmtech.internal"].id,
+                    title=n_title,
+                    message=n_msg,
+                    notification_type=n_type,
+                    is_read=(idx % 2 == 0),
+                ))
+    session.flush()
+    counts["notifications"] = session.execute(select(func.count(Notification.id))).scalar() or 0
+
+    # 13. Audit Logs
     audit_entries = [
         ("LOGIN_SUCCESS", "users", admin.id, "Admin logged into governance console."),
         ("ASSESSMENT_PUBLISHED", "assessments", assessments["Core Python & Data Structures Assessment"].id, "Published official assessment."),
         ("GROWTH_RING_APPROVED", "assessment_attempts", None, "Mentor approved final Growth Ring reports."),
         ("TALENT_ALERT_ACTION", "talent_alerts", None, "Mentor took action SCHEDULE_INTERVIEW on talent alert."),
+        ("SEED_COMPLETION", "system", None, "Deterministic demo data pack successfully initialized."),
     ]
     for action, res, res_id, reason in audit_entries:
         session.add(AuditLog(
@@ -671,22 +902,34 @@ if __name__ == "__main__":
         db_url = "sqlite:///trellis_demo.db"
         os.environ["DATABASE_URL"] = db_url
 
-    engine = create_engine(db_url)
-    insp = inspect(engine)
-    if "organisations" not in insp.get_table_names():
-        print(f"📦 Database at {db_url} is empty. Running Alembic migrations to head...")
-        backend_dir = Path(__file__).resolve().parent.parent / "backend"
-        ini_path = backend_dir / "alembic.ini"
-        cfg = Config(str(ini_path))
-        cfg.set_main_option("script_location", str(backend_dir / "alembic"))
-        cfg.set_main_option("version_locations", str(backend_dir / "alembic" / "versions"))
-        cfg.set_main_option("sqlalchemy.url", db_url)
-        command.upgrade(cfg, "head")
-        print("✅ Migrations applied successfully.")
+    # Strip async dialect prefixes for sync engine and alembic
+    if db_url.startswith("postgresql+asyncpg://"):
+        sync_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://", 1)
+    elif db_url.startswith("sqlite+aiosqlite://"):
+        sync_url = db_url.replace("sqlite+aiosqlite://", "sqlite://", 1)
+    elif db_url.startswith("mysql+asyncmy://"):
+        sync_url = db_url.replace("mysql+asyncmy://", "mysql+pymysql://", 1)
+    elif db_url.startswith("postgres://"):
+        sync_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif db_url.startswith("postgresql://") and not db_url.startswith("postgresql+"):
+        sync_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+    else:
+        sync_url = db_url
+
+    engine = create_engine(sync_url)
+    backend_dir = Path(__file__).resolve().parent.parent / "backend"
+    ini_path = backend_dir / "alembic.ini"
+    cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(backend_dir / "alembic"))
+    cfg.set_main_option("version_locations", str(backend_dir / "alembic" / "versions"))
+    cfg.set_main_option("sqlalchemy.url", sync_url)
+    print(f"Ensuring database at {sync_url} is migrated to Alembic head...")
+    command.upgrade(cfg, "head")
+    print("Database schema is at head.")
 
     with Session(engine) as session:
-        print("🌱 Seeding TRELLIS Enterprise Demo Data Pack...")
+        print("Seeding TRELLIS Enterprise Demo Data Pack...")
         results = seed_demo_pack(session)
-        print("✨ Demo Pack Seeding Complete! Summary:")
+        print("Demo Pack Seeding Complete! Summary:")
         for k, v in results.items():
             print(f"  • {k.capitalize()}: {v}")

@@ -259,6 +259,7 @@ def run_code(
 
     is_custom_input = payload.custom_input is not None
     cases = []
+    problem = None
 
     if is_custom_input:
         # Custom input box run: report program output without pass/fail verdict
@@ -304,6 +305,8 @@ def run_code(
             time_limit_ms=3000,
             mask_hidden_inputs=False,
             is_custom_run=is_custom_input,
+            entry_point=getattr(problem, "entry_point", None) if problem else None,
+            argument_schema=getattr(problem, "argument_schema", None) if problem else None,
         )
     finally:
         _EXECUTION_SEMAPHORE.release()
@@ -391,6 +394,8 @@ def submit_code(
             memory_limit_mb=problem.memory_limit_mb,
             mask_hidden_inputs=True,
             is_custom_run=False,
+            entry_point=getattr(problem, "entry_point", None),
+            argument_schema=getattr(problem, "argument_schema", None),
         )
     finally:
         _EXECUTION_SEMAPHORE.release()

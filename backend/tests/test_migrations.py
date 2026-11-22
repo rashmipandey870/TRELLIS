@@ -106,6 +106,15 @@ def test_migration_0009_definition() -> None:
     assert hasattr(mod, "downgrade")
 
 
+def test_migration_0010_definition() -> None:
+    """Verify Migration 0010 covers coding problem judge format columns and links to 0009."""
+    mod = load_migration_module("0010_coding_problem_judge_format.py")
+    assert mod.revision == "0010"
+    assert mod.down_revision == "0009"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+
+
 def test_alembic_upgrade_head_on_clean_database(tmp_path: Path) -> None:
     """Verify that 'alembic upgrade head' runs successfully on an empty database."""
     from alembic import command

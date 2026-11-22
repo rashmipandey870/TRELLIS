@@ -31,6 +31,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.config import settings
+from app.services.judge_harness import (
+    outputs_match,
+    build_python_harness,
+    build_javascript_harness,
+    build_java_harness,
+    build_cpp_harness,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +99,8 @@ class BaseCodeRunner(ABC):
         memory_limit_mb: int = 256,
         mask_hidden_inputs: bool = False,
         is_custom_run: bool = False,
+        entry_point: str | None = None,
+        argument_schema: list[dict[str, Any]] | None = None,
     ) -> ExecutionResult:
         """Execute source code against test cases within resource constraints."""
         pass
@@ -150,6 +159,8 @@ class Judge0Runner(BaseCodeRunner):
         memory_limit_mb: int = 256,
         mask_hidden_inputs: bool = False,
         is_custom_run: bool = False,
+        entry_point: str | None = None,
+        argument_schema: list[dict[str, Any]] | None = None,
     ) -> ExecutionResult:
         lang = language.lower().strip()
         lang_id = self.LANGUAGE_MAP.get(lang)
@@ -163,6 +174,16 @@ class Judge0Runner(BaseCodeRunner):
                 score=0,
                 compile_error=f"Unsupported language '{language}' in Judge0 runner.",
             )
+
+        if entry_point:
+            if lang in {"python", "py", "python3"}:
+                code = build_python_harness(code, entry_point, len(argument_schema or []))
+            elif lang in {"javascript", "js", "node"}:
+                code = build_javascript_harness(code, entry_point, len(argument_schema or []))
+            elif lang == "java":
+                code = build_java_harness(code, entry_point)
+            elif lang in {"cpp", "c++"}:
+                code = build_cpp_harness(code, entry_point)
 
         timeout_sec = max(0.5, time_limit_ms / 1000.0)
         case_results: list[TestCaseResult] = []
@@ -232,9 +253,7 @@ class Judge0Runner(BaseCodeRunner):
                 custom_out = actual_stdout
                 err = actual_stderr or None
             elif status_id == 3:  # Accepted
-                actual_norm = normalize_output(actual_stdout)
-                expected_norm = normalize_output(expected_text)
-                if actual_norm == expected_norm:
+                if outputs_match(actual_stdout, expected_text):
                     verdict = "ACCEPTED"
                     passed_count += 1
                     earned_weight += weight
@@ -353,6 +372,8 @@ class DockerRunner(BaseCodeRunner):
         memory_limit_mb: int = 256,
         mask_hidden_inputs: bool = False,
         is_custom_run: bool = False,
+        entry_point: str | None = None,
+        argument_schema: list[dict[str, Any]] | None = None,
     ) -> ExecutionResult:
         docker_bin = shutil.which("docker")
         if not docker_bin:
@@ -378,6 +399,16 @@ class DockerRunner(BaseCodeRunner):
                 score=0,
                 compile_error=f"Unsupported language '{language}' in Docker runner.",
             )
+
+        if entry_point:
+            if lang in {"python", "py", "python3"}:
+                code = build_python_harness(code, entry_point, len(argument_schema or []))
+            elif lang in {"javascript", "js", "node"}:
+                code = build_javascript_harness(code, entry_point, len(argument_schema or []))
+            elif lang == "java":
+                code = build_java_harness(code, entry_point)
+            elif lang in {"cpp", "c++"}:
+                code = build_cpp_harness(code, entry_point)
 
         timeout_sec = max(0.5, time_limit_ms / 1000.0)
 
@@ -465,17 +496,14 @@ class DockerRunner(BaseCodeRunner):
                     elif proc.returncode != 0:
                         verdict = "RUNTIME_ERROR"
                         err = stderr_str or f"Non-zero exit code ({proc.returncode})"
+                    elif outputs_match(stdout_str, expected_text):
+                        verdict = "ACCEPTED"
+                        passed_count += 1
+                        earned_weight += weight
+                        err = None
                     else:
-                        actual_norm = normalize_output(stdout_str)
-                        expected_norm = normalize_output(expected_text)
-                        if actual_norm == expected_norm:
-                            verdict = "ACCEPTED"
-                            passed_count += 1
-                            earned_weight += weight
-                            err = None
-                        else:
-                            verdict = "WRONG_ANSWER"
-                            err = None
+                        verdict = "WRONG_ANSWER"
+                        err = None
 
                 except subprocess.TimeoutExpired:
                     elapsed_ms = timeout_sec * 1000.0
@@ -567,9 +595,22 @@ class LocalSubprocessRunner(BaseCodeRunner):
         memory_limit_mb: int = 256,
         mask_hidden_inputs: bool = False,
         is_custom_run: bool = False,
+        entry_point: str | None = None,
+        argument_schema: list[dict[str, Any]] | None = None,
     ) -> ExecutionResult:
         lang = language.lower().strip()
         timeout_sec = max(0.5, time_limit_ms / 1000.0)
+
+        # Apply judge harness if entry_point is specified
+        if entry_point:
+            if lang in {"python", "py", "python3"}:
+                code = build_python_harness(code, entry_point, len(argument_schema or []))
+            elif lang in {"javascript", "js", "node"}:
+                code = build_javascript_harness(code, entry_point, len(argument_schema or []))
+            elif lang == "java":
+                code = build_java_harness(code, entry_point)
+            elif lang in {"cpp", "c++"}:
+                code = build_cpp_harness(code, entry_point)
 
         # Dispatch execution
         if lang in {"python", "py", "python3"}:
@@ -737,6 +778,16 @@ class LocalSubprocessRunner(BaseCodeRunner):
                     score=0,
                     compile_error="Compilation timed out.",
                 )
+            except (OSError, subprocess.SubprocessError) as ex:
+                return ExecutionResult(
+                    verdict="RUNNER_UNAVAILABLE",
+                    passed_cases=0,
+                    total_cases=len(test_cases),
+                    runtime_ms=0,
+                    memory_mb=0,
+                    score=0,
+                    compile_error=f"C/C++ compiler failed to execute: {ex}",
+                )
 
             return self._evaluate_cases(
                 cmd=[out_file],
@@ -788,8 +839,9 @@ class LocalSubprocessRunner(BaseCodeRunner):
                 compile_error="Java compiler (javac) or runtime (java) not found on system path.",
             )
 
+        main_class = "SolutionRunner" if "class SolutionRunner" in code else "Solution"
         with tempfile.TemporaryDirectory(prefix="trellis_java_") as tmpdir:
-            src_file = os.path.join(tmpdir, "Solution.java")
+            src_file = os.path.join(tmpdir, f"{main_class}.java")
             with open(src_file, "w", encoding="utf-8") as f:
                 f.write(code)
 
@@ -824,7 +876,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                 )
 
             return self._evaluate_cases(
-                cmd=[java, f"-Xmx{memory_limit_mb}m", "-cp", tmpdir, "Solution"],
+                cmd=[java, f"-Xmx{memory_limit_mb}m", "-cp", tmpdir, main_class],
                 cwd=tmpdir,
                 test_cases=test_cases,
                 timeout_sec=timeout_sec,
@@ -883,9 +935,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                     custom_out = actual_output
                     err = None
                 else:
-                    actual_norm = normalize_output(actual_output)
-                    expected_norm = normalize_output(expected_text)
-                    if actual_norm == expected_norm:
+                    if outputs_match(actual_output, expected_text, is_sql=True):
                         verdict = "ACCEPTED"
                         passed_count += 1
                         earned_weight += weight
@@ -1022,9 +1072,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                     verdict = "RUNTIME_ERROR"
                     err = stderr_str[:500] if stderr_str else f"Non-zero exit code ({proc.returncode})"
                 else:
-                    actual_norm = normalize_output(stdout_str)
-                    expected_norm = normalize_output(expected_text)
-                    if actual_norm == expected_norm:
+                    if outputs_match(stdout_str, expected_text):
                         verdict = "ACCEPTED"
                         passed_count += 1
                         earned_weight += weight
@@ -1136,6 +1184,8 @@ class CodeRunner:
         memory_limit_mb: int = 256,
         mask_hidden_inputs: bool = False,
         is_custom_run: bool = False,
+        entry_point: str | None = None,
+        argument_schema: list[dict[str, Any]] | None = None,
     ) -> ExecutionResult:
         """Execute code using the configured runner with concurrency and queue controls."""
         acquired = _RUNNER_SEMAPHORE.acquire(timeout=10.0)
@@ -1159,6 +1209,8 @@ class CodeRunner:
                 memory_limit_mb=memory_limit_mb,
                 mask_hidden_inputs=mask_hidden_inputs,
                 is_custom_run=is_custom_run,
+                entry_point=entry_point,
+                argument_schema=argument_schema,
             )
         finally:
             _RUNNER_SEMAPHORE.release()
