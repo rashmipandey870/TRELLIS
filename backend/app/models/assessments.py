@@ -33,7 +33,8 @@ class QuestionBank(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
-    question_type: Mapped[str] = mapped_column(String(32), nullable=False)  # MCQ, CODING
+    question_type: Mapped[str] = mapped_column(String(32), nullable=False)  # MCQ, CODING, SQL, SHORT_ANSWER, SCENARIO, COMMUNICATION, FILE_UPLOAD, LIKERT
+    category: Mapped[str] = mapped_column(String(64), default="Technical Knowledge", server_default="Technical Knowledge", nullable=False)
     field: Mapped[str] = mapped_column(String(128), index=True, nullable=False)  # Python, Java, DSA, Web, etc.
     topic: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     difficulty: Mapped[str] = mapped_column(String(32), default="MEDIUM", nullable=False)  # EASY, MEDIUM, HARD

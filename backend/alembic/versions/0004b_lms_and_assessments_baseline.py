@@ -140,6 +140,7 @@ def upgrade() -> None:
             sa.Column("title", sa.String(255), nullable=False),
             sa.Column("question_text", sa.Text(), nullable=False),
             sa.Column("question_type", sa.String(32), nullable=False),
+            sa.Column("category", sa.String(64), server_default="Technical Knowledge", nullable=False),
             sa.Column("field", sa.String(128), index=True, nullable=False),
             sa.Column("topic", sa.String(128), index=True, nullable=False),
             sa.Column("difficulty", sa.String(32), nullable=False),
