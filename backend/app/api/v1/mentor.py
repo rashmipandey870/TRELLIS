@@ -46,6 +46,7 @@ from app.models.notifications import Notification
 from app.models.practice import AlertAction, PracticeScore, TalentAlert
 from app.models.reviews import MentorRemark
 from app.models.user import User
+from app.schemas.category import AssessmentCategory
 
 router = APIRouter(prefix="/mentor", tags=["Mentor Portal"])
 
@@ -251,6 +252,7 @@ def validate_meeting_schedule_and_conflicts(
 class McqQuestionCreateRequest(BaseModel):
     title: str
     question_text: str
+    category: AssessmentCategory = Field(default=AssessmentCategory.TECHNICAL_KNOWLEDGE)
     field: str
     topic: str
     difficulty: str = "MEDIUM"
@@ -262,6 +264,7 @@ class McqQuestionCreateRequest(BaseModel):
 class CodingProblemCreateRequest(BaseModel):
     title: str
     description: str
+    category: AssessmentCategory = Field(default=AssessmentCategory.CODING)
     constraints: str | None = None
     field: str
     difficulty: str = "MEDIUM"
@@ -331,6 +334,7 @@ class UnifiedQuestionCreateRequest(BaseModel):
     description: str | None = None
     type: str = "MCQ"
     question_type: str | None = None
+    category: AssessmentCategory = Field(default=AssessmentCategory.TECHNICAL_KNOWLEDGE)
     field: str = "Python"
     topic: str = "General"
     difficulty: str = "MEDIUM"
@@ -1254,6 +1258,7 @@ def create_question_unified(
         prob_payload = CodingProblemCreateRequest(
             title=payload.title,
             description=payload.description or payload.question_text or payload.title,
+            category=payload.category,
             constraints=payload.constraints,
             field=payload.field,
             difficulty=payload.difficulty.upper(),
@@ -1276,11 +1281,13 @@ def create_question_unified(
             res["type"] = "SQL"
         return res
     elif q_type in ("SHORT_ANSWER", "FILE_UPLOAD", "SCENARIO", "COMMUNICATION", "SQL"):
+        cat_val = payload.category.value if isinstance(payload.category, AssessmentCategory) else str(payload.category)
         bank_q = QuestionBank(
             author_id=mentor.id,
             title=payload.title,
             question_text=payload.question_text or payload.description or payload.title,
             question_type=q_type,
+            category=cat_val,
             field=payload.field,
             topic=payload.topic,
             difficulty=payload.difficulty.upper(),
@@ -1314,6 +1321,7 @@ def create_question_unified(
         mcq_payload = McqQuestionCreateRequest(
             title=payload.title,
             question_text=payload.question_text or payload.description or payload.title,
+            category=payload.category,
             field=payload.field,
             topic=payload.topic,
             difficulty=payload.difficulty.upper(),
@@ -1364,11 +1372,13 @@ def add_mcq_to_bank(
     mentor: User = Depends(require_mentor),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    cat_val = payload.category.value if isinstance(payload.category, AssessmentCategory) else str(payload.category)
     q = QuestionBank(
         author_id=mentor.id,
         title=payload.title,
         question_text=payload.question_text,
         question_type="MCQ",
+        category=cat_val,
         field=payload.field,
         topic=payload.topic,
         difficulty=payload.difficulty.upper(),
@@ -1399,11 +1409,13 @@ def add_coding_to_bank(
     mentor: User = Depends(require_mentor),
     _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
+    cat_val = payload.category.value if isinstance(payload.category, AssessmentCategory) else str(payload.category)
     q = QuestionBank(
         author_id=mentor.id,
         title=payload.title,
         question_text=payload.description,
         question_type="CODING",
+        category=cat_val,
         field=payload.field,
         topic="Algorithms",
         difficulty=payload.difficulty.upper(),
@@ -1714,6 +1726,7 @@ def ai_evaluate_subjective_answer(
     answer_id: str,
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     """Provide AI-driven rubric evaluation for open-ended or subjective trainee answers."""
     attempt = db.get(AssessmentAttempt, attempt_id)
@@ -2227,15 +2240,14 @@ def chat_with_mentor_assistant(
     return result
 
 
-@router.get("/chatbot/stream", summary="Stream chat with TRELLIS Mentor Assistant (GET)")
 @router.post("/chatbot/stream", summary="Stream chat with TRELLIS Mentor Assistant (POST)")
 def stream_with_mentor_assistant(
-    message: str = Query(..., description="User query"),
+    payload: MentorChatbotRequest,
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
 ) -> StreamingResponse:
     from app.ai.chatbot.chat_service import stream_chat_role
     return StreamingResponse(
-        stream_chat_role(user=mentor, user_message=message, db=db),
+        stream_chat_role(user=mentor, user_message=payload.message, db=db),
         media_type="text/event-stream",
     )

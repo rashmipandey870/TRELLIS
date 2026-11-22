@@ -863,15 +863,14 @@ def chat_with_admin_copilot(
     return result
 
 
-@router.get("/chatbot/stream", summary="Stream chat with TRELLIS Enterprise Operations Copilot (GET)")
 @router.post("/chatbot/stream", summary="Stream chat with TRELLIS Enterprise Operations Copilot (POST)")
 def stream_with_admin_copilot(
-    message: str = Query(..., description="User query"),
+    payload: AdminChatbotRequest,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ) -> StreamingResponse:
     from app.ai.chatbot.chat_service import stream_chat_role
     return StreamingResponse(
-        stream_chat_role(user=admin, user_message=message, db=db),
+        stream_chat_role(user=admin, user_message=payload.message, db=db),
         media_type="text/event-stream",
     )

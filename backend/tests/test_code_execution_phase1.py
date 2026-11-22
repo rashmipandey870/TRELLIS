@@ -14,6 +14,7 @@ Validates:
 from __future__ import annotations
 
 import os
+import shutil
 from unittest.mock import patch
 
 import pytest
@@ -182,6 +183,7 @@ print(len(secret_keys))
     assert res.case_results[0].actual_output.strip() == "0"
 
 
+@pytest.mark.skipif(not shutil.which("javac"), reason="JDK javac compiler not available on host")
 def test_do_nothing_java_program_is_not_accepted():
     """No simulated execution: A do-nothing Java program MUST NOT be accepted."""
     code = """public class Solution {

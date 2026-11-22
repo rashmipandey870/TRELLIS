@@ -99,8 +99,8 @@ services:
       - DATABASE_MIGRATION_URL=${DATABASE_MIGRATION_URL:-postgresql+psycopg2://${DB_USER:-trellis_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-trellis}}
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY:?Error: SECRET_KEY environment variable is required}
-      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:-qW7GZ9X_8K4jL2mN5pQ8rT1vX3zB6dF9hJ0lP2sU4wY=}
-      - LEDGER_SALT_KEY=${LEDGER_SALT_KEY:-trellis-ledger-pseudonym-salt-2026}
+      - FIELD_ENCRYPTION_KEY=${FIELD_ENCRYPTION_KEY:?Error: FIELD_ENCRYPTION_KEY environment variable is required}
+      - LEDGER_SALT_KEY=${LEDGER_SALT_KEY:?Error: LEDGER_SALT_KEY environment variable is required}
       - AI_API_KEY=${AI_API_KEY:-}
       - CODE_RUNNER=${CODE_RUNNER:-isolated}
       - JUDGE0_URL=${JUDGE0_URL:-http://judge0:2358}

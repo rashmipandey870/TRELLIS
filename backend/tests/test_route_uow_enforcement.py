@@ -19,6 +19,9 @@ REVIEWED_UOW_EXEMPT_ROUTES: dict[str, str] = {
     "/api/v1/auth/mfa/setup": "Audits TOTP setup atomically inside auth_service.setup_totp_mfa",
     "/api/v1/auth/refresh": "Audits token rotation & reuse revocation atomically inside auth_service.rotate_refresh_token",
     "/api/v1/auth/logout": "Audits session revocation atomically inside auth_service.logout_session",
+    "/api/v1/admin/chatbot/stream": "Read-only SSE streaming endpoint; query sent in POST body to prevent URL parameter PII leakage, does not mutate DB",
+    "/api/v1/mentor/chatbot/stream": "Read-only SSE streaming endpoint; query sent in POST body to prevent URL parameter PII leakage, does not mutate DB",
+    "/api/v1/learner/chatbot/stream": "Read-only SSE streaming endpoint; query sent in POST body to prevent URL parameter PII leakage, does not mutate DB",
 }
 
 

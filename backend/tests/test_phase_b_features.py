@@ -267,7 +267,7 @@ def test_mentor_and_admin_chatbot_endpoints(b_setup, db_session):
 
 def test_chatbot_streaming_sse_generator(b_setup, db_session):
     learner = b_setup["learner"]
-    response = stream_with_the_gardener(message="Hello Gardener", db=db_session, learner=learner)
+    response = stream_with_the_gardener(payload=ChatbotRequest(message="Hello Gardener"), db=db_session, learner=learner)
     assert response.media_type == "text/event-stream"
 
     chunks = list(stream_chat_role(user=learner, user_message="Hello Gardener", db=db_session))

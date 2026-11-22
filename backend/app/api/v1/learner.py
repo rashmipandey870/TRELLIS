@@ -877,6 +877,7 @@ def upload_answer_file(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
+    _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     attempt = db.get(AssessmentAttempt, attempt_id)
     if not attempt or attempt.learner_id != learner.id:
@@ -1039,6 +1040,7 @@ def get_learner_topic_mastery(
 def generate_study_plan(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
+    _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     mastery = get_learner_topic_mastery(db=db, learner=learner)
     weak_topic = mastery.get("weakest_topic", "Technical Fundamentals")
@@ -1063,16 +1065,15 @@ def generate_study_plan(
     }
 
 
-@router.get("/chatbot/stream", summary="Stream chat with The Gardener AI coach (GET)")
 @router.post("/chatbot/stream", summary="Stream chat with The Gardener AI coach (POST)")
 def stream_with_the_gardener(
-    message: str = Query(..., description="User query"),
+    payload: ChatbotRequest,
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> StreamingResponse:
     from app.ai.chatbot.chat_service import stream_chat_role
     return StreamingResponse(
-        stream_chat_role(user=learner, user_message=message, db=db),
+        stream_chat_role(user=learner, user_message=payload.message, db=db),
         media_type="text/event-stream",
     )
 

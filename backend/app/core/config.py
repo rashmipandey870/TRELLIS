@@ -1,5 +1,7 @@
 """TRELLIS Application Configuration & Environment Settings."""
 
+import base64
+import os
 from pathlib import Path
 
 from pydantic import model_validator
@@ -48,9 +50,9 @@ class Settings(BaseSettings):
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # Field-level Encryption (AES-256 / Fernet key for sensitive columns e.g. totp_secret at rest)
-    FIELD_ENCRYPTION_KEY: str = "gAAAAABnhX-dummy-fernet-key-32bytes-base64-dev-only="
-    LEDGER_SALT_KEY: str = "trellis-ledger-pseudonym-salt-2026"
-    SECRET_KEY: str = "trellis-secret-key-salt-2026"
+    FIELD_ENCRYPTION_KEY: str = ""
+    LEDGER_SALT_KEY: str = ""
+    SECRET_KEY: str = ""
 
     # Argon2id Parameters
     ARGON2_TIME_COST: int = 3
@@ -113,6 +115,23 @@ class Settings(BaseSettings):
                     f"FATAL: In production (TRELLIS_ENV={self.TRELLIS_ENV}), CODE_RUNNER must be 'judge0' or 'docker', "
                     f"got '{self.CODE_RUNNER}'. Local subprocess execution is strictly forbidden outside dev."
                 )
+            if not self.LEDGER_SALT_KEY:
+                raise RuntimeError(
+                    "FATAL: LEDGER_SALT_KEY must be provided via environment variables in non-dev environment."
+                )
+            if not self.SECRET_KEY:
+                raise RuntimeError(
+                    "FATAL: SECRET_KEY must be provided via environment variables in non-dev environment."
+                )
+        else:
+            # Ephemeral keys generated for local development if not explicitly configured in environment
+            import secrets as _secrets
+            if not self.FIELD_ENCRYPTION_KEY:
+                self.FIELD_ENCRYPTION_KEY = base64.urlsafe_b64encode(os.urandom(32)).decode()
+            if not self.LEDGER_SALT_KEY:
+                self.LEDGER_SALT_KEY = _secrets.token_hex(16)
+            if not self.SECRET_KEY:
+                self.SECRET_KEY = _secrets.token_hex(32)
         return self
 
 
