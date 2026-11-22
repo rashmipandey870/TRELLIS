@@ -8,10 +8,14 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class Provenance(BaseModel):
-    """Provenance and audit tracking metadata for every AI artifact."""
-    model: str = Field(default="trellis-ai-v1")
+    """Truthful provenance and audit tracking metadata for every AI artifact.
+    Distinguishes real model output (ollama/cloud) from procedural generation and curated bank items.
+    """
+    provider: Literal["ollama", "cloud", "procedural", "curated"] = Field(default="procedural")
+    model: str = Field(default="trellis-procedural-v1")
     prompt_version: str = Field(default="1.2.0")
-    served_from: Literal["live", "pool", "verified_fallback"] = Field(default="live")
+    served_from: Literal["live", "pool", "fallback"] = Field(default="fallback")
+    verified: bool = Field(default=True)
     generated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
@@ -27,11 +31,12 @@ class GeneratedMcqProblem(BaseModel):
     difficulty: str = Field(default="MEDIUM")
     category: str = Field(default="Technical Knowledge")
     topic: str | None = None
+    source: str = Field(default="procedural")  # "model", "procedural", or "curated"
     solver_verification: dict[str, Any] | None = None
     provenance: Provenance = Field(default_factory=Provenance)
 
     @model_validator(mode="after")
-    def validate_options_and_answer(self) -> "GeneratedMcqProblem":
+    def validate_options_and_source(self) -> "GeneratedMcqProblem":
         if len(self.options) != 4:
             raise ValueError("MCQ must have exactly 4 options.")
         if len(set(self.options)) != 4:
@@ -40,6 +45,13 @@ class GeneratedMcqProblem(BaseModel):
             raise ValueError(
                 f"correct_answer '{self.correct_answer}' must match one of the 4 options: {self.options}"
             )
+        # Truthful source alignment with provenance
+        if self.provenance.provider in ("ollama", "cloud"):
+            self.source = "model"
+        elif self.provenance.provider == "curated":
+            self.source = "curated"
+        else:
+            self.source = "procedural"
         return self
 
 
@@ -59,10 +71,11 @@ class GeneratedCodingProblem(BaseModel):
     explanation: str = Field(..., min_length=5)
     hints: list[str] = Field(default_factory=list)
     category: str = Field(default="Coding")
+    source: str = Field(default="procedural")  # "model", "procedural", or "curated"
     provenance: Provenance = Field(default_factory=Provenance)
 
     @model_validator(mode="after")
-    def validate_starter_code_and_cases(self) -> "GeneratedCodingProblem":
+    def validate_starter_code_and_source(self) -> "GeneratedCodingProblem":
         # Ensure starter code maps to the correct language key
         lang_key = self.language.lower().strip()
         if lang_key not in self.starter_code:
@@ -81,6 +94,14 @@ class GeneratedCodingProblem(BaseModel):
         for idx, tc in enumerate(self.test_cases):
             if "expected_output" not in tc:
                 raise ValueError(f"Test case #{idx} missing required key 'expected_output'")
+
+        # Truthful source alignment
+        if self.provenance.provider in ("ollama", "cloud"):
+            self.source = "model"
+        elif self.provenance.provider == "curated":
+            self.source = "curated"
+        else:
+            self.source = "procedural"
         return self
 
 
@@ -92,8 +113,9 @@ class GeneratedSubjectiveProblem(BaseModel):
     difficulty: str = Field(default="MEDIUM")
     category: str = Field(default="English & Communication")
     sample_solution: str = Field(..., min_length=10)
-    rubric: list[dict[str, Any]] = Field(..., min_length=1)  # list of {criterion, weight, description}
+    rubric: list[dict[str, Any]] = Field(..., min_length=1)
     hints: list[str] = Field(default_factory=list)
+    source: str = Field(default="procedural")
     provenance: Provenance = Field(default_factory=Provenance)
 
 

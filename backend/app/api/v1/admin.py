@@ -42,7 +42,8 @@ class UserCreateRequest(BaseModel):
     email: str = Field(..., pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", min_length=5, max_length=255)
     full_name: str = Field(..., min_length=2, max_length=255)
     role: str = Field("LEARNER", pattern="^(ADMIN|MENTOR|LEARNER)$")
-    password: str = Field("CSMTrellis2026!", min_length=6)
+    password: str | None = None
+    is_demo: bool = False
 
 
 class UserUpdateRequest(BaseModel):
@@ -123,7 +124,13 @@ def create_user(
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Email '{payload.email}' already exists.")
 
-    one_time_pwd = payload.password or secrets.token_urlsafe(12)
+    if payload.is_demo and payload.password:
+        one_time_pwd = payload.password
+        must_change = False
+    else:
+        one_time_pwd = secrets.token_urlsafe(12)
+        must_change = True
+
     new_user = User(
         org_id=admin.org_id,
         email=payload.email,
@@ -131,7 +138,7 @@ def create_user(
         full_name=payload.full_name,
         role=payload.role.upper(),
         is_active=True,
-        must_change_password=True,
+        must_change_password=must_change,
     )
     db.add(new_user)
     db.commit()
@@ -142,8 +149,9 @@ def create_user(
         "full_name": new_user.full_name,
         "role": new_user.role,
         "is_active": new_user.is_active,
-        "must_change_password": True,
-        "one_time_password": one_time_pwd,
+        "must_change_password": must_change,
+        "one_time_password": one_time_pwd if must_change else None,
+        "invite_link": f"/auth/login?email={new_user.email}&otp={one_time_pwd}" if must_change else None,
     }
 
 

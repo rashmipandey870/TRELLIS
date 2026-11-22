@@ -71,6 +71,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`talent_alerts` TO 'trellis
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`alert_actions` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`notifications` TO 'trellis_app'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`system_settings` TO 'trellis_app'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON `trellis_db`.`ai_question_pool` TO 'trellis_app'@'%';
 
 -- 4. Explicit Per-Table Grants on IMMUTABLE Tables (ONLY SELECT and INSERT; NEVER UPDATE/DELETE)
 GRANT SELECT, INSERT ON `trellis_db`.`audit_log` TO 'trellis_app'@'%';

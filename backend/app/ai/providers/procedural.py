@@ -67,10 +67,10 @@ class ProceduralAIProvider(BaseAIProvider):
 
         if "sql" in f:
             titles = [
-                f"SQL Aggregate Grouping and Filtering (#{seed})",
-                f"Index Utilization in Multi-Table Joins (#{seed})",
-                f"Window Function Partitioning Semantics (#{seed})",
-                f"ACID Isolation Levels Under High Concurrency (#{seed})",
+                f"SQL Aggregate Grouping and Filtering",
+                f"Index Utilization in Multi-Table Joins",
+                f"Window Function Partitioning Semantics",
+                f"ACID Isolation Levels Under High Concurrency",
             ]
             title = random.choice(titles)
             question = (
@@ -84,7 +84,7 @@ class ProceduralAIProvider(BaseAIProvider):
                 "whereas WHERE filters individual rows before grouping occurs."
             )
         elif "java" in f:
-            title = f"JVM Memory and Object Lifecycle (#{seed})"
+            title = f"JVM Memory and Object Lifecycle"
             question = (
                 "In modern Java (SE 17+), which garbage collection region is specifically designed to store "
                 "short-lived newly allocated objects before tenure promotion?"
@@ -100,7 +100,7 @@ class ProceduralAIProvider(BaseAIProvider):
                 "are moved to Survivor spaces before eventual promotion to the Tenured Generation."
             )
         elif "web" in f or "javascript" in f:
-            title = f"Asynchronous Event Loop Semantics (#{seed})"
+            title = f"Asynchronous Event Loop Semantics"
             question = (
                 "In JavaScript (V8 engine), in what exact order are Microtasks (such as Promise.then callbacks) "
                 "executed relative to Macrotasks (such as setTimeout)?"
@@ -116,7 +116,7 @@ class ProceduralAIProvider(BaseAIProvider):
                 "at the conclusion of each turn/macrotask before rendering or processing the next macrotask."
             )
         elif "cloud" in f or "devops" in f:
-            title = f"Container Orchestration and Pod Lifecycle (#{seed})"
+            title = f"Container Orchestration and Pod Lifecycle"
             question = (
                 "In Kubernetes, which probe determines whether a container is ready to accept incoming network traffic "
                 "from Service endpoints without restarting the container?"
@@ -130,7 +130,7 @@ class ProceduralAIProvider(BaseAIProvider):
         elif "aptitude" in f or "reasoning" in f:
             val1 = random.randint(12, 28)
             val2 = val1 * 3 - 4
-            title = f"Numerical Reasoning and Series Progression (#{seed})"
+            title = f"Numerical Reasoning and Series Progression"
             question = (
                 f"Determine the next logical number in the progression: {val1}, {val1 + 7}, {val1 + 16}, {val1 + 27}, ?"
             )
@@ -142,7 +142,7 @@ class ProceduralAIProvider(BaseAIProvider):
                 f"The next difference is +13, yielding {val1 + 27} + 13 = {ans_val}."
             )
         else:  # Python / DSA
-            title = f"Python Memory Model and Hashability (#{seed})"
+            title = f"Python Memory Model and Hashability"
             question = (
                 "In Python 3, which of the following built-in collection types is immutable and can serve as a valid "
                 "dictionary key assuming all of its contained elements are also hashable?"
@@ -174,7 +174,7 @@ class ProceduralAIProvider(BaseAIProvider):
             provenance=Provenance(
                 model="trellis-procedural-v1",
                 prompt_version=PROMPT_VERSION,
-                served_from="verified_fallback",
+                provider="procedural", served_from="fallback",
             ),
         )
 
@@ -191,7 +191,7 @@ class ProceduralAIProvider(BaseAIProvider):
 
         if "sql" in f or lang in ("sql", "sqlite", "postgresql"):
             table_name = f"dept_records_{seed}"
-            title = f"Department Salary Threshold Aggregation (#{seed})"
+            title = f"Department Salary Threshold Aggregation"
             question = (
                 f"Write a SQL query to find the department and total payroll for departments with at least "
                 f"2 employees and a total salary exceeding 100,000. Output columns: department, total_payroll "
@@ -247,12 +247,12 @@ class ProceduralAIProvider(BaseAIProvider):
                 provenance=Provenance(
                     model="trellis-procedural-v1",
                     prompt_version=PROMPT_VERSION,
-                    served_from="verified_fallback",
+                    provider="procedural", served_from="fallback",
                 ),
             )
 
         elif "java" in f or lang == "java":
-            title = f"Array Prefix Running Sum (#{seed})"
+            title = f"Array Prefix Running Sum"
             question = (
                 "Given an array of integers read from standard input as space-separated integers on a single line, "
                 "compute the running sum of the array where runningSum[i] = sum(nums[0]...nums[i]). "
@@ -314,12 +314,12 @@ class ProceduralAIProvider(BaseAIProvider):
                 provenance=Provenance(
                     model="trellis-procedural-v1",
                     prompt_version=PROMPT_VERSION,
-                    served_from="verified_fallback",
+                    provider="procedural", served_from="fallback",
                 ),
             )
 
         elif "javascript" in f or "web" in f or lang in ("javascript", "js"):
-            title = f"Array Chunking Utility (#{seed})"
+            title = f"Array Chunking Utility"
             question = (
                 "Given an array of integers and a chunk size k from standard input (first line: space-separated integers; "
                 "second line: chunk size integer k), split the array into sub-arrays of maximum size k. "
@@ -370,12 +370,12 @@ class ProceduralAIProvider(BaseAIProvider):
                 provenance=Provenance(
                     model="trellis-procedural-v1",
                     prompt_version=PROMPT_VERSION,
-                    served_from="verified_fallback",
+                    provider="procedural", served_from="fallback",
                 ),
             )
 
         else:  # Python / DSA
-            title = f"Sliding Window Maximum Product Subsequence (#{seed})"
+            title = f"Sliding Window Maximum Product Subsequence"
             question = (
                 "Given a sequence of integers on standard input separated by spaces, find the maximum product of any "
                 "two distinct elements in the sequence. Print the maximum product as an integer."
@@ -437,7 +437,7 @@ class ProceduralAIProvider(BaseAIProvider):
                 provenance=Provenance(
                     model="trellis-procedural-v1",
                     prompt_version=PROMPT_VERSION,
-                    served_from="verified_fallback",
+                    provider="procedural", served_from="fallback",
                 ),
             )
 
@@ -462,7 +462,7 @@ class ProceduralAIProvider(BaseAIProvider):
             dimensions = ["Team Collaboration", "Workplace Agility", "Growth Mindset", "Resilience & Focus", "Constructive Feedback"]
             dim = topic or random.choice(dimensions)
             if q_type == "LIKERT":
-                title = f"Behavioral Dimension: {dim} (#{seed})"
+                title = f"Behavioral Dimension: {dim}"
                 statement = (
                     f"When working under tight sprint deadlines with ambiguous technical requirements, "
                     f"I actively organize peer huddles to clarify objectives and divide tasks systematically."
@@ -486,7 +486,7 @@ class ProceduralAIProvider(BaseAIProvider):
                     "explanation": f"{disclaimer} Evaluates self-efficacy and collaborative alignment in high-velocity projects.",
                 }
             else:
-                title = f"Workplace Scenario: {dim} (#{seed})"
+                title = f"Workplace Scenario: {dim}"
                 question = (
                     f"During a major release rollout, a teammate discovers an unexpected edge-case bug that may delay launch by 2 hours. "
                     f"Which response best demonstrates high {dim.lower()}?"
@@ -513,7 +513,7 @@ class ProceduralAIProvider(BaseAIProvider):
 
         elif cat == "English & Communication":
             if q_type in ("COMMUNICATION", "SHORT_ANSWER"):
-                title = f"Professional Escalation Email: Outage Notification (#{seed})"
+                title = f"Professional Escalation Email: Outage Notification"
                 question = (
                     "Draft a professional status email (3-4 paragraphs) to senior enterprise stakeholders regarding a 25-minute "
                     "database failover outage that has now been fully resolved. Your email must include: an executive summary, "
@@ -538,7 +538,7 @@ class ProceduralAIProvider(BaseAIProvider):
                     "explanation": "Evaluates clarity, executive tone, transparency, and operational accountability in customer communications.",
                 }
             else:
-                title = f"Sentence Error Correction & Parallelism (#{seed})"
+                title = f"Sentence Error Correction & Parallelism"
                 question = "Identify the grammatically correct sentence adhering to parallel structure:"
                 correct = "The lead engineer is responsible for auditing code, deploying services, and monitoring platform metrics."
                 distractors = [
@@ -564,7 +564,7 @@ class ProceduralAIProvider(BaseAIProvider):
             val_a = random.randint(20, 50)
             val_b = random.randint(15, 30)
             combined = round((val_a * val_b) / (val_a + val_b), 1)
-            title = f"Work and Time Productivity Calculation (#{seed})"
+            title = f"Work and Time Productivity Calculation"
             question = (
                 f"Worker A can complete a cloud migration pipeline in {val_a} hours, while Worker B can complete the same pipeline "
                 f"in {val_b} hours. Working concurrently without interruption, approximately how many hours will they take to complete the migration together?"
@@ -586,7 +586,7 @@ class ProceduralAIProvider(BaseAIProvider):
             }
 
         elif cat == "Logical & Analytical Reasoning":
-            title = f"Deductive Syllogism and Categorical Logic (#{seed})"
+            title = f"Deductive Syllogism and Categorical Logic"
             question = (
                 "Statements:\n"
                 "1. All microservices communicate over encrypted transport.\n"
@@ -613,7 +613,7 @@ class ProceduralAIProvider(BaseAIProvider):
             }
 
         elif cat == "Additional":
-            title = f"Situational Judgement: Cross-Team Dependency Blocker (#{seed})"
+            title = f"Situational Judgement: Cross-Team Dependency Blocker"
             question = (
                 "You are leading the integration of an AI model service. Another department's auth team has not delivered "
                 "the promised OAuth token exchange endpoint on schedule, putting your sprint commitment at risk.\n"

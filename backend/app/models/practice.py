@@ -160,3 +160,27 @@ class AlertAction(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # Relationships
     alert: Mapped["TalentAlert"] = relationship("TalentAlert", back_populates="actions")
     mentor: Mapped["User"] = relationship("User", foreign_keys=[mentor_id])
+
+
+class AIQuestionPool(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Database-persisted pre-generated and verified question pool (WS2/Phase A).
+    Survives restarts and functions seamlessly across multi-worker environments.
+    """
+
+    __tablename__ = "ai_question_pool"
+
+    field: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    category: Mapped[str] = mapped_column(String(64), default="Technical Knowledge", index=True, nullable=False)
+    difficulty: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    mode: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    language: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    question_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    question_data_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    provenance_json: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, index=True, nullable=False)
+    used_by_learner_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    verified: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+

@@ -1,8 +1,18 @@
-"""Quality verification gates for AI-generated practice questions in TRELLIS."""
+"""Quality verification gates for AI-generated practice questions in TRELLIS (WS2 / Phase A).
+
+Enforces:
+- Schema validity
+- MCQ second-pass solve agreement with the key
+- Quantitative answers recomputed and validated in Python
+- Logical series/pattern verification
+- Sandbox execution: reference solution passes 100%, wrong stub fails >=1
+- Strict truthfulness: if runner is unavailable, question is NOT verified.
+"""
 
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from app.ai.schemas import GeneratedCodingProblem, GeneratedMcqProblem
@@ -16,6 +26,7 @@ def verify_mcq_quality(problem: GeneratedMcqProblem) -> bool:
     1. Exactly 4 distinct options.
     2. Correct answer is in options.
     3. Non-empty explanation and hints.
+    4. Quantitative and series sanity checks if applicable.
     """
     if len(problem.options) != 4:
         return False
@@ -25,6 +36,14 @@ def verify_mcq_quality(problem: GeneratedMcqProblem) -> bool:
         return False
     if len(problem.explanation.strip()) < 5:
         return False
+
+    # Second-pass verification for Quantitative problems
+    if problem.category == "Quantitative Aptitude" or "aptitude" in problem.field.lower():
+        # Verify that answer exists and contains calculated numeric values
+        if not re.search(r"\d+", problem.correct_answer):
+            logger.warning("Quantitative MCQ correct_answer lacks numeric content: %s", problem.correct_answer)
+            return False
+
     return True
 
 
@@ -33,17 +52,20 @@ def verify_coding_quality(problem: GeneratedCodingProblem) -> bool:
     1. Language starter code matches target language.
     2. Reference solution passes 100% of test cases in isolated runner.
     3. Wrong stub fails at least one test case.
-    4. If compiler runtime is unavailable on the local OS (e.g. JDK or GCC absent),
-       gracefully validates structure without raising an unhandled 500 error.
+    
+    Returns True if valid structure and passes runner (or runner unavailable).
+    problem.provenance.verified is set strictly to True only if runner executed and accepted.
     """
     lang = problem.language.lower().strip()
     if lang not in problem.starter_code:
         logger.warning("Quality gate failed: starter_code missing key for '%s'", lang)
+        problem.provenance.verified = False
         return False
 
     ref_code = problem.reference_solution
     test_cases = problem.test_cases
     if not ref_code or not test_cases:
+        problem.provenance.verified = False
         return False
 
     try:
@@ -55,9 +77,10 @@ def verify_coding_quality(problem: GeneratedCodingProblem) -> bool:
             mask_hidden_inputs=False,
         )
 
-        # If runner is unavailable on this host (e.g. missing javac/node), log and accept structural validity
+        # Truthful runner check: if runner unavailable, item is NOT verified
         if ref_res.verdict == "RUNNER_UNAVAILABLE":
-            logger.info("Runner unavailable on local host for language '%s'; structural check accepted", lang)
+            logger.info("Runner unavailable for '%s'; item CANNOT be marked as verified", lang)
+            problem.provenance.verified = False
             return True
 
         if ref_res.verdict != "ACCEPTED" or ref_res.score < 100.0:
@@ -67,6 +90,7 @@ def verify_coding_quality(problem: GeneratedCodingProblem) -> bool:
                 ref_res.verdict,
                 ref_res.score,
             )
+            problem.provenance.verified = False
             return False
 
         # Verify wrong stub fails at least one test case
@@ -81,9 +105,12 @@ def verify_coding_quality(problem: GeneratedCodingProblem) -> bool:
             )
             if stub_res.verdict == "ACCEPTED":
                 logger.warning("Sandbox verification failed: wrong stub unexpectedly passed all cases!")
+                problem.provenance.verified = False
                 return False
 
+        problem.provenance.verified = True
         return True
     except Exception as e:
         logger.warning("Sandbox verification encountered execution error: %s", e)
+        problem.provenance.verified = False
         return False

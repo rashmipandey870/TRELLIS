@@ -173,3 +173,25 @@ def test_ai_gateway_never_fail_ladder():
     # Reset
     gateway.circuit_breaker.reset()
     assert gateway.circuit_breaker.state == "CLOSED"
+
+
+def test_procedural_output_never_labeled_as_model_output():
+    """CI Integrity Check (Phase A): Procedural output MUST NEVER be labeled as model output."""
+    provider = ProceduralAIProvider()
+    mcq = provider.generate_mcq(field="Python")
+    assert mcq.source != "model", "Procedural MCQ was untruthfully labeled as 'model'"
+    assert mcq.provenance.provider == "procedural"
+    assert mcq.source in ("procedural", "curated")
+
+    coding = provider.generate_coding(field="SQL")
+    assert coding.source != "model", "Procedural Coding problem was untruthfully labeled as 'model'"
+    assert coding.provenance.provider == "procedural"
+    assert coding.source in ("procedural", "curated")
+
+    # Gateway fallback check
+    gateway = AIGateway()
+    gateway.circuit_breaker.trip()  # force offline
+    problem = gateway.generate_practice_problem(field="Java", mode="CODING")
+    assert problem["source"] != "model", "Gateway fallback was untruthfully labeled as 'model'"
+    assert problem.get("provenance", {}).get("provider") == "procedural"
+    gateway.circuit_breaker.reset()

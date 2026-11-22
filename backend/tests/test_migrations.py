@@ -88,6 +88,24 @@ def test_migration_0007_definition() -> None:
     assert hasattr(mod, "downgrade")
 
 
+def test_migration_0008_definition() -> None:
+    """Verify Migration 0008 covers question_bank category and links to 0007."""
+    mod = load_migration_module("0008_assessment_category_layer.py")
+    assert mod.revision == "0008"
+    assert mod.down_revision == "0007"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+
+
+def test_migration_0009_definition() -> None:
+    """Verify Migration 0009 covers ai_question_pool and links to 0008."""
+    mod = load_migration_module("0009_ai_question_pool.py")
+    assert mod.revision == "0009"
+    assert mod.down_revision == "0008"
+    assert hasattr(mod, "upgrade")
+    assert hasattr(mod, "downgrade")
+
+
 def test_alembic_upgrade_head_on_clean_database(tmp_path: Path) -> None:
     """Verify that 'alembic upgrade head' runs successfully on an empty database."""
     from alembic import command
@@ -97,6 +115,8 @@ def test_alembic_upgrade_head_on_clean_database(tmp_path: Path) -> None:
     db_path = tmp_path / "clean_alembic_test.db"
     ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
     cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(ini_path.parent / "alembic"))
+    cfg.set_main_option("version_locations", str(ini_path.parent / "alembic" / "versions"))
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
 
     # Run upgrade head from scratch
@@ -112,7 +132,8 @@ def test_alembic_upgrade_head_on_clean_database(tmp_path: Path) -> None:
     assert "meetings" in tables
     assert "talent_alerts" in tables
     assert "practice_scores" in tables
-    assert len(tables) >= 45
+    assert "ai_question_pool" in tables
+    assert len(tables) >= 46
 
 
 def test_schema_model_drift_check(tmp_path: Path) -> None:
@@ -125,6 +146,8 @@ def test_schema_model_drift_check(tmp_path: Path) -> None:
     db_path = tmp_path / "drift_check.db"
     ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
     cfg = Config(str(ini_path))
+    cfg.set_main_option("script_location", str(ini_path.parent / "alembic"))
+    cfg.set_main_option("version_locations", str(ini_path.parent / "alembic" / "versions"))
     cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
     command.upgrade(cfg, "head")
 

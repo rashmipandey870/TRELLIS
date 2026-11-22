@@ -132,7 +132,15 @@ def generate_question(
             else None
         )
 
-        source_label = "llm" if data.get("provenance") or data.get("source") == "llm" else data.get("source", "llm")
+        # Truthful provenance and source derivation (Phase A requirement)
+        provenance = data.get("provenance") or {}
+        prov_provider = provenance.get("provider", "procedural")
+        if prov_provider in ("ollama", "cloud"):
+            source_label = "model"
+        elif prov_provider == "curated":
+            source_label = "curated"
+        else:
+            source_label = "procedural"
 
         # Determine proper starter code matching field/language
         lang_key = (data.get("language") or ("sql" if "sql" in pq.field.lower() else "python")).lower()

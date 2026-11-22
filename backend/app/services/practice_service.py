@@ -440,9 +440,14 @@ def generate_practice_question(
         field=target_field,
         difficulty=target_diff,
         mode=target_mode,
+        db=session,
+        learner_id=learner_id,
+        seen_hashes=seen_hashes,
     )
     if "source" not in selected_tmpl:
-        selected_tmpl["source"] = selected_tmpl.get("provenance", {}).get("served_from", "llm")
+        prov = selected_tmpl.get("provenance", {})
+        prov_p = prov.get("provider", "procedural")
+        selected_tmpl["source"] = "model" if prov_p in ("ollama", "cloud") else ("curated" if prov_p == "curated" else "procedural")
 
     # Create session if not active
     practice_session = PracticeSession(

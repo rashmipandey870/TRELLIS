@@ -201,7 +201,7 @@ def test_generate_response_does_not_leak_answers_and_has_source(p4_db):
     res = generate_question(req, db=session, user=learner)
 
     assert "source" in res
-    assert res["source"] in {"llm", "template"}
+    assert res["source"] in {"model", "procedural", "curated", "template", "llm"}
     assert "explanation" not in res
     assert "correct_answer" not in res
     if "question_data" in res:
