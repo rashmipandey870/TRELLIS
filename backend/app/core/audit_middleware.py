@@ -16,6 +16,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.security import decode_access_token
 
+# Enterprise HTTP Security Headers (Phase 3.3)
+SECURITY_HEADERS: dict[str, str] = {
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=()",
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: ws: wss:;"
+    ),
+}
+
 
 class AccessLogMiddleware(BaseHTTPMiddleware):
     """ASGI middleware tracking correlation IDs and authenticated request access.
@@ -44,8 +57,10 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         # Execute downstream route handler
         response: Response = await call_next(request)
 
-        # Attach correlation header to downstream response
+        # Attach correlation header and Enterprise Security Headers (Phase 3.3)
         response.headers["X-Request-ID"] = request_id
+        for header_key, header_val in SECURITY_HEADERS.items():
+            response.headers[header_key] = header_val
         return response
 
 

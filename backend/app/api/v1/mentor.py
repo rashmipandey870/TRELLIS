@@ -2251,3 +2251,147 @@ def stream_with_mentor_assistant(
         stream_chat_role(user=mentor, user_message=payload.message, db=db),
         media_type="text/event-stream",
     )
+
+
+# --- Assessment Presets & CSV Import/Export Studio (Phase 3.5) ---
+
+class QuestionImportRequest(BaseModel):
+    csv_content: str
+    dry_run: bool = True
+
+
+@router.get("/assessments/templates", summary="Get role and learning path assessment templates/presets (Phase 3.5)")
+def get_assessment_templates(
+    mentor: User = Depends(require_mentor),
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "FULLSTACK_ENTRY",
+            "name": "Junior Full-Stack Engineering Entry",
+            "field": "Web & Full Stack",
+            "target_experience": "0-2 Years",
+            "duration_minutes": 60,
+            "passing_score": 60.0,
+            "proctoring_flags": {"strict_tab_monitoring": True, "fullscreen_required": False},
+            "category_split": {"Technical Knowledge": 40, "Coding": 40, "Quantitative Aptitude": 20},
+            "instructions": "Baseline engineering evaluation covering JavaScript/TypeScript, REST architecture, and core algorithms.",
+        },
+        {
+            "id": "CLOUD_DEVOPS_MID",
+            "name": "Mid-Level Cloud Platform & DevOps",
+            "field": "Cloud & DevOps",
+            "target_experience": "2-4 Years",
+            "duration_minutes": 75,
+            "passing_score": 65.0,
+            "proctoring_flags": {"strict_tab_monitoring": True, "fullscreen_required": True},
+            "category_split": {"Technical Knowledge": 50, "Coding": 30, "Situational Judgement": 20},
+            "instructions": "Production infrastructure readiness sprint focusing on Docker, Kubernetes, CI/CD, and system diagnostics.",
+        },
+        {
+            "id": "DATA_AI_SPECIALIST",
+            "name": "Senior Data Engineering & AI Sprint",
+            "field": "Data & AI",
+            "target_experience": "3-6 Years",
+            "duration_minutes": 90,
+            "passing_score": 70.0,
+            "proctoring_flags": {"strict_tab_monitoring": True, "fullscreen_required": True},
+            "category_split": {"Technical Knowledge": 40, "Coding": 40, "Logical Reasoning": 20},
+            "instructions": "Advanced data pipeline architecture, SQL query tuning, Spark optimizations, and LLM evaluation benchmarks.",
+        },
+        {
+            "id": "SYSTEMS_KERNEL",
+            "name": "Core Systems & Embedded C/C++",
+            "field": "Core Systems",
+            "target_experience": "2-5 Years",
+            "duration_minutes": 90,
+            "passing_score": 70.0,
+            "proctoring_flags": {"strict_tab_monitoring": True, "fullscreen_required": True},
+            "category_split": {"Technical Knowledge": 40, "Coding": 50, "Quantitative Aptitude": 10},
+            "instructions": "Memory management, POSIX threading, low-level pointer arithmetic, and system call profiling.",
+        },
+        {
+            "id": "WORKPLACE_READINESS",
+            "name": "Workplace Communication & Readiness",
+            "field": "Engineering Architecture",
+            "target_experience": "All Cohorts",
+            "duration_minutes": 45,
+            "passing_score": 60.0,
+            "proctoring_flags": {"strict_tab_monitoring": False, "fullscreen_required": False},
+            "category_split": {"English & Communication": 50, "Psychometric": 50},
+            "instructions": "Evaluates professional clarity, workplace collaboration, stakeholder communication, and situational composure.",
+        },
+    ]
+
+
+@router.post("/questions/import", summary="Import questions via CSV with dry-run support (Phase 3.5)")
+def import_questions_csv(
+    payload: QuestionImportRequest,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    reader = csv.DictReader(io.StringIO(payload.csv_content.strip()))
+    valid_rows = []
+    errors = []
+    valid_categories = {c.value for c in AssessmentCategory}
+
+    for idx, row in enumerate(reader, 1):
+        title = (row.get("title") or "").strip()
+        text = (row.get("question_text") or "").strip()
+        category = (row.get("category") or "").strip()
+        field = (row.get("field") or "General").strip()
+        topic = (row.get("topic") or "General").strip()
+        difficulty = (row.get("difficulty") or "MEDIUM").strip().upper()
+        correct_answer = (row.get("correct_answer") or "").strip()
+        raw_options = (row.get("options") or "").strip()
+
+        if not title or not text:
+            errors.append(f"Row {idx}: 'title' and 'question_text' are required.")
+            continue
+        if category not in valid_categories:
+            errors.append(f"Row {idx}: Invalid category '{category}'. Must be one of: {sorted(list(valid_categories))}")
+            continue
+
+        options = [opt.strip() for opt in raw_options.split("|") if opt.strip()] if raw_options else []
+        valid_rows.append({
+            "title": title,
+            "question_text": text,
+            "category": category,
+            "field": field,
+            "topic": topic,
+            "difficulty": difficulty,
+            "correct_answer": correct_answer,
+            "options": options,
+        })
+
+    if not payload.dry_run and valid_rows:
+        for item in valid_rows:
+            q = QuestionBank(
+                author_id=mentor.id,
+                title=item["title"],
+                question_text=item["question_text"],
+                question_type="MCQ" if item["options"] else "SHORT_ANSWER",
+                category=item["category"],
+                field=item["field"],
+                topic=item["topic"],
+                difficulty=item["difficulty"],
+                is_active=True,
+            )
+            db.add(q)
+            db.flush()
+            for seq, opt_text in enumerate(item["options"], 1):
+                db.add(McqOption(
+                    question_id=q.id,
+                    option_text=opt_text,
+                    is_correct=(opt_text == item["correct_answer"]),
+                    sequence_order=seq,
+                ))
+
+    return {
+        "dry_run": payload.dry_run,
+        "total_parsed": len(valid_rows) + len(errors),
+        "valid_count": len(valid_rows),
+        "error_count": len(errors),
+        "errors": errors,
+        "preview": valid_rows[:5],
+    }

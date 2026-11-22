@@ -87,6 +87,15 @@ class Settings(BaseSettings):
     AI_BASE_URL: str = "https://api.anthropic.com"
     AI_LOCAL_URL: str = "http://localhost:11434"
 
+    # SMTP / MailHog Service Configuration (Phase 3.1)
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 1025
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_TLS: bool = False
+    EMAILS_FROM_EMAIL: str = "notifications@csmtech.internal"
+    EMAILS_FROM_NAME: str = "CSM TRELLIS Platform"
+
     @model_validator(mode="after")
     def validate_production_invariants(self) -> "Settings":
         """Strictly refuse startup in non-dev environments if secrets or keys are missing."""

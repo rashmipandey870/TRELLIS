@@ -24,7 +24,7 @@
     <div class="summary-box">
       <strong>Overall Status:</strong> 
       <span class="badge-pass">100% RELEASE READY (ALL GATES PASSED)</span><br>
-      <strong>Executed At:</strong> 2026-11-22T20:46:47.143979+00:00<br>
+      <strong>Executed At:</strong> 2026-11-22T21:22:06.907976+00:00<br>
       <strong>Target Repository:</strong> rashmipandey870/TRELLIS
     </div>
 
@@ -42,7 +42,7 @@
         <tr>
           <td><strong>Clean DB Baseline & Enterprise Demo Seed</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>20.59s</td>
+          <td>16.90s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>Ensuring database at sqlite:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/release_gate_test.db is migrated to Alembic head...
@@ -97,7 +97,7 @@ INFO  [alembic.runtime.migration] Running upgrade 0009 -> 0010, Add judge format
         <tr>
           <td><strong>Coding Pack Verification Gate</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>32.80s</td>
+          <td>24.08s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>bprocessRunner. Never use in production (TRELLIS_ENV != dev)!
@@ -124,7 +124,7 @@ SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in
         <tr>
           <td><strong>Answer-Key Distribution & Likert Tests</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>2.97s</td>
+          <td>1.94s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
@@ -140,14 +140,14 @@ collecting ... collected 2 items
 tests/test_answer_key_distribution.py::test_mcq_answer_key_distribution_is_balanced PASSED [ 50%]
 tests/test_answer_key_distribution.py::test_psychometric_likert_dimensions_and_rubrics PASSED [100%]
 
-============================== 2 passed in 1.45s ==============================
+============================== 2 passed in 0.74s ==============================
 </pre></details></td>
         </tr>
 
         <tr>
           <td><strong>Full Backend Pytest Suite</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>71.03s</td>
+          <td>58.40s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>=================
@@ -173,37 +173,37 @@ tests/test_migrations.py::test_schema_model_drift_check
     util.warn_deprecated(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-============ 179 passed, 5 skipped, 6 warnings in 67.26s (0:01:07) ============
+================= 184 passed, 5 skipped, 6 warnings in 54.91s =================
 </pre></details></td>
         </tr>
 
         <tr>
           <td><strong>Frontend Production Build (Angular 22)</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>19.09s</td>
+          <td>14.33s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>499.24 kB |               121.17 kB
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>522.52 kB |               127.33 kB
 
 Lazy chunk files      | Names                         |  Raw size | Estimated transfer size
-chunk-Dh_rcRSD.js     | mentor-assessments-component  |  82.39 kB |                14.10 kB
-chunk-xDT-mAMW.js     | -                             |  26.28 kB |                 6.32 kB
-chunk-B5E92DCP.js     | learner-practice-component    |  21.83 kB |                 5.55 kB
-chunk-Dtp6mrwI.js     | learner-coding-component      |  18.91 kB |                 4.96 kB
-chunk-CbCDENeX.js     | learner-assessments-component |  18.13 kB |                 4.60 kB
-chunk-B18uM-K4.js     | csm-landing-component         |  14.57 kB |                 3.38 kB
-chunk-DFbYgzyN.js     | admin-dashboard-component     |  13.72 kB |                 3.49 kB
-chunk-CTGOsgFz.js     | mentor-learners-component     |  12.98 kB |                 3.63 kB
-chunk-DQ5jyH0W.js     | admin-users-component         |  12.78 kB |                 3.33 kB
-chunk-BBvBTO6T.js     | admin-learners-component      |  12.43 kB |                 3.40 kB
-chunk-ZO4nODrT.js     | mentor-meetings-component     |  11.77 kB |                 3.12 kB
-chunk-D_4EF5Tt.js     | admin-batches-component       |  11.48 kB |                 2.74 kB
-chunk-C4956C0u.js     | learner-results-component     |   9.80 kB |                 2.80 kB
-chunk-Cp05CPvk.js     | change-password-component     |   8.01 kB |                 2.36 kB
-chunk-C4-_a4KM.js     | -                             |   8.00 kB |                 2.60 kB
+chunk-CenOfCrU.js     | mentor-assessments-component  |  82.39 kB |                14.11 kB
+chunk-DR3b9s5g.js     | learner-practice-component    |  21.83 kB |                 5.54 kB
+chunk-BSoS1e0B.js     | learner-coding-component      |  18.91 kB |                 4.97 kB
+chunk-NFCaZ3DO.js     | learner-assessments-component |  18.16 kB |                 4.63 kB
+chunk-C6w_bfi6.js     | csm-landing-component         |  14.58 kB |                 3.35 kB
+chunk-WQ5kZ13E.js     | admin-dashboard-component     |  13.72 kB |                 3.49 kB
+chunk-CR90zCUu.js     | -                             |  13.65 kB |                 3.30 kB
+chunk--o2yJT90.js     | mentor-learners-component     |  12.98 kB |                 3.62 kB
+chunk-Pl-YNdDm.js     | admin-users-component         |  12.78 kB |                 3.32 kB
+chunk-DflOrLAC.js     | admin-learners-component      |  12.43 kB |                 3.41 kB
+chunk-C79CY3Vb.js     | mentor-meetings-component     |  11.77 kB |                 3.14 kB
+chunk-BTPCdp4h.js     | admin-batches-component       |  11.48 kB |                 2.74 kB
+chunk-BhZ86YwF.js     | learner-results-component     |   9.80 kB |                 2.81 kB
+chunk-DxxEGPjP.js     | change-password-component     |   8.04 kB |                 2.37 kB
+chunk-Bp73c90S.js     | -                             |   8.00 kB |                 2.59 kB
 ...and 11 more lazy chunks files. Use "--verbose" to show all the files.
 
-Application bundle generation complete. [14.388 seconds] - 2026-11-22T20:46:45.691Z
+Application bundle generation complete. [10.118 seconds] - 2026-11-22T21:22:05.991Z
 
 Output location: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\frontend\dist\frontend
 

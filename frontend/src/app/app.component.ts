@@ -2,16 +2,24 @@ import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ToastService } from './core/services/toast.service';
+import { CommandPaletteComponent } from './shared/components/command-palette.component';
+import { AssistantComponent } from './shared/assistant/assistant.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet],
+  imports: [CommonModule, RouterOutlet, CommandPaletteComponent, AssistantComponent],
   template: `
     <!-- Skip Link for Keyboard Accessibility (WCAG 2.4.1) -->
     <a href="#main-content" class="skip-link sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:p-2 focus:bg-white focus:text-slate-900 focus:shadow-md focus:rounded-md">
       Skip to main content
     </a>
+
+    <!-- Command Palette (Ctrl+K or Cmd+K) -->
+    <app-command-palette />
+
+    <!-- Role-Governed AI Assistant Floating Action Widget -->
+    <app-assistant />
 
     <!-- Toast Notifications Region (WCAG 4.1.3 Live Region) -->
     <div aria-live="polite" aria-atomic="true" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none">

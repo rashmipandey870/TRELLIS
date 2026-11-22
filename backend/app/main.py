@@ -58,8 +58,8 @@ app = FastAPI(
     description="CSM Technology Learning & Knowledge Platform - Where every Tendril climbs",
     version=settings.VERSION,
     lifespan=lifespan,
-    docs_url=f"{settings.API_V1_STR}/docs",
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=f"{settings.API_V1_STR}/docs" if settings.TRELLIS_ENV in ("dev", "test") else None,
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.TRELLIS_ENV in ("dev", "test") else None,
 )
 
 # CORS Middleware
