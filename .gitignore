@@ -46,6 +46,10 @@ coverage.json
 .dmypy.json
 dmypy.json
 
+# Storage
+storage/
+backend/storage/
+
 # Node & Frontend
 node_modules/
 dist/

@@ -17,6 +17,7 @@ from app.api.v1.mentor import router as mentor_router
 from app.api.v1.notifications import router as notifications_router
 from app.api.v1.pathways import router as pathways_router
 from app.api.v1.practice import router as practice_router
+from app.api.v1.storage import router as storage_router
 from app.core.audit_middleware import AuditLogMiddleware
 from app.core.config import settings
 
@@ -83,6 +84,7 @@ app.include_router(practice_router, prefix=settings.API_V1_STR)
 app.include_router(notifications_router, prefix=settings.API_V1_STR)
 app.include_router(home_router, prefix=settings.API_V1_STR)
 app.include_router(pathways_router, prefix=settings.API_V1_STR)
+app.include_router(storage_router, prefix=settings.API_V1_STR)
 
 
 @app.get(f"{settings.API_V1_STR}/health", tags=["Health"], status_code=status.HTTP_200_OK)

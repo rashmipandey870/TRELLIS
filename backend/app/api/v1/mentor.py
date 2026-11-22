@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
@@ -1328,6 +1329,7 @@ def create_question_unified(
 def list_question_bank(
     field: str | None = None,
     difficulty: str | None = None,
+    category: str | None = None,
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
 ) -> list[dict[str, Any]]:
@@ -1336,6 +1338,8 @@ def list_question_bank(
         query = query.where(QuestionBank.field == field)
     if difficulty:
         query = query.where(QuestionBank.difficulty == difficulty.upper())
+    if category:
+        query = query.where(QuestionBank.category == category)
 
     items = db.execute(query).scalars().all()
     return [
@@ -1344,6 +1348,7 @@ def list_question_bank(
             "title": q.title,
             "type": q.question_type,
             "field": q.field,
+            "category": getattr(q, "category", "Technical Knowledge"),
             "difficulty": q.difficulty,
             "tags": q.tags_json or [],
             "content": q.question_text,
@@ -1703,6 +1708,63 @@ def grade_attempt_answers(
     }
 
 
+@router.post("/assessments/attempts/{attempt_id}/answers/{answer_id}/ai-evaluate", summary="AI Subjective Rubric Evaluation")
+def ai_evaluate_subjective_answer(
+    attempt_id: str,
+    answer_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> dict[str, Any]:
+    """Provide AI-driven rubric evaluation for open-ended or subjective trainee answers."""
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment attempt not found.")
+
+    ans = db.get(Answer, answer_id)
+    if not ans or ans.attempt_id != attempt.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Answer not found in this attempt.")
+
+    bq = ans.question
+    aq = next((q for q in attempt.assessment.questions if q.bank_question_id == bq.id), None)
+    max_marks = float(aq.marks) if aq else 10.0
+
+    student_response = (ans.text_response or ans.file_name or "").strip()
+    from app.services.rubric_evaluator import evaluate_subjective_response
+    evaluation = evaluate_subjective_response(
+        question_title=bq.title,
+        question_text=bq.question_text,
+        student_response=student_response,
+        max_marks=max_marks,
+        rubric_criteria=getattr(bq, "rubric_json", None),
+    )
+    return evaluation
+
+
+@router.get("/assessments/attempts/{attempt_id}/report/pdf", summary="Export Growth Ring Report as PDF (Mentor)")
+def export_growth_ring_pdf_mentor(
+    attempt_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> Response:
+    """Generate and return official CSM Growth Ring evaluation PDF for mentor review."""
+    attempt = db.get(AssessmentAttempt, attempt_id)
+    if not attempt or attempt.assessment.mentor_id != mentor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment attempt not found.")
+
+    if not attempt.report_json:
+        from app.services.ai_analytics_engine import generate_growth_ring_report
+        generate_growth_ring_report(attempt.id, db)
+        db.refresh(attempt)
+
+    from app.services.pdf_report_service import generate_growth_ring_pdf
+    pdf_bytes = generate_growth_ring_pdf(attempt.report_json)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="growth_ring_report_{attempt.id[:8]}.pdf"'},
+    )
+
+
 @router.post("/assessments/attempts/{attempt_id}/approve-report", summary="Approve AI Growth Ring report for learner")
 def approve_assessment_report(
     attempt_id: str,
@@ -2056,3 +2118,124 @@ def act_on_talent_alert(
 
     db.commit()
     return {"message": "Action recorded successfully.", "status": alert.status}
+
+
+# --- Needs Attention Queue & Role Chatbot (Phase B) ---
+class ChatMessageItem(BaseModel):
+    role: str
+    content: str
+
+
+class MentorChatbotRequest(BaseModel):
+    message: str
+    history: list[ChatMessageItem] = Field(default_factory=list)
+
+
+@router.get("/learners/needs-attention", summary="Get priority queue of trainees requiring mentor intervention")
+def get_learners_needs_attention(
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> list[dict[str, Any]]:
+    """Identify trainees with failing assessment attempts, pending grading, or broken streaks."""
+    # Find assigned learners
+    learner_query = select(MentorLearnerAssignment.learner_id).where(
+        MentorLearnerAssignment.mentor_id == mentor.id
+    )
+    assigned_learner_ids = list(set(db.execute(learner_query).scalars().all()))
+
+    if not assigned_learner_ids:
+        return []
+
+    attention_items = []
+    learners = db.execute(select(User).where(User.id.in_(assigned_learner_ids))).scalars().all()
+
+    for l in learners:
+        # Check for unreviewed subjective answers
+        pending_att = db.execute(
+            select(AssessmentAttempt)
+            .where(
+                AssessmentAttempt.learner_id == l.id,
+                AssessmentAttempt.status == "SUBMITTED",
+                AssessmentAttempt.grading_status == "PENDING_REVIEW",
+            )
+        ).scalars().first()
+
+        if pending_att:
+            attention_items.append({
+                "learner_id": l.id,
+                "learner_name": l.full_name,
+                "learner_email": l.email,
+                "urgency": "HIGH",
+                "reason": f"Pending subjective grading on '{pending_att.assessment.title if pending_att.assessment else 'Assessment'}'",
+                "attempt_id": pending_att.id,
+                "action_type": "GRADE_SUBMISSION",
+            })
+            continue
+
+        # Check for recent failed assessment
+        latest_att = db.execute(
+            select(AssessmentAttempt)
+            .where(AssessmentAttempt.learner_id == l.id, AssessmentAttempt.status == "SUBMITTED")
+            .order_by(AssessmentAttempt.submit_time.desc())
+        ).scalars().first()
+
+        if latest_att and not latest_att.passed:
+            score_pct = (float(latest_att.score) / float(latest_att.total_marks or 100.0)) * 100.0
+            attention_items.append({
+                "learner_id": l.id,
+                "learner_name": l.full_name,
+                "learner_email": l.email,
+                "urgency": "HIGH",
+                "reason": f"Failed '{latest_att.assessment.title if latest_att.assessment else 'Assessment'}' with {score_pct:.1f}%",
+                "attempt_id": latest_att.id,
+                "action_type": "SCHEDULE_1ON1",
+            })
+            continue
+
+        # Check for inactive streak
+        if l.streak_days == 0:
+            attention_items.append({
+                "learner_id": l.id,
+                "learner_name": l.full_name,
+                "learner_email": l.email,
+                "urgency": "MEDIUM",
+                "reason": "Learning streak lapsed to 0 days (no practice activity)",
+                "attempt_id": None,
+                "action_type": "SEND_NUDGE",
+            })
+
+    return attention_items
+
+
+@router.post("/chatbot/chat", summary="Chat with TRELLIS Mentor Assistant")
+def chat_with_mentor_assistant(
+    payload: MentorChatbotRequest,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    from app.ai.chatbot.chat_service import chat_role
+    history_dicts = [{"role": m.role, "content": m.content} for m in payload.history]
+    result = chat_role(
+        user=mentor,
+        user_message=payload.message,
+        db=db,
+        history=history_dicts,
+    )
+    if "error" in result and result["error"] == "RATE_LIMIT_EXCEEDED":
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=result["message"])
+    return result
+
+
+@router.get("/chatbot/stream", summary="Stream chat with TRELLIS Mentor Assistant (GET)")
+@router.post("/chatbot/stream", summary="Stream chat with TRELLIS Mentor Assistant (POST)")
+def stream_with_mentor_assistant(
+    message: str = Query(..., description="User query"),
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> StreamingResponse:
+    from app.ai.chatbot.chat_service import stream_chat_role
+    return StreamingResponse(
+        stream_chat_role(user=mentor, user_message=message, db=db),
+        media_type="text/event-stream",
+    )

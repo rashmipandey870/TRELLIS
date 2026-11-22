@@ -620,6 +620,7 @@ def generate_growth_ring_report(attempt_id: str, db: Session) -> dict[str, Any]:
         "next_steps": next_steps,
         "ai_narrative": ai_narrative,
         "radar_chart_svg": radar_svg,
+        "disclaimer": "Indicative only, not clinical. Psychometric and developmental diagnostic indicators are for professional coaching only.",
         "generated_at": datetime.now(UTC).isoformat(),
     }
 

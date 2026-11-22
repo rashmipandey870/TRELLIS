@@ -18,6 +18,7 @@ import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -828,3 +829,49 @@ def trigger_ai_pool_refill(
         "message": "Question pool replenishment triggered.",
         "pool_counts": ai_gateway.pool.get_pool_counts(),
     }
+
+
+# --- Admin Enterprise Copilot Chatbot (Phase B) ---
+class ChatMessageItem(BaseModel):
+    role: str
+    content: str
+
+
+class AdminChatbotRequest(BaseModel):
+    message: str
+    history: list[ChatMessageItem] = Field(default_factory=list)
+
+
+@router.post("/chatbot/chat", summary="Chat with TRELLIS Enterprise Operations Copilot")
+def chat_with_admin_copilot(
+    payload: AdminChatbotRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    """Execute grounded administrative chat inquiry."""
+    from app.ai.chatbot.chat_service import chat_role
+    history_dicts = [{"role": m.role, "content": m.content} for m in payload.history]
+    result = chat_role(
+        user=admin,
+        user_message=payload.message,
+        db=db,
+        history=history_dicts,
+    )
+    if "error" in result and result["error"] == "RATE_LIMIT_EXCEEDED":
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=result["message"])
+    return result
+
+
+@router.get("/chatbot/stream", summary="Stream chat with TRELLIS Enterprise Operations Copilot (GET)")
+@router.post("/chatbot/stream", summary="Stream chat with TRELLIS Enterprise Operations Copilot (POST)")
+def stream_with_admin_copilot(
+    message: str = Query(..., description="User query"),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> StreamingResponse:
+    from app.ai.chatbot.chat_service import stream_chat_role
+    return StreamingResponse(
+        stream_chat_role(user=admin, user_message=message, db=db),
+        media_type="text/event-stream",
+    )

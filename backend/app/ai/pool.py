@@ -39,10 +39,9 @@ class VerifiedPoolManager:
         self._memory_pools: dict[str, collections.deque[dict[str, Any]]] = collections.defaultdict(collections.deque)
         self._lock = threading.Lock()
         self._procedural = ProceduralAIProvider()
-        # Seed initial memory buffers for immediate availability
+        # Seed initial memory buffers for immediate availability (MCQs fast-seeded; coding seeded on demand)
         for fld in ["Python", "SQL"]:
-            for m in ["MCQ", "CODING"]:
-                self.populate_memory_fallback(fld, m, "MEDIUM", count=self.target_per_bucket)
+            self.populate_memory_fallback(fld, "MCQ", "MEDIUM", count=self.target_per_bucket)
 
     def _bucket_key(self, field: str, mode: str, difficulty: str = "MEDIUM") -> str:
         return f"{field.strip().lower()}:{mode.strip().lower()}:{difficulty.strip().lower()}"
