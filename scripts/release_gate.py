@@ -1,13 +1,16 @@
-"""TRELLIS Enterprise Release Gate Verification Script (Phase 1.5).
+"""TRELLIS Enterprise Release Gate Verification Script.
 
-Cross-platform verification suite:
-1. Clean Database Migrations & Enterprise Demo Seed (Alembic upgrade head -> Seed 42 users, 304 questions, 24 coding problems, 400+ submissions, 19 meetings)
-2. Coding Pack Verification Gate (runs every reference solution & stub through judge harness)
-3. Answer-Key Distribution & Psychometric Likert Validation (<35% position bias, 8 dimensions)
-4. Full Portable Backend Pytest Suite (184 test items across security, auth, UoW, grading bounds)
-5. Data Integrity Checks (ensures required counts for manager-readiness)
-6. Frontend Angular Production Build (npm run build cross-platform)
-7. Generates comprehensive RELEASE_REPORT.html with verifiable audit evidence.
+Comprehensive cross-platform verification suite:
+1. Clean Database Migrations & Enterprise Demo Seed
+2. Demo Data Integrity Verification (record thresholds across all key models)
+3. Seed Idempotency Verification (test_seed_idempotency.py)
+4. Content Quality & Uniqueness Gate (test_content_quality.py)
+5. Psychometric Flow & Consent Gate (test_psychometric_flow.py)
+6. Frontend Cleanliness & Light Theme Gate (test_frontend_cleanliness_and_light_theme.py)
+7. Coding Pack Judge Harness Gate (verify_coding_pack.py)
+8. Full Backend Pytest Suite
+9. Frontend Production Build (npm run build cross-platform)
+10. Generates comprehensive RELEASE_REPORT.html with verifiable audit evidence.
 """
 
 from __future__ import annotations
@@ -66,6 +69,7 @@ def check_data_integrity(db_path: Path) -> tuple[bool, str]:
             ("practice_attempts", 600),
             ("meetings", 18),
             ("notifications", 150),
+            ("ai_question_pool", 24),
         ]
         
         report = []
@@ -119,25 +123,49 @@ def main():
     print(f"{'✅ PASSED' if ok_int else '❌ FAILED'} Data Integrity Verification:\n{out_int}")
     if not ok_int: all_passed = False
 
-    # 3. Coding Pack Verification Gate
+    # 3. Frontend Cleanliness & Light Theme Gate
+    clean_cmd = [python_exe, "-m", "pytest", "tests/test_frontend_cleanliness_and_light_theme.py", "-v"]
+    ok, out, dur = run_step("Frontend Cleanliness & Light Theme Gate", clean_cmd, cwd=backend_dir)
+    report_entries.append(("Frontend Cleanliness & Light Theme Gate", ok, dur, out))
+    if not ok: all_passed = False
+
+    # 4. Content Quality & Policy Coverage Gate
+    content_cmd = [python_exe, "-m", "pytest", "tests/test_content_quality.py", "-v"]
+    ok, out, dur = run_step("Content Quality & Policy Coverage Gate", content_cmd, cwd=backend_dir)
+    report_entries.append(("Content Quality & Policy Coverage Gate", ok, dur, out))
+    if not ok: all_passed = False
+
+    # 5. Psychometric Flow Gate
+    psych_cmd = [python_exe, "-m", "pytest", "tests/test_psychometric_flow.py", "-v"]
+    ok, out, dur = run_step("Psychometric Flow & Consent Gate", psych_cmd, cwd=backend_dir)
+    report_entries.append(("Psychometric Flow & Consent Gate", ok, dur, out))
+    if not ok: all_passed = False
+
+    # 6. Seed Idempotency Gate
+    idemp_cmd = [python_exe, "-m", "pytest", "tests/test_seed_idempotency.py", "-v"]
+    ok, out, dur = run_step("Seed Idempotency Gate", idemp_cmd, cwd=backend_dir)
+    report_entries.append(("Seed Idempotency Gate", ok, dur, out))
+    if not ok: all_passed = False
+
+    # 7. Coding Pack Verification Gate
     verify_pack_cmd = [python_exe, "scripts/verify_coding_pack.py"]
     ok, out, dur = run_step("Coding Pack Judge Harness Gate", verify_pack_cmd, cwd=repo_root)
     report_entries.append(("Coding Pack Verification Gate", ok, dur, out))
     if not ok: all_passed = False
 
-    # 4. Answer-Key Distribution & Psychometric Likert
+    # 8. Answer-Key Distribution & Psychometric Likert Tests
     dist_cmd = [python_exe, "-m", "pytest", "tests/test_answer_key_distribution.py", "-v"]
     ok, out, dur = run_step("Answer-Key Distribution & Likert Tests", dist_cmd, cwd=backend_dir)
     report_entries.append(("Answer-Key Distribution & Likert Tests", ok, dur, out))
     if not ok: all_passed = False
 
-    # 5. Full Backend Portable Pytest Suite
+    # 9. Full Backend Portable Pytest Suite
     full_pytest_cmd = [python_exe, "-m", "pytest", "-v"]
     ok, out, dur = run_step("Full Backend Pytest Suite", full_pytest_cmd, cwd=backend_dir)
     report_entries.append(("Full Backend Pytest Suite", ok, dur, out))
     if not ok: all_passed = False
 
-    # 6. Frontend Production Build (Cross-platform npm execution)
+    # 10. Frontend Production Build (Cross-platform npm execution)
     npm_bin = shutil.which("npm.cmd" if sys.platform == "win32" else "npm") or "npm"
     build_cmd = [npm_bin, "run", "build"]
     ok, out, dur = run_step("Frontend Production Build (Angular 22)", build_cmd, cwd=frontend_dir)
@@ -151,7 +179,7 @@ def main():
         except Exception:
             pass
 
-    # 7. Generate RELEASE_REPORT.html
+    # 11. Generate RELEASE_REPORT.html
     report_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>

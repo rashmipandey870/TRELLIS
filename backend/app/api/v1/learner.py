@@ -34,7 +34,8 @@ from app.models.batches import MentorLearnerAssignment
 from app.models.meetings import Meeting, MeetingAttendance, MeetingAudience
 from app.models.practice import PracticeScore
 from app.models.reviews import MentorRemark
-from app.models.user import User
+from app.models.user import Consent, User
+from app.schemas.category import PSYCHOMETRIC_DISCLAIMER
 
 router = APIRouter(prefix="/learner", tags=["Learner Portal"])
 
@@ -322,6 +323,8 @@ def _execute_assessment_submit(
 
     earned_score = 0.0
     has_pending_review = False
+    has_psychometric = False
+    likert_dimension_scores: dict[str, list[float]] = {}
 
     for aq in assessment.questions:
         bq = aq.question
@@ -344,15 +347,25 @@ def _execute_assessment_submit(
             db.add(ans)
 
         elif bq.question_type == "LIKERT":
+            has_psychometric = True
             selected_ids = user_ans.get("selected_options", [])
-            q_score = aq.marks if selected_ids else 0.0
-            earned_score += q_score
+            # Phase D: Likert items have NO pass/fail marks and do NOT contribute to numerical test score
+            # Score along 1..5 scale per dimension, handling reverse-keyed items
+            opt = None
+            if selected_ids:
+                opt = next((o for o in bq.options if o.id in selected_ids), None)
+            raw_val = float(opt.sequence_order) if (opt and opt.sequence_order) else 3.0
+            rubric = bq.rubric_json or {}
+            dim_name = rubric.get("dimension") or bq.topic or "Workplace Dimension"
+            is_reverse = rubric.get("is_reverse", False)
+            dim_val = (6.0 - raw_val) if is_reverse else raw_val
+            likert_dimension_scores.setdefault(dim_name, []).append(dim_val)
 
             ans = Answer(
                 attempt_id=attempt.id,
                 bank_question_id=bq.id,
                 selected_option_ids_json=selected_ids,
-                score_awarded=q_score,
+                score_awarded=0.0,
                 grading_status="GRADED",
             )
             db.add(ans)
@@ -412,15 +425,48 @@ def _execute_assessment_submit(
             )
             db.add(ans)
 
-    total_marks = attempt.total_marks or sum(q.marks for q in assessment.questions) or 100.0
-    percentage = (earned_score / total_marks) * 100.0 if total_marks > 0 else 0.0
+    # Phase D: Compute 8-dimension psychometric profile if Likert questions are present
+    psychometric_profile = None
+    if has_psychometric and likert_dimension_scores:
+        dim_summary = {}
+        for dim, vals in likert_dimension_scores.items():
+            # Normalized percentage 0.0 - 100.0 (1..5 scale: (avg - 1) / 4 * 100)
+            avg_val = sum(vals) / len(vals)
+            norm_pct = round(max(0.0, min(100.0, ((avg_val - 1.0) / 4.0) * 100.0)), 1)
+            dim_summary[dim] = norm_pct
 
-    attempt.score = earned_score
-    attempt.passed = percentage >= assessment.passing_score
+        psychometric_profile = {
+            "dimensions": dim_summary,
+            "disclaimer": PSYCHOMETRIC_DISCLAIMER,
+            "narrative": "Evaluated behavioral profile across workplace dimensions. Indicative coaching guidance.",
+        }
+
+    is_pure_psychometric = all(aq.question.question_type == "LIKERT" for aq in assessment.questions)
+
+    # Pure psychometric assessments have NO pass/fail and NO marks
+    if is_pure_psychometric:
+        attempt.total_marks = 0.0
+        attempt.score = 0.0
+        attempt.passed = True  # Participation complete, no pass/fail
+        attempt.grading_status = "GRADED"
+    else:
+        scored_marks = sum(aq.marks for aq in assessment.questions if aq.question.question_type != "LIKERT") or 100.0
+        percentage = (earned_score / scored_marks) * 100.0 if scored_marks > 0 else 0.0
+        attempt.total_marks = scored_marks
+        attempt.score = earned_score
+        attempt.passed = percentage >= assessment.passing_score if not has_pending_review else False
+        attempt.grading_status = "PENDING_REVIEW" if has_pending_review else "GRADED"
+
     attempt.status = "SUBMITTED"
-    attempt.grading_status = "PENDING_REVIEW" if has_pending_review else "GRADED"
     attempt.submit_time = datetime.now(UTC)
     attempt.tab_switch_count = tab_switches
+
+    # Attach psychometric profile to report_json
+    existing_rep = attempt.report_json or {}
+    if psychometric_profile:
+        existing_rep["psychometric_profile"] = psychometric_profile
+    attempt.report_json = existing_rep
+
     db.commit()
 
     # Generate initial Growth Ring report
@@ -432,10 +478,13 @@ def _execute_assessment_submit(
 
     return {
         "attempt_id": attempt.id,
-        "score": attempt.score,
-        "total_marks": attempt.total_marks,
-        "passed": attempt.passed,
+        "score": attempt.score if not is_pure_psychometric else None,
+        "total_marks": attempt.total_marks if not is_pure_psychometric else None,
+        "passed": attempt.passed if not is_pure_psychometric else None,
         "status": attempt.status,
+        "is_psychometric": is_pure_psychometric,
+        "psychometric_profile": psychometric_profile,
+        "disclaimer": PSYCHOMETRIC_DISCLAIMER if (is_pure_psychometric or psychometric_profile) else None,
     }
 
 
@@ -589,6 +638,30 @@ def start_assessment(
             }
         questions_data.append(q_item)
 
+    # Capture DPDP consent if assessment contains psychometric questions (Phase D)
+    has_psychometric = any(aq.question.question_type == "LIKERT" for aq in assessment.questions)
+    if has_psychometric:
+        consent = (
+            db.execute(
+                select(Consent).where(
+                    Consent.user_id == learner.id,
+                    Consent.purpose_code == "PSYCHOMETRIC_EVALUATION",
+                    Consent.status == "GRANTED",
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if not consent:
+            consent = Consent(
+                user_id=learner.id,
+                org_id=learner.org_id,
+                purpose_code="PSYCHOMETRIC_EVALUATION",
+                status="GRANTED",
+            )
+            db.add(consent)
+            db.commit()
+
     return {
         "attempt_id": attempt.id,
         "assessment_id": assessment.id,
@@ -598,6 +671,9 @@ def start_assessment(
         "remaining_seconds": remaining_seconds,
         "autosave_state": attempt.autosave_state_json or {},
         "tab_switches": attempt.tab_switch_count,
+        "has_psychometric": has_psychometric,
+        "psychometric_disclaimer": PSYCHOMETRIC_DISCLAIMER if has_psychometric else None,
+        "consent_captured": has_psychometric,
         "questions": questions_data,
     }
 
@@ -728,12 +804,18 @@ def get_assessment_result(
 
         questions_review.append(q_rev)
 
+    is_pure_psychometric = all(aq.question.question_type == "LIKERT" for aq in assessment.questions) if assessment.questions else False
+    psychometric_profile = (attempt.report_json or {}).get("psychometric_profile")
+
     return {
         "assessment_title": assessment.title,
-        "score": attempt.score,
-        "total_marks": attempt.total_marks,
-        "passed": attempt.passed,
-        "batch_average": round(float(batch_avg), 1),
+        "score": attempt.score if not is_pure_psychometric else None,
+        "total_marks": attempt.total_marks if not is_pure_psychometric else None,
+        "passed": attempt.passed if not is_pure_psychometric else None,
+        "is_psychometric": is_pure_psychometric,
+        "psychometric_profile": psychometric_profile,
+        "disclaimer": PSYCHOMETRIC_DISCLAIMER if (is_pure_psychometric or psychometric_profile) else None,
+        "batch_average": round(float(batch_avg), 1) if not is_pure_psychometric else None,
         "submitted_at": attempt.submit_time.isoformat() if attempt.submit_time else None,
         "questions": questions_review,
     }

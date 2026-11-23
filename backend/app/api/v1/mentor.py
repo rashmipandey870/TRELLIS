@@ -47,6 +47,7 @@ from app.models.practice import AlertAction, PracticeScore, TalentAlert
 from app.models.reviews import MentorRemark
 from app.models.user import User
 from app.schemas.category import AssessmentCategory
+from app.services.email_service import dispatch_email_notification
 
 router = APIRouter(prefix="/mentor", tags=["Mentor Portal"])
 
@@ -539,6 +540,17 @@ def schedule_meeting(
             link="/learner/meetings",
         )
         db.add(notif)
+        u = db.get(User, lid)
+        if u and u.email:
+            try:
+                dispatch_email_notification(
+                    to_email=u.email,
+                    subject=f"TRELLIS Meeting: {meeting.title}",
+                    html_content=f"<p>Hello {u.full_name},</p><p>Your mentor {mentor.full_name} scheduled <strong>{meeting.title}</strong> for {meeting.meeting_date} at {meeting.start_time}.</p><p><a href='{meeting.meeting_link}'>Join Meeting</a></p>",
+                    text_content=f"Hello {u.full_name},\nYour mentor {mentor.full_name} scheduled '{meeting.title}' for {meeting.meeting_date} at {meeting.start_time}.\nLink: {meeting.meeting_link}",
+                )
+            except Exception:
+                pass
 
     db.commit()
     return {"id": meeting.id, "title": meeting.title, "status": meeting.status}
@@ -620,6 +632,17 @@ def cancel_meeting(
                 link="/learner/meetings",
             )
             db.add(notif)
+            u = db.get(User, aud.learner_id)
+            if u and u.email:
+                try:
+                    dispatch_email_notification(
+                        to_email=u.email,
+                        subject=f"TRELLIS Meeting Cancelled: {meeting.title}",
+                        html_content=f"<p>Hello {u.full_name},</p><p>Meeting <strong>{meeting.title}</strong> scheduled for {meeting.meeting_date} has been cancelled by {mentor.full_name}.</p>",
+                        text_content=f"Hello {u.full_name},\nMeeting '{meeting.title}' scheduled for {meeting.meeting_date} has been cancelled.",
+                    )
+                except Exception:
+                    pass
 
     db.commit()
     return {"message": "Meeting cancelled."}
@@ -908,6 +931,17 @@ def publish_assessment(
             link="/learner/assessments",
         )
         db.add(notif)
+        u = db.get(User, lid)
+        if u and u.email:
+            try:
+                dispatch_email_notification(
+                    to_email=u.email,
+                    subject=f"New Assessment Available: {assessment.title}",
+                    html_content=f"<p>Hello {u.full_name},</p><p>Mentor {mentor.full_name} published assessment <strong>{assessment.title}</strong>.</p><p>Duration: {assessment.duration_minutes} minutes.</p>",
+                    text_content=f"Hello {u.full_name},\nMentor {mentor.full_name} published assessment '{assessment.title}'. Duration: {assessment.duration_minutes} mins.",
+                )
+            except Exception:
+                pass
 
     db.commit()
     return {"id": assessment.id, "status": assessment.status}

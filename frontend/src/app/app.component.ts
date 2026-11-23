@@ -28,10 +28,10 @@ import { AssistantComponent } from './shared/assistant/assistant.component';
           role="alert"
           class="pointer-events-auto p-4 rounded-xl shadow-lg border transition-all duration-300 flex items-start gap-3"
           [ngClass]="{
-            'bg-emerald-50 dark:bg-emerald-950/90 border-emerald-200 text-emerald-900 dark:text-emerald-100': toast.type === 'success',
-            'bg-rose-50 dark:bg-rose-950/90 border-rose-200 text-rose-900 dark:text-rose-100': toast.type === 'error',
-            'bg-amber-50 dark:bg-amber-950/90 border-amber-200 text-amber-900 dark:text-amber-100': toast.type === 'warning',
-            'bg-sky-50 dark:bg-sky-950/90 border-sky-200 text-sky-900 dark:text-sky-100': toast.type === 'info'
+            'bg-emerald-50  border-emerald-200 text-emerald-900 ': toast.type === 'success',
+            'bg-rose-50  border-rose-200 text-rose-900 ': toast.type === 'error',
+            'bg-amber-50  border-amber-200 text-amber-900 ': toast.type === 'warning',
+            'bg-sky-50  border-sky-200 text-sky-900 ': toast.type === 'info'
           }">
           <div class="flex-1 text-xs">
             @if (toast.title) {
@@ -42,7 +42,7 @@ import { AssistantComponent } from './shared/assistant/assistant.component';
           <button
             type="button"
             (click)="toastService.remove(toast.id)"
-            class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold"
+            class="text-slate-400 hover:text-slate-600 text-sm font-bold"
             aria-label="Close notification">
             &times;
           </button>
@@ -50,7 +50,7 @@ import { AssistantComponent } from './shared/assistant/assistant.component';
       }
     </div>
 
-    <div id="main-content" class="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+    <div id="main-content" class="min-h-screen bg-slate-50 text-slate-900">
       <router-outlet />
     </div>
   `,

@@ -1,11 +1,14 @@
 """TRELLIS Authentication API Endpoints."""
 
+import json
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_user_claims, get_db, get_uow
+from app.core.config import settings
 from app.core.security import get_jwks, hash_password, verify_password
 from app.models import AuditLog, User
 from app.schemas.auth import (
@@ -27,6 +30,7 @@ from app.services.auth_service import (
     setup_totp_mfa,
     verify_mfa_challenge,
 )
+from app.services.email_service import dispatch_email_notification
 from app.services.oidc_adapter import get_oidc_adapter
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -182,6 +186,17 @@ def change_password(
     )
     db.add(audit)
     db.commit()
+
+    try:
+        dispatch_email_notification(
+            to_email=current_user.email,
+            subject="TRELLIS Account Security: Password Changed",
+            html_content=f"<p>Hello {current_user.full_name},</p><p>Your TRELLIS account password was successfully updated. If you did not initiate this change, contact your system administrator immediately.</p>",
+            text_content=f"Hello {current_user.full_name},\nYour TRELLIS account password was successfully updated.",
+        )
+    except Exception:
+        pass
+
     return {"message": "Password updated successfully."}
 
 
@@ -208,3 +223,49 @@ def oidc_login_redirect(
     adapter = get_oidc_adapter()
     url = adapter.get_authorization_url(state, redirect_uri)
     return {"authorization_url": url}
+
+
+@router.get("/demo-accounts", status_code=status.HTTP_200_OK, summary="Get demo accounts if DEMO_MODE is active (Phase A3)")
+def get_demo_accounts() -> dict[str, Any]:
+    """Optional demo convenience endpoint: disabled unless DEMO_MODE=true.
+    
+    Credentials come strictly from environment variables when DEMO_MODE=True,
+    never from the frontend client bundle.
+    """
+    if not settings.DEMO_MODE:
+        return {"enabled": False, "accounts": []}
+
+    accounts = []
+    if settings.DEMO_ACCOUNTS_JSON:
+        try:
+            accounts = json.loads(settings.DEMO_ACCOUNTS_JSON)
+        except Exception:
+            pass
+
+    if not accounts:
+        demo_pwd = os.environ.get("DEMO_PASSWORD", "CSMTrellis2026!")
+        accounts = [
+            {
+                "role": "LEARNER",
+                "name": "Priya Sharma",
+                "email": os.environ.get("DEMO_LEARNER_EMAIL", "learner1@csmtech.internal"),
+                "password": demo_pwd,
+                "description": "Associate Platform Engineer (Batch Alpha)",
+            },
+            {
+                "role": "MENTOR",
+                "name": "Ananya Rao",
+                "email": os.environ.get("DEMO_MENTOR_EMAIL", "mentor1@csmtech.internal"),
+                "password": demo_pwd,
+                "description": "Lead Cloud Architect & Evaluator",
+            },
+            {
+                "role": "ADMIN",
+                "name": "Rajesh Mohanty",
+                "email": os.environ.get("DEMO_ADMIN_EMAIL", "admin@csmtech.internal"),
+                "password": demo_pwd,
+                "description": "L&K Governance Administrator",
+            },
+        ]
+
+    return {"enabled": True, "accounts": accounts}

@@ -34,6 +34,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_sync_engine
 from app.core.security import hash_password
 from app.models import (
+    AIQuestionPool,
     AlertAction,
     Answer,
     Assessment,
@@ -44,6 +45,7 @@ from app.models import (
     Batch,
     CodingProblem,
     Cohort,
+    Consent,
     McqOption,
     Meeting,
     MeetingAttendance,
@@ -62,7 +64,7 @@ from app.models import (
     TestCase,
     User,
 )
-from app.schemas.category import AssessmentCategory
+from app.schemas.category import AssessmentCategory, PSYCHOMETRIC_DISCLAIMER
 from app.services.code_runner import CodeRunner
 
 # Import fixtures
@@ -331,23 +333,23 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
     counts["question_bank"] = session.execute(select(func.count(QuestionBank.id))).scalar() or 0
     counts["coding_problems"] = session.execute(select(func.count(CodingProblem.id))).scalar() or 0
 
-    # 6. 12 Realistic Assessments across Lifecycle States
-    # 4 DRAFT, 2 SCHEDULED, 3 PUBLISHED, 3 CLOSED
+    # 6. 12 Realistic Assessments across Lifecycle States (Phase E1)
+    # At least 3 coding assessments, 1 psychometric (Likert), 1 mixed battery, plus lifecycle states
     assessment_specs = [
-        # DRAFTS (4)
+        # DRAFTS (3)
         ("Advanced Microservices Architecture", "DRAFT", "Cloud & DevOps", batches["BATCH_BETA"], 90, 70.0, mentors["soumya.p@csmtech.internal"]),
         ("Kubernetes Operator Development", "DRAFT", "Cloud & DevOps", batches["BATCH_BETA"], 75, 65.0, mentors["soumya.p@csmtech.internal"]),
-        ("LLM Fine-Tuning & Evaluation Systems", "DRAFT", "Data & AI", batches["BATCH_GAMMA"], 60, 60.0, mentors["ananya.m@csmtech.internal"]),
         ("Linux Kernel Driver Programming", "DRAFT", "Core Systems", batches["BATCH_DELTA"], 120, 75.0, mentors["debashis.j@csmtech.internal"]),
 
         # SCHEDULED (2)
         ("Enterprise Full-Stack Capstone Assessment", "SCHEDULED", "Web & Full Stack", batches["BATCH_ALPHA"], 90, 65.0, mentors["soumya.p@csmtech.internal"]),
         ("Cloud Security & Compliance Certification Sprint", "SCHEDULED", "Cloud & DevOps", batches["BATCH_BETA"], 60, 70.0, mentors["soumya.p@csmtech.internal"]),
 
-        # PUBLISHED / ACTIVE (3)
+        # PUBLISHED / ACTIVE (4)
         ("Core Python & Data Structures Assessment", "PUBLISHED", "Web & Full Stack", batches["BATCH_ALPHA"], 60, 60.0, mentors["soumya.p@csmtech.internal"]),
         ("Enterprise SQL & Database Performance Assessment", "PUBLISHED", "Data & AI", batches["BATCH_GAMMA"], 60, 60.0, mentors["ananya.m@csmtech.internal"]),
-        ("Cloud Native DevOps & CI/CD Assessment", "PUBLISHED", "Cloud & DevOps", batches["BATCH_BETA"], 75, 65.0, mentors["soumya.p@csmtech.internal"]),
+        ("Workplace Behavioral & Psychometric Dimension Profile", "PUBLISHED", "Psychometric", batches["BATCH_ALPHA"], 45, 60.0, mentors["soumya.p@csmtech.internal"]),
+        ("Campus-to-Corporate Readiness Battery", "PUBLISHED", "Engineering Architecture", batches["BATCH_ALPHA"], 90, 65.0, mentors["soumya.p@csmtech.internal"]),
 
         # CLOSED (3)
         ("Foundational Technical Knowledge Baseline", "CLOSED", "Web & Full Stack", batches["BATCH_ALPHA"], 45, 60.0, mentors["soumya.p@csmtech.internal"]),
@@ -377,16 +379,43 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             session.add(a)
             session.flush()
 
-            # Attach 5-8 questions to the assessment
-            selected_qs = [q for q in bank_questions if q.field == field or q.field == "Engineering Architecture"][:8]
-            if not selected_qs:
-                selected_qs = bank_questions[:6]
+            # Attach appropriate domain questions (Phase E1)
+            if title == "Core Python & Data Structures Assessment":
+                # Attach Python coding problems + Python MCQs
+                py_coding = [q for q in bank_questions if q.question_type == "CODING" and "Python" in q.title][:2]
+                py_mcq = [q for q in bank_questions if q.field == "Python" and q.question_type == "MCQ"][:4]
+                selected_qs = py_coding + py_mcq
+            elif title == "Enterprise SQL & Database Performance Assessment":
+                # Attach SQL coding problems + SQL MCQs
+                sql_coding = [q for q in bank_questions if q.question_type == "SQL"][:2]
+                sql_mcq = [q for q in bank_questions if q.field == "SQL" and q.question_type == "MCQ"][:4]
+                selected_qs = sql_coding + sql_mcq
+            elif title == "Enterprise Full-Stack Capstone Assessment":
+                # Attach JS coding problems + Web dev MCQs
+                js_coding = [q for q in bank_questions if q.question_type == "CODING" and any(k in q.title for k in ("JavaScript", "LRU", "Debounce", "Flatten"))][:2]
+                js_mcq = [q for q in bank_questions if q.field in ("Web & Full Stack", "JavaScript") and q.question_type == "MCQ"][:4]
+                selected_qs = js_coding + js_mcq
+            elif title == "Workplace Behavioral & Psychometric Dimension Profile":
+                # Attach 16 Likert questions across 8 dimensions
+                selected_qs = [q for q in bank_questions if q.category == "Psychometric"][:16]
+            elif title == "Campus-to-Corporate Readiness Battery":
+                # Mixed: 3 Aptitude MCQs + 1 Python coding problem + 1 Subjective Short Answer + 8 Likert items
+                apt_mcqs = [q for q in bank_questions if q.category in ("Quantitative Aptitude", "Logical & Reasoning")][:3]
+                py_coding = [q for q in bank_questions if q.question_type == "CODING"][:1]
+                sub_q = [q for q in bank_questions if q.question_type == "SHORT_ANSWER"][:1]
+                likert_qs = [q for q in bank_questions if q.category == "Psychometric"][:8]
+                selected_qs = apt_mcqs + py_coding + sub_q + likert_qs
+            else:
+                selected_qs = [q for q in bank_questions if q.field == field or q.field == "Engineering Architecture"][:8]
+                if not selected_qs:
+                    selected_qs = bank_questions[:6]
+
             for seq, q in enumerate(selected_qs, 1):
                 session.add(AssessmentQuestion(
                     assessment_id=a.id,
                     bank_question_id=q.id,
                     sequence_order=seq,
-                    marks=10.0,
+                    marks=10.0 if q.question_type != "LIKERT" else 0.0,
                 ))
         assessments[title] = a
     session.flush()
@@ -395,9 +424,11 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
     audience_assessments = [
         assessments["Core Python & Data Structures Assessment"],
         assessments["Enterprise SQL & Database Performance Assessment"],
+        assessments["Workplace Behavioral & Psychometric Dimension Profile"],
+        assessments["Campus-to-Corporate Readiness Battery"],
     ]
     for a in audience_assessments:
-        for l in learners[:6]:
+        for l in learners[:12]:
             existing_aud = session.execute(
                 select(AssessmentAudience).where(
                     AssessmentAudience.assessment_id == a.id,
@@ -410,14 +441,15 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
 
     counts["assessments"] = session.execute(select(func.count(Assessment.id))).scalar() or 0
 
-    # 7. 180+ Assessment Attempts with Bell Curve Scores & Growth Ring Reports
+    # 7. 180+ Assessment Attempts with Bell Curve Scores & Growth Ring Reports (Phase E)
     scored_assessments = [
         assessments["Foundational Technical Knowledge Baseline"],
         assessments["Engineering Aptitude & Deductive Reasoning Sprint"],
         assessments["Workplace Communication & Readiness Baseline"],
         assessments["Core Python & Data Structures Assessment"],
         assessments["Enterprise SQL & Database Performance Assessment"],
-        assessments["Cloud Native DevOps & CI/CD Assessment"],
+        assessments["Workplace Behavioral & Psychometric Dimension Profile"],
+        assessments["Campus-to-Corporate Readiness Battery"],
     ]
 
     random.seed(42)  # Deterministic seed for reproducible evaluation data
@@ -430,6 +462,9 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             )
         )
         extended_learners = list(set(target_learners + learners[:25]))
+
+        is_psych = (a.field == "Psychometric" or "Psychometric" in a.title)
+        is_mixed = ("Campus-to-Corporate" in a.title)
 
         for l in extended_learners:
             existing_att = session.execute(
@@ -446,22 +481,94 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                 start_t = (a.start_window or now) + timedelta(hours=random.randint(2, 24))
                 submit_t = start_t + timedelta(minutes=random.randint(25, a.duration_minutes - 5))
 
-                growth_report = {
-                    "learner_name": l.full_name,
-                    "overall_score": final_score,
-                    "passed": passed,
-                    "competencies": {
-                        "Technical Knowledge": min(100.0, final_score + random.uniform(-5, 5)),
-                        "Problem Solving": min(100.0, final_score + random.uniform(-8, 6)),
-                        "Code Quality": min(100.0, final_score + random.uniform(-6, 8)),
-                        "System Architecture": min(100.0, final_score + random.uniform(-10, 4)),
-                        "Professional Execution": min(100.0, final_score + random.uniform(-4, 6)),
-                    },
-                    "recommendations": [
-                        "Deepen concurrency synchronization understanding.",
-                        "Practice parameterized query design for performance tuning.",
-                    ]
-                }
+                if is_psych:
+                    final_score = None
+                    total_marks = None
+                    passed = None
+                    growth_report = {
+                        "learner_name": l.full_name,
+                        "is_psychometric": True,
+                        "disclaimer": PSYCHOMETRIC_DISCLAIMER,
+                        "psychometric_profile": {
+                            "Agreeableness": 84.5,
+                            "Conscientiousness": 88.0,
+                            "Emotional Stability": 76.5,
+                            "Openness": 82.0,
+                            "Extraversion": 71.0,
+                            "Grit": 90.0,
+                            "Collaborative Mindset": 86.5,
+                            "Problem-Solving Integrity": 93.0,
+                        },
+                        "strengths": ["High resilience under project constraints", "Constructive peer feedback culture"],
+                        "development_areas": ["Public cross-functional presentation confidence"],
+                    }
+                    # Seed consent for psychometric evaluation
+                    ex_consent = session.execute(
+                        select(Consent).where(
+                            Consent.user_id == l.id,
+                            Consent.purpose_code == "PSYCHOMETRIC_EVALUATION",
+                        )
+                    ).scalar_one_or_none()
+                    if not ex_consent:
+                        session.add(Consent(
+                            user_id=l.id,
+                            org_id=l.org_id,
+                            purpose_code="PSYCHOMETRIC_EVALUATION",
+                            status="GRANTED",
+                            granted_at=now,
+                        ))
+                else:
+                    total_marks = 100.0
+                    growth_report = {
+                        "learner_name": l.full_name,
+                        "overall_score": final_score,
+                        "passed": passed,
+                        "competencies": {
+                            "Technical Knowledge": min(100.0, final_score + random.uniform(-5, 5)),
+                            "Problem Solving": min(100.0, final_score + random.uniform(-8, 6)),
+                            "Code Quality": min(100.0, final_score + random.uniform(-6, 8)),
+                            "System Architecture": min(100.0, final_score + random.uniform(-10, 4)),
+                            "Professional Execution": min(100.0, final_score + random.uniform(-4, 6)),
+                        },
+                        "recommendations": [
+                            "Deepen concurrency synchronization understanding.",
+                            "Practice parameterized query design for performance tuning.",
+                        ]
+                    }
+                    if is_mixed:
+                        growth_report["psychometric_profile"] = {
+                            "Agreeableness": 82.0,
+                            "Conscientiousness": 86.5,
+                            "Emotional Stability": 79.0,
+                            "Openness": 80.5,
+                            "Extraversion": 74.0,
+                            "Grit": 88.0,
+                            "Collaborative Mindset": 85.0,
+                            "Problem-Solving Integrity": 91.5,
+                        }
+                        growth_report["disclaimer"] = PSYCHOMETRIC_DISCLAIMER
+                        ex_consent = session.execute(
+                            select(Consent).where(
+                                Consent.user_id == l.id,
+                                Consent.purpose_code == "PSYCHOMETRIC_EVALUATION",
+                            )
+                        ).scalar_one_or_none()
+                        if not ex_consent:
+                            session.add(Consent(
+                                user_id=l.id,
+                                org_id=l.org_id,
+                                purpose_code="PSYCHOMETRIC_EVALUATION",
+                                status="GRANTED",
+                                granted_at=now,
+                            ))
+
+                # Varied report statuses: APPROVED, PENDING_APPROVAL, PROVISIONAL
+                if a.status == "CLOSED":
+                    rep_status = "APPROVED"
+                elif attempt_count % 3 == 0:
+                    rep_status = "PROVISIONAL"
+                else:
+                    rep_status = "PENDING_APPROVAL"
 
                 att = AssessmentAttempt(
                     assessment_id=a.id,
@@ -469,36 +576,45 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     start_time=start_t,
                     submit_time=submit_t,
                     score=final_score,
-                    total_marks=100.0,
+                    total_marks=total_marks,
                     passed=passed,
                     status="SUBMITTED",
                     grading_status="GRADED",
                     report_json=growth_report,
-                    report_status="APPROVED" if a.status == "CLOSED" else "PENDING_APPROVAL",
-                    report_approved_at=submit_t + timedelta(hours=2) if a.status == "CLOSED" else None,
+                    report_status=rep_status,
+                    report_approved_at=submit_t + timedelta(hours=2) if rep_status == "APPROVED" else None,
                 )
                 session.add(att)
                 session.flush()
 
                 # Populate concrete Answers for attempt
                 for aq in a.questions[:5]:
+                    is_q_likert = is_psych or (getattr(aq, "question", None) and getattr(aq.question, "question_type", None) == "LIKERT")
                     session.add(Answer(
                         attempt_id=att.id,
                         bank_question_id=aq.bank_question_id,
-                        text_response="Optimized approach utilizing hash-map indices for linear time complexity.",
+                        text_response="5" if is_q_likert else "Optimized approach utilizing hash-map indices for linear time complexity.",
                         grading_status="GRADED",
-                        score_awarded=aq.marks if passed else (aq.marks * 0.5),
+                        score_awarded=0.0 if is_q_likert else (aq.marks if passed else (aq.marks * 0.5)),
                     ))
 
                 # Create Qualitative Mentor Remark for a sample of attempts
                 if attempt_count % 4 == 0:
-                    session.add(MentorRemark(
-                        mentor_id=a.mentor_id,
-                        learner_id=l.id,
-                        assessment_id=a.id,
-                        remark_text=f"Demonstrated solid grasp of {a.field} fundamentals. Recommendation: continue daily coding practice on edge cases.",
-                        visibility="LEARNER_AND_ADMIN",
-                    ))
+                    ex_rem = session.execute(
+                        select(MentorRemark).where(
+                            MentorRemark.mentor_id == a.mentor_id,
+                            MentorRemark.learner_id == l.id,
+                            MentorRemark.assessment_id == a.id,
+                        )
+                    ).scalar_one_or_none()
+                    if not ex_rem:
+                        session.add(MentorRemark(
+                            mentor_id=a.mentor_id,
+                            learner_id=l.id,
+                            assessment_id=a.id,
+                            remark_text=f"Demonstrated solid grasp of {a.field} fundamentals. Recommendation: continue daily coding practice on edge cases.",
+                            visibility="LEARNER_AND_ADMIN",
+                        ))
 
                 attempt_count += 1
     session.flush()
@@ -535,10 +651,19 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             ))
     session.flush()
 
-    # 7c. Subjective Graded Answers (12 answers with in-depth text_response and mentor feedback)
+    # 7c. Subjective Graded & Pending Answers (14 answers with in-depth text_response, pending manual review & AI rubric)
     subjective_q = session.execute(
         select(QuestionBank).where(QuestionBank.question_type == "SHORT_ANSWER")
     ).scalar_one_or_none()
+    subjective_rubric = {
+        "dimensions": [
+            {"dimension": "Architecture Contrast", "weight": 0.5, "description": "Clear distinction between Kafka log streaming and ACID relational storage."},
+            {"dimension": "Scalability & Consistency", "weight": 0.5, "description": "Addresses CAP theorem, horizontal scaling vs dual-write bottlenecks."}
+        ],
+        "suggested_answers": [
+            "Kafka decouples producers/consumers with append-only partitioning but introduces eventual consistency. Relational DB guarantees ACID transactions but has vertical write limits."
+        ]
+    }
     if not subjective_q:
         subjective_q = QuestionBank(
             author_id=author_id,
@@ -549,14 +674,22 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             field="System Architecture",
             topic="Distributed Systems",
             difficulty="HARD",
+            rubric_json=subjective_rubric,
             is_active=True,
         )
         session.add(subjective_q)
         session.flush()
+    else:
+        subjective_q.rubric_json = subjective_rubric
 
     recent_submitted_attempts = session.execute(
-        select(AssessmentAttempt).where(AssessmentAttempt.status == "SUBMITTED").limit(12)
+        select(AssessmentAttempt).where(AssessmentAttempt.status == "SUBMITTED").limit(14)
     ).scalars().all()
+
+    ai_feedback_suggestions = [
+        "[AI Rubric Suggestion]: Proposed Score 8.5/10 (94% confidence). Decoupled Kafka stream contrasted with ACID transactional isolation. Meets criteria for Architecture Contrast and CAP trade-offs.",
+        "[AI Rubric Suggestion]: Proposed Score 7.0/10 (88% confidence). Accurately noted write throughput differences, but could expand on transaction replayability and saga orchestration.",
+    ]
 
     for idx, s_att in enumerate(recent_submitted_attempts):
         ex_sub_ans = session.execute(
@@ -566,7 +699,7 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             )
         ).scalar_one_or_none()
         if not ex_sub_ans:
-            score = 8.5 + (idx % 3) * 0.5
+            feedback = ai_feedback_suggestions[idx % len(ai_feedback_suggestions)] if idx < 7 else None
             session.add(Answer(
                 attempt_id=s_att.id,
                 bank_question_id=subjective_q.id,
@@ -575,22 +708,26 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     "However, it introduces eventual consistency and dual-write challenges. A centralized relational system provides ACID guarantees "
                     "and straightforward queries via foreign keys, but suffers write contention and vertical scaling bottlenecks at scale."
                 ),
-                mentor_feedback=f"Excellent trade-off breakdown covering consistency vs availability. Awarded {score}/10 marks.",
-                grading_status="GRADED",
-                score_awarded=score,
+                mentor_feedback=feedback,
+                grading_status="PENDING_REVIEW",
+                score_awarded=None,
             ))
+            s_att.grading_status = "PENDING_REVIEW"
+            s_att.report_status = "PROVISIONAL"
     session.flush()
 
     counts["attempts"] = session.execute(select(func.count(AssessmentAttempt.id))).scalar() or 0
 
-    # 8. 400+ Coding Submissions across Learners & Problems
+    # 8. 400+ Coding Submissions across Learners & Problems (Phase E: including COMPILATION_ERROR and MEMORY_LIMIT_EXCEEDED)
     existing_sub_count = session.execute(select(func.count(Submission.id))).scalar() or 0
-    if existing_sub_count < 400 and cp_objs:
+    if existing_sub_count == 0 and cp_objs:
         verdict_weights = (
             ["ACCEPTED"] * 8
             + ["WRONG_ANSWER"] * 2
             + ["RUNTIME_ERROR"] * 1
             + ["TIME_LIMIT_EXCEEDED"] * 1
+            + ["COMPILATION_ERROR"] * 1
+            + ["MEMORY_LIMIT_EXCEEDED"] * 1
         )
         for l_idx, l in enumerate(learners):
             # Each learner submits 12-14 problems
@@ -613,6 +750,16 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                     score = 0.0
                     runtime = 2050.0
                     code = "# Nested loop causing TLE\n" + (prob.starter_code_json.get("python", "") if prob.starter_code_json else "")
+                elif v == "COMPILATION_ERROR":
+                    tc_passed = 0
+                    score = 0.0
+                    runtime = 0.0
+                    code = "def syntax_error_in_code(\n    return 42"
+                elif v == "MEMORY_LIMIT_EXCEEDED":
+                    tc_passed = random.randint(1, max(1, tc_total // 2))
+                    score = 0.0
+                    memory = 265.0
+                    code = "def memory_exhaustion():\n    return [0] * (10**8)"
                 else:  # RUNTIME_ERROR
                     tc_passed = 0
                     score = 0.0
@@ -641,48 +788,55 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
 
     counts["submissions"] = session.execute(select(func.count(Submission.id))).scalar() or 0
 
-    # 9. 600+ Practice Attempts across Categories & Dedication Scores
+    # 9. 600+ Practice Attempts across Categories & Dedication Scores (Phase B3: Idempotency Protected)
     practice_fields = ["Python", "SQL", "Java", "JavaScript", "C++", "Cloud & DevOps", "Data & AI"]
 
     for l in learners:
         for f in practice_fields[:5]:
-            ps = PracticeSession(
-                learner_id=l.id,
-                field=f,
-                difficulty="MEDIUM",
-                mode="MCQ",
-                completed_at=now - timedelta(days=random.randint(1, 14)),
-            )
-            session.add(ps)
-            session.flush()
-
-            # Add 5 practice questions and attempts per session
-            for q_idx in range(5):
-                pq = PracticeQuestion(
-                    session_id=ps.id,
+            existing_ps = session.execute(
+                select(PracticeSession).where(
+                    PracticeSession.learner_id == l.id,
+                    PracticeSession.field == f,
+                )
+            ).first()
+            if not existing_ps:
+                ps = PracticeSession(
+                    learner_id=l.id,
                     field=f,
                     difficulty="MEDIUM",
                     mode="MCQ",
-                    title=f"{f} Practice Drill #{q_idx+1}",
-                    question_data_json={
-                        "title": f"{f} Core Drill",
-                        "question": f"Analyze the time and space complexity of {f} collection operations.",
-                        "options": ["O(1) average lookup", "O(N) linear scan", "O(N log N)", "O(N^2)"],
-                        "answer": "O(1) average lookup",
-                    },
-                    verified=True,
+                    completed_at=now - timedelta(days=random.randint(1, 14)),
                 )
-                session.add(pq)
+                session.add(ps)
                 session.flush()
 
-                is_c = random.choice([True, True, True, False])  # 75% accuracy
-                session.add(PracticeAttempt(
-                    question_id=pq.id,
-                    learner_id=l.id,
-                    answer_json={"selected": "O(1) average lookup" if is_c else "O(N) linear scan"},
-                    is_correct=is_c,
-                    score=10.0 if is_c else 0.0,
-                ))
+                # Add 5 practice questions and attempts per session
+                for q_idx in range(5):
+                    pq = PracticeQuestion(
+                        session_id=ps.id,
+                        field=f,
+                        difficulty="MEDIUM",
+                        mode="MCQ",
+                        title=f"{f} Practice Drill #{q_idx+1}",
+                        question_data_json={
+                            "title": f"{f} Core Drill",
+                            "question": f"Analyze the time and space complexity of {f} collection operations.",
+                            "options": ["O(1) average lookup", "O(N) linear scan", "O(N log N)", "O(N^2)"],
+                            "answer": "O(1) average lookup",
+                        },
+                        verified=True,
+                    )
+                    session.add(pq)
+                    session.flush()
+
+                    is_c = random.choice([True, True, True, False])  # 75% accuracy
+                    session.add(PracticeAttempt(
+                        question_id=pq.id,
+                        learner_id=l.id,
+                        answer_json={"selected": "O(1) average lookup" if is_c else "O(N) linear scan"},
+                        is_correct=is_c,
+                        score=10.0 if is_c else 0.0,
+                    ))
 
         # Populate PracticeScore record for dedication tracking
         existing_score = session.execute(
@@ -855,7 +1009,6 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
             select(func.count(Notification.id)).where(Notification.recipient_id == u.id)
         ).scalar() or 0
         if existing_n_count < 4:
-            # Seed 4-6 notifications
             sample_notifs = random.sample(notification_templates, k=5)
             for idx, (n_type, n_title, n_msg) in enumerate(sample_notifs):
                 session.add(Notification(
@@ -869,7 +1022,31 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
     session.flush()
     counts["notifications"] = session.execute(select(func.count(Notification.id))).scalar() or 0
 
-    # 13. Audit Logs
+    # 13. 24 Verified AI Question Pool Items (12 Ollama + 12 Procedural / Curated) (Phase E2)
+    from generate_ai_pool_items import make_pool_items
+    pool_items = make_pool_items()
+    for p_item in pool_items:
+        ex_pool = session.execute(
+            select(AIQuestionPool).where(AIQuestionPool.question_hash == p_item["question_hash"])
+        ).scalar_one_or_none()
+        if not ex_pool:
+            session.add(AIQuestionPool(
+                field=p_item["field"],
+                category=p_item["category"],
+                difficulty=p_item["difficulty"],
+                mode=p_item["mode"],
+                language=p_item.get("language"),
+                title=p_item["title"],
+                question_hash=p_item["question_hash"],
+                question_data_json=p_item["question_data_json"],
+                provenance_json=p_item["provenance_json"],
+                is_used=False,
+                verified=True,
+            ))
+    session.flush()
+    counts["ai_question_pool"] = session.execute(select(func.count(AIQuestionPool.id))).scalar() or 0
+
+    # 14. Audit Logs (Idempotency Protected)
     audit_entries = [
         ("LOGIN_SUCCESS", "users", admin.id, "Admin logged into governance console."),
         ("ASSESSMENT_PUBLISHED", "assessments", assessments["Core Python & Data Structures Assessment"].id, "Published official assessment."),
@@ -877,15 +1054,22 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
         ("TALENT_ALERT_ACTION", "talent_alerts", None, "Mentor took action SCHEDULE_INTERVIEW on talent alert."),
         ("SEED_COMPLETION", "system", None, "Deterministic demo data pack successfully initialized."),
     ]
-    for action, res, res_id, reason in audit_entries:
-        session.add(AuditLog(
-            org_id=org.id,
-            actor_id=admin.id,
-            action=action,
-            resource=res,
-            resource_id=res_id,
-            reason=reason,
-        ))
+    existing_audit = session.execute(
+        select(AuditLog).where(
+            AuditLog.actor_id == admin.id,
+            AuditLog.action == "SEED_COMPLETION",
+        )
+    ).first()
+    if not existing_audit:
+        for action, res, res_id, reason in audit_entries:
+            session.add(AuditLog(
+                org_id=org.id,
+                actor_id=admin.id,
+                action=action,
+                resource=res,
+                resource_id=res_id,
+                reason=reason,
+            ))
     session.commit()
 
     return counts

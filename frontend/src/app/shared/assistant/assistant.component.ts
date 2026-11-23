@@ -40,7 +40,7 @@ interface ChatMessage {
 
     <!-- Assistant Chat Window -->
     @if (isOpen()) {
-      <div class="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+      <div class="fixed bottom-6 right-6 z-50 w-96 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
         
         <!-- Header -->
         <div class="px-4 py-3 bg-gradient-to-r from-[#008FBB] to-[#005e7c] text-white flex items-center justify-between">
@@ -66,16 +66,16 @@ interface ChatMessage {
         </div>
 
         <!-- Chat History -->
-        <div class="p-4 h-80 overflow-y-auto space-y-3 bg-slate-50 dark:bg-slate-950 text-xs">
+        <div class="p-4 h-80 overflow-y-auto space-y-3 bg-slate-50 text-xs">
           @for (msg of messages(); track msg.id) {
             <div [ngClass]="msg.sender === 'user' ? 'flex justify-end' : 'flex justify-start'">
               <div 
                 [ngClass]="msg.sender === 'user' 
                   ? 'bg-[#008FBB] text-white rounded-2xl rounded-tr-none px-3.5 py-2 max-w-[85%]' 
-                  : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-slate-700 rounded-2xl rounded-tl-none px-3.5 py-2 max-w-[85%] shadow-sm'">
+                  : 'bg-white  text-slate-800  border border-slate-200  rounded-2xl rounded-tl-none px-3.5 py-2 max-w-[85%] shadow-sm'">
                 
                 @if (msg.sender === 'assistant' && msg.isOfflineCard) {
-                  <div class="mb-1.5 flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/30 font-semibold text-[10px]">
+                  <div class="mb-1.5 flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-500/10 text-amber-700 border border-amber-500/30 font-semibold text-[10px]">
                     <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
@@ -96,7 +96,7 @@ interface ChatMessage {
                   <span class="inline-block w-1.5 h-3 ml-0.5 bg-[#008FBB] animate-pulse"></span>
                 }
 
-                <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100 dark:border-slate-700/50 text-[9px]">
+                <div class="flex items-center justify-between mt-1 pt-1 border-t border-slate-100 text-[9px]">
                   <span [ngClass]="msg.sender === 'user' ? 'text-sky-200' : 'text-slate-400'">{{ msg.time }}</span>
                   @if (msg.sender === 'assistant' && !loading() && lastFailedMessage()) {
                     <button (click)="retryLastMessage()" class="text-[#008FBB] hover:underline font-bold">Retry</button>
@@ -118,11 +118,11 @@ interface ChatMessage {
 
         <!-- Stop Generating Bar (When streaming) -->
         @if (loading()) {
-          <div class="px-3 py-1 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-center">
+          <div class="px-3 py-1 bg-slate-100 border-t border-slate-200 flex justify-center">
             <button 
               type="button" 
               (click)="stopGenerating()" 
-              class="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-200 dark:bg-slate-800 hover:bg-red-50 hover:text-red-600 text-slate-700 dark:text-slate-300 text-[10px] font-bold transition">
+              class="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-200 hover:bg-red-50 hover:text-red-600 text-slate-700 text-[10px] font-bold transition">
               <svg class="w-3 h-3 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                 <rect x="4" y="4" width="12" height="12" rx="2" />
               </svg>
@@ -133,12 +133,12 @@ interface ChatMessage {
 
         <!-- Role-based Prompt Suggestions -->
         @if (!loading()) {
-          <div class="px-3 py-2 bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-1.5 overflow-x-auto text-[10px]">
+          <div class="px-3 py-2 bg-slate-100 border-t border-slate-200 flex gap-1.5 overflow-x-auto text-[10px]">
             @for (prompt of suggestedPrompts(); track prompt) {
               <button 
                 type="button" 
                 (click)="sendQuickPrompt(prompt)"
-                class="whitespace-nowrap px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#008FBB] hover:text-[#008FBB] transition">
+                class="whitespace-nowrap px-2.5 py-1 rounded-full bg-white border border-slate-200 text-slate-600 hover:border-[#008FBB] hover:text-[#008FBB] transition">
                 {{ prompt }}
               </button>
             }
@@ -146,14 +146,14 @@ interface ChatMessage {
         }
 
         <!-- Input Bar (POST with body only) -->
-        <form (ngSubmit)="sendMessage()" class="p-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+        <form (ngSubmit)="sendMessage()" class="p-2.5 bg-white border-t border-slate-200 flex gap-2">
           <input 
             type="text" 
             [(ngModel)]="userInput" 
             name="message" 
             [disabled]="loading()"
             placeholder="Ask anything about curriculum, meetings, stats..."
-            class="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
+            class="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
           <button 
             type="submit" 
             [disabled]="loading() || !userInput.trim()"

@@ -18,14 +18,14 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
     <div class="space-y-4">
       
       <!-- Top Bar: Problem Selection & Controls -->
-      <div class="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      <div class="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Problem:</span>
           @if (problems().length > 0) {
             <select 
               [(ngModel)]="selectedProblemId" 
               (ngModelChange)="onProblemChange()"
-              class="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white">
+              class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900">
               @for (p of problems(); track p.id) {
                 <option [value]="p.id">{{ p.title }} ({{ p.difficulty }})</option>
               }
@@ -46,19 +46,19 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
         <div class="flex items-center gap-2">
           <!-- Active Tab Selector (Editor vs History) -->
-          <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs font-bold">
+          <div class="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
             <button 
               type="button" 
               (click)="activeTab = 'editor'"
               class="px-3 py-1 rounded-lg transition"
-              [ngClass]="activeTab === 'editor' ? 'bg-white dark:bg-slate-900 text-[#008FBB] shadow-sm' : 'text-slate-500'">
+              [ngClass]="activeTab === 'editor' ? 'bg-white  text-[#008FBB] shadow-sm' : 'text-slate-500'">
               Editor &amp; Output
             </button>
             <button 
               type="button" 
               (click)="openSubmissionHistory()"
               class="px-3 py-1 rounded-lg transition"
-              [ngClass]="activeTab === 'history' ? 'bg-white dark:bg-slate-900 text-[#008FBB] shadow-sm' : 'text-slate-500'">
+              [ngClass]="activeTab === 'history' ? 'bg-white  text-[#008FBB] shadow-sm' : 'text-slate-500'">
               Submissions ({{ submissionHistory().length }})
             </button>
           </div>
@@ -68,11 +68,11 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
       <!-- Main Layout -->
       @if (problems().length === 0 && !currentProblem()) {
         <!-- Proper Empty State -->
-        <div class="p-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center space-y-3">
-          <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl text-slate-400">
+        <div class="p-12 rounded-2xl bg-white border border-slate-200 text-center space-y-3">
+          <div class="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-xl text-slate-400">
             💻
           </div>
-          <h3 class="text-base font-bold text-slate-800 dark:text-slate-200">No Coding Problems Available</h3>
+          <h3 class="text-base font-bold text-slate-800">No Coding Problems Available</h3>
           <p class="text-xs text-slate-500 max-w-md mx-auto">
             You do not currently have any active coding assessment or assigned problems. Check your assessments or practice lab!
           </p>
@@ -81,12 +81,12 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
           
           <!-- Left: Problem Statement & Constraints (5 cols) -->
-          <div class="lg:col-span-5 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 max-h-[750px] overflow-y-auto text-xs">
+          <div class="lg:col-span-5 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 max-h-[750px] overflow-y-auto text-xs">
             <div>
-              <h2 class="text-lg font-black text-slate-900 dark:text-white">{{ currentProblem()?.title }}</h2>
+              <h2 class="text-lg font-black text-slate-900">{{ currentProblem()?.title }}</h2>
               <div class="flex items-center gap-1.5 mt-1">
                 @for (tag of currentProblem()?.tags ?? ['Algorithm', 'Data Structures']; track tag) {
-                  <span class="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-semibold">
+                  <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px] font-semibold">
                     {{ tag }}
                   </span>
                 }
@@ -94,7 +94,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
             </div>
 
             <!-- Description -->
-            <div class="space-y-2 text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+            <div class="space-y-2 text-slate-700 whitespace-pre-wrap leading-relaxed">
               {{ currentProblem()?.statement }}
             </div>
 
@@ -102,8 +102,8 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
             <div class="space-y-3 pt-2">
               <h4 class="font-bold uppercase tracking-wider text-slate-400 text-[10px]">Sample Test Cases</h4>
               @for (ex of currentProblem()?.examples ?? defaultExamples; track ex.input) {
-                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 font-mono text-[11px] space-y-1">
-                  <div><span class="text-slate-400">Input:</span> <span class="font-bold text-slate-800 dark:text-slate-200">{{ ex.input }}</span></div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 font-mono text-[11px] space-y-1">
+                  <div><span class="text-slate-400">Input:</span> <span class="font-bold text-slate-800">{{ ex.input }}</span></div>
                   <div><span class="text-slate-400">Output:</span> <span class="font-bold text-emerald-600">{{ ex.output }}</span></div>
                   @if (ex.explanation) {
                     <p class="text-[10px] text-slate-400 font-sans mt-1">{{ ex.explanation }}</p>
@@ -113,9 +113,9 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
             </div>
 
             <!-- Constraints -->
-            <div class="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div class="pt-2 border-t border-slate-100">
               <h4 class="font-bold uppercase tracking-wider text-slate-400 text-[10px] mb-1">Constraints &amp; Limits</h4>
-              <p class="font-mono text-[11px] text-slate-600 dark:text-slate-400">{{ currentProblem()?.constraints || 'Standard execution limits apply.' }}</p>
+              <p class="font-mono text-[11px] text-slate-600">{{ currentProblem()?.constraints || 'Standard execution limits apply.' }}</p>
               <div class="mt-2 text-[10px] text-slate-400 flex items-center gap-3">
                 <span>Time Limit: {{ currentProblem()?.time_limit_ms || 3000 }}ms</span>
                 <span>Memory Limit: {{ currentProblem()?.memory_limit_mb || 256 }}MB</span>
@@ -138,14 +138,14 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
               </div>
 
               <!-- Action Bar -->
-              <div class="p-3.5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+              <div class="p-3.5 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-between">
                 <span class="text-[10px] text-slate-400 font-mono">Run: Custom / Sample Input &bull; Submit: All Hidden Cases</span>
                 <div class="flex items-center gap-2">
                   <button 
                     type="button" 
                     [disabled]="isRunning() || isSubmitting()"
                     (click)="runSample()"
-                    class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 text-xs font-bold transition flex items-center gap-1.5">
+                    class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-800 text-xs font-bold transition flex items-center gap-1.5">
                     @if (isRunning()) {
                       <span class="animate-spin text-xs">&#9696;</span>
                       <span>Executing...</span>
@@ -170,8 +170,8 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
               </div>
 
               <!-- Console / Results Area -->
-              <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3">
+                <div class="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div class="flex items-center gap-2">
                     <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Execution Output</span>
                     @if (submitResult()) {
@@ -200,7 +200,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
                     type="text" 
                     [(ngModel)]="customInput" 
                     placeholder="Enter standard input for your run..."
-                    class="w-full px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 font-mono text-xs rounded-xl" />
+                    class="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 font-mono text-xs rounded-xl" />
                 </div>
 
                 <!-- Run Standard Output -->
@@ -217,7 +217,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
                 <!-- First Failing Case Inspection -->
                 @if (submitResult()?.failing_case) {
-                  <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 font-mono text-xs space-y-1">
+                  <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200 font-mono text-xs space-y-1">
                     <span class="font-bold text-[#D7182A] uppercase text-[10px] block">First Failing Test Case</span>
                     <div><span class="text-slate-400">Input:</span> {{ submitResult()?.failing_case?.input }}</div>
                     <div><span class="text-slate-400">Expected:</span> <span class="text-emerald-600 font-bold">{{ submitResult()?.failing_case?.expected }}</span></div>
@@ -227,8 +227,8 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
               </div>
             } @else {
               <!-- Submissions History Tab -->
-              <div class="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                   <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">My Submission History</h3>
                   <button (click)="activeTab = 'editor'" class="text-xs font-bold text-[#008FBB] hover:underline">
                     &larr; Back to Editor
@@ -242,13 +242,13 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
                 } @else {
                   <div class="space-y-2">
                     @for (sub of submissionHistory(); track sub.id) {
-                      <div class="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 flex items-center justify-between text-xs font-mono">
+                      <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between text-xs font-mono">
                         <div class="flex items-center gap-3">
                           <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                             [ngClass]="sub.verdict === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
                             {{ sub.verdict }}
                           </span>
-                          <span class="text-slate-600 dark:text-slate-300">
+                          <span class="text-slate-600">
                             Passed: <strong>{{ sub.passed_cases }}/{{ sub.total_cases }}</strong> (Score: {{ sub.score }})
                           </span>
                         </div>

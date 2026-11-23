@@ -12,8 +12,8 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Batch Cohort Management</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">Batch Cohort Management</h1>
+          <p class="text-xs text-slate-500">
             Structure learners and assign dedicated mentors to each learning track.
           </p>
         </div>
@@ -28,13 +28,13 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
       <!-- Batches Cards Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         @for (b of batches(); track b.id) {
-          <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-start justify-between">
               <div>
-                <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#008FBB] bg-sky-50 dark:bg-sky-950/60 px-2 py-0.5 rounded border border-sky-200 dark:border-sky-800">
+                <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-[#008FBB] bg-sky-50 px-2 py-0.5 rounded border border-sky-200">
                   {{ b.code }}
                 </span>
-                <h3 class="text-base font-black text-slate-900 dark:text-white mt-1">{{ b.name }}</h3>
+                <h3 class="text-base font-black text-slate-900 mt-1">{{ b.name }}</h3>
                 <p class="text-xs text-slate-400 mt-0.5">{{ b.description || 'Full-stack engineering cohort' }}</p>
               </div>
               <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
@@ -43,14 +43,14 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
             </div>
 
             <!-- Stats -->
-            <div class="grid grid-cols-2 gap-3 py-3 border-y border-slate-100 dark:border-slate-800 text-xs">
+            <div class="grid grid-cols-2 gap-3 py-3 border-y border-slate-100 text-xs">
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Assigned Mentors</span>
-                <span class="font-bold text-slate-800 dark:text-slate-100">{{ b.mentors.length || 1 }} Advisors</span>
+                <span class="font-bold text-slate-800">{{ b.mentors.length || 1 }} Advisors</span>
               </div>
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Enrolled Learners</span>
-                <span class="font-bold text-slate-800 dark:text-slate-100">{{ b.learners_count || 3 }} Engineers</span>
+                <span class="font-bold text-slate-800">{{ b.learners_count || 3 }} Engineers</span>
               </div>
             </div>
 
@@ -59,7 +59,7 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
               <span class="text-[10px] font-bold uppercase text-slate-400">Assigned Mentors:</span>
               <div class="flex flex-wrap gap-1.5">
                 @for (m of b.mentors; track m.id) {
-                  <span class="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-[#FAA634]">
+                  <span class="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-[11px] font-bold text-[#FAA634]">
                     {{ m.name }}
                   </span>
                 } @empty {
@@ -73,19 +73,19 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
               <button 
                 type="button" 
                 (click)="openAssignMentor(b)"
-                class="flex-1 py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition text-center">
+                class="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition text-center">
                 Assign Mentor
               </button>
               <button 
                 type="button" 
                 (click)="openAssignLearner(b)"
-                class="flex-1 py-2 px-3 rounded-xl bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 text-xs font-bold text-[#008FBB] transition text-center">
+                class="flex-1 py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 border border-sky-200 text-xs font-bold text-[#008FBB] transition text-center">
                 Assign Learner
               </button>
             </div>
           </div>
         } @empty {
-          <div class="col-span-2 p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+          <div class="col-span-2 p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
             No batches defined yet.
           </div>
         }
@@ -94,25 +94,25 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
       <!-- Create Batch Modal -->
       @if (showCreateModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Create New Batch</h3>
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">Create New Batch</h3>
             
             <form (ngSubmit)="submitCreateBatch()" class="space-y-3">
               <div>
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Batch Code</label>
-                <input type="text" [(ngModel)]="newBatch.code" name="code" placeholder="e.g. BATCH_GAMMA" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs uppercase font-mono" />
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Batch Code</label>
+                <input type="text" [(ngModel)]="newBatch.code" name="code" placeholder="e.g. BATCH_GAMMA" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs uppercase font-mono" />
               </div>
               <div>
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Batch Name</label>
-                <input type="text" [(ngModel)]="newBatch.name" name="name" placeholder="e.g. 2026 Cloud & Fullstack Engineers" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs" />
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Batch Name</label>
+                <input type="text" [(ngModel)]="newBatch.name" name="name" placeholder="e.g. 2026 Cloud & Fullstack Engineers" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
               </div>
               <div>
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Description</label>
-                <textarea [(ngModel)]="newBatch.description" name="desc" rows="3" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs"></textarea>
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Description</label>
+                <textarea [(ngModel)]="newBatch.description" name="desc" rows="3" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs"></textarea>
               </div>
 
               <div class="flex justify-end gap-2 pt-2">
-                <button type="button" (click)="showCreateModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                <button type="button" (click)="showCreateModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Cancel</button>
                 <button type="submit" class="px-4 py-2 rounded-xl bg-[#008FBB] text-xs font-bold text-white hover:bg-[#007499]">Create Batch</button>
               </div>
             </form>
@@ -123,20 +123,20 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
       <!-- Assign Mentor Modal -->
       @if (selectedBatchForAssignment() && assignmentType() === 'MENTOR') {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
               Assign Mentor to {{ selectedBatchForAssignment()?.name }}
             </h3>
             <div class="space-y-2">
-              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">Select Mentor:</label>
-              <select [(ngModel)]="selectedUserId" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+              <label class="block text-xs font-semibold text-slate-600">Select Mentor:</label>
+              <select [(ngModel)]="selectedUserId" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
                 @for (m of mentorOptions(); track m.id) {
                   <option [value]="m.id">{{ m.full_name }} ({{ m.email }})</option>
                 }
               </select>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">Cancel</button>
+              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">Cancel</button>
               <button type="button" (click)="confirmAssignMentor()" class="px-4 py-2 rounded-xl bg-[#FAA634] text-xs font-bold text-white">Assign Mentor</button>
             </div>
           </div>
@@ -146,20 +146,20 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
       <!-- Assign Learner Modal -->
       @if (selectedBatchForAssignment() && assignmentType() === 'LEARNER') {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
               Assign Learner to {{ selectedBatchForAssignment()?.name }}
             </h3>
             <div class="space-y-2">
-              <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400">Select Learner:</label>
-              <select [(ngModel)]="selectedUserId" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+              <label class="block text-xs font-semibold text-slate-600">Select Learner:</label>
+              <select [(ngModel)]="selectedUserId" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
                 @for (l of learnerOptions(); track l.id) {
                   <option [value]="l.id">{{ l.full_name }} ({{ l.email }})</option>
                 }
               </select>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">Cancel</button>
+              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">Cancel</button>
               <button type="button" (click)="confirmAssignLearner()" class="px-4 py-2 rounded-xl bg-[#008FBB] text-xs font-bold text-white">Assign Learner</button>
             </div>
           </div>

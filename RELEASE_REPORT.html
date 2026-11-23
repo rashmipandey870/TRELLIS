@@ -24,7 +24,7 @@
     <div class="summary-box">
       <strong>Overall Status:</strong> 
       <span class="badge-pass">100% RELEASE READY (ALL GATES PASSED)</span><br>
-      <strong>Executed At:</strong> 2026-11-22T21:22:06.907976+00:00<br>
+      <strong>Executed At:</strong> 2026-11-23T11:52:09.274418+00:00<br>
       <strong>Target Repository:</strong> rashmipandey870/TRELLIS
     </div>
 
@@ -42,10 +42,10 @@
         <tr>
           <td><strong>Clean DB Baseline & Enterprise Demo Seed</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>16.90s</td>
+          <td>17.01s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>Ensuring database at sqlite:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/release_gate_test.db is migrated to Alembic head...
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>qlite:///C:/Users/Rashm/.gemini/antigravity/scratch/trellis/release_gate_test.db is migrated to Alembic head...
 Database schema is at head.
 Seeding TRELLIS Enterprise Demo Data Pack...
 Demo Pack Seeding Complete! Summary:
@@ -53,12 +53,13 @@ Demo Pack Seeding Complete! Summary:
   • Question_bank: 352
   • Coding_problems: 24
   • Assessments: 12
-  • Attempts: 164
+  • Attempts: 189
   • Submissions: 468
   • Practice_attempts: 900
   • Talent_alerts: 4
   • Meetings: 20
   • Notifications: 211
+  • Ai_question_pool: 24
 
 STDERR:
 INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
@@ -87,17 +88,110 @@ INFO  [alembic.runtime.migration] Running upgrade 0009 -> 0010, Add judge format
   • question_bank         :   353 records (min required:  300) [PASS]
   • coding_problems       :    24 records (min required:   20) [PASS]
   • assessments           :    12 records (min required:   10) [PASS]
-  • assessment_attempts   :   164 records (min required:  150) [PASS]
+  • assessment_attempts   :   189 records (min required:  150) [PASS]
   • submissions           :   468 records (min required:  400) [PASS]
   • practice_attempts     :   900 records (min required:  600) [PASS]
   • meetings              :    20 records (min required:   18) [PASS]
-  • notifications         :   211 records (min required:  150) [PASS]</pre></details></td>
+  • notifications         :   211 records (min required:  150) [PASS]
+  • ai_question_pool      :    24 records (min required:   24) [PASS]</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Frontend Cleanliness & Light Theme Gate</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>1.72s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.5.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 2 items
+
+tests/test_frontend_cleanliness_and_light_theme.py::test_no_credentials_in_frontend_src_or_dist PASSED [ 50%]
+tests/test_frontend_cleanliness_and_light_theme.py::test_light_theme_only_and_no_dark_classes PASSED [100%]
+
+============================== 2 passed in 0.64s ==============================
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Content Quality & Policy Coverage Gate</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>1.86s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.5.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
+
+tests/test_content_quality.py::test_zero_duplicate_question_stems PASSED [ 25%]
+tests/test_content_quality.py::test_no_distractor_in_more_than_three_questions PASSED [ 50%]
+tests/test_content_quality.py::test_options_are_distinct_per_question PASSED [ 75%]
+tests/test_content_quality.py::test_english_category_policy_coverage PASSED [100%]
+
+============================== 4 passed in 0.70s ==============================
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Psychometric Flow & Consent Gate</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>8.56s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.5.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_psychometric_flow.py::test_psychometric_consent_and_disclaimer_flow PASSED [100%]
+
+============================== 1 passed in 6.52s ==============================
+</pre></details></td>
+        </tr>
+
+        <tr>
+          <td><strong>Seed Idempotency Gate</strong></td>
+          <td><span class="badge-pass">PASSED</span></td>
+          <td>21.93s</td>
+        </tr>
+        <tr>
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
+platform win32 -- Python 3.14.0, pytest-9.2.0, pluggy-1.7.0 -- C:\Users\Rashm\.gemini\antigravity\scratch\fresh_venv\Scripts\python.exe
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\backend
+configfile: pyproject.toml
+plugins: hypothesis-6.170.15, asyncio-1.5.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/test_seed_idempotency.py::test_seed_demo_pack_is_strictly_idempotent PASSED [100%]
+
+============================= 1 passed in 20.38s ==============================
+</pre></details></td>
         </tr>
 
         <tr>
           <td><strong>Coding Pack Verification Gate</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>24.08s</td>
+          <td>22.31s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>bprocessRunner. Never use in production (TRELLIS_ENV != dev)!
@@ -124,7 +218,7 @@ SECURITY WARNING: Running code with dev-only LocalSubprocessRunner. Never use in
         <tr>
           <td><strong>Answer-Key Distribution & Likert Tests</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>1.94s</td>
+          <td>2.38s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>============================= test session starts =============================
@@ -140,14 +234,14 @@ collecting ... collected 2 items
 tests/test_answer_key_distribution.py::test_mcq_answer_key_distribution_is_balanced PASSED [ 50%]
 tests/test_answer_key_distribution.py::test_psychometric_likert_dimensions_and_rubrics PASSED [100%]
 
-============================== 2 passed in 0.74s ==============================
+============================== 2 passed in 0.85s ==============================
 </pre></details></td>
         </tr>
 
         <tr>
           <td><strong>Full Backend Pytest Suite</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>58.40s</td>
+          <td>56.15s</td>
         </tr>
         <tr>
           <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>=================
@@ -173,37 +267,37 @@ tests/test_migrations.py::test_schema_model_drift_check
     util.warn_deprecated(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-================= 184 passed, 5 skipped, 6 warnings in 54.91s =================
+================= 192 passed, 5 skipped, 6 warnings in 52.96s =================
 </pre></details></td>
         </tr>
 
         <tr>
           <td><strong>Frontend Production Build (Angular 22)</strong></td>
           <td><span class="badge-pass">PASSED</span></td>
-          <td>14.33s</td>
+          <td>13.85s</td>
         </tr>
         <tr>
-          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre>522.52 kB |               127.33 kB
+          <td colspan="3"><details><summary style="cursor:pointer; color:#008FBB;">View Execution Output</summary><pre> 425.12 kB |               116.39 kB
 
 Lazy chunk files      | Names                         |  Raw size | Estimated transfer size
-chunk-CenOfCrU.js     | mentor-assessments-component  |  82.39 kB |                14.11 kB
-chunk-DR3b9s5g.js     | learner-practice-component    |  21.83 kB |                 5.54 kB
-chunk-BSoS1e0B.js     | learner-coding-component      |  18.91 kB |                 4.97 kB
-chunk-NFCaZ3DO.js     | learner-assessments-component |  18.16 kB |                 4.63 kB
+chunk-Cx7rIfFy.js     | mentor-assessments-component  |  78.28 kB |                13.92 kB
+chunk-qUbW7CS4.js     | learner-practice-component    |  20.73 kB |                 5.43 kB
+chunk-B8FlksOQ.js     | learner-coding-component      |  17.98 kB |                 4.89 kB
+chunk-DjVvluEM.js     | learner-assessments-component |  17.27 kB |                 4.51 kB
+chunk-DyVIvfqD.js     | -                             |  14.95 kB |                 3.70 kB
 chunk-C6w_bfi6.js     | csm-landing-component         |  14.58 kB |                 3.35 kB
-chunk-WQ5kZ13E.js     | admin-dashboard-component     |  13.72 kB |                 3.49 kB
-chunk-CR90zCUu.js     | -                             |  13.65 kB |                 3.30 kB
-chunk--o2yJT90.js     | mentor-learners-component     |  12.98 kB |                 3.62 kB
-chunk-Pl-YNdDm.js     | admin-users-component         |  12.78 kB |                 3.32 kB
-chunk-DflOrLAC.js     | admin-learners-component      |  12.43 kB |                 3.41 kB
-chunk-C79CY3Vb.js     | mentor-meetings-component     |  11.77 kB |                 3.14 kB
-chunk-BTPCdp4h.js     | admin-batches-component       |  11.48 kB |                 2.74 kB
-chunk-BhZ86YwF.js     | learner-results-component     |   9.80 kB |                 2.81 kB
-chunk-DxxEGPjP.js     | change-password-component     |   8.04 kB |                 2.37 kB
-chunk-Bp73c90S.js     | -                             |   8.00 kB |                 2.59 kB
+chunk-BsSaXIFJ.js     | admin-dashboard-component     |  12.95 kB |                 3.41 kB
+chunk-DYSPG6bM.js     | mentor-learners-component     |  12.12 kB |                 3.54 kB
+chunk-CIGVWnDo.js     | admin-users-component         |  11.87 kB |                 3.26 kB
+chunk-C2h6x27E.js     | admin-learners-component      |  11.64 kB |                 3.32 kB
+chunk-BibCX4pL.js     | mentor-meetings-component     |  10.99 kB |                 3.07 kB
+chunk-AfGcGKxW.js     | admin-batches-component       |  10.72 kB |                 2.67 kB
+chunk-TacyTbTT.js     | learner-results-component     |   8.98 kB |                 2.73 kB
+chunk-zejSGtFq.js     | change-password-component     |   7.43 kB |                 2.30 kB
+chunk-COiYcWeM.js     | -                             |   7.05 kB |                 2.43 kB
 ...and 11 more lazy chunks files. Use "--verbose" to show all the files.
 
-Application bundle generation complete. [10.118 seconds] - 2026-11-22T21:22:05.991Z
+Application bundle generation complete. [7.594 seconds] - 2026-11-23T11:52:08.413Z
 
 Output location: C:\Users\Rashm\.gemini\antigravity\scratch\trellis\frontend\dist\frontend
 

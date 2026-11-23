@@ -21,6 +21,7 @@ from app.models.ledger import EvidenceLedger, EvidenceRecord, LedgerCheckpoint
 from app.models.meetings import Meeting, MeetingAttendance, MeetingAudience
 from app.models.notifications import Notification
 from app.models.practice import (
+    AIQuestionPool,
     AlertAction,
     PracticeAttempt,
     PracticeQuestion,

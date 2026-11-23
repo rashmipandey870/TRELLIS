@@ -10,33 +10,33 @@ import { AuthService } from '../../core/services/auth.service';
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="min-h-screen flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50 dark:bg-slate-950">
-      <div class="absolute inset-0 bg-gradient-to-tr from-amber-100/30 via-sky-100/30 to-rose-100/20 dark:from-slate-900 dark:via-slate-950 dark:to-slate-900 pointer-events-none"></div>
+    <div class="min-h-screen flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
+      <div class="absolute inset-0 bg-gradient-to-tr from-amber-100/30 via-sky-100/30 to-rose-100/20 pointer-events-none"></div>
 
-      <div class="relative w-full max-w-md space-y-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 rounded-2xl shadow-xl">
+      <div class="relative w-full max-w-md space-y-6 bg-white border border-slate-200 p-8 rounded-2xl shadow-xl">
         <!-- Header -->
         <div class="text-center space-y-2">
           <div class="inline-flex items-center justify-center gap-2 mb-1">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#FAA634] to-[#D7182A] flex items-center justify-center shadow-md">
               <span class="text-white font-black text-xl tracking-tight">T</span>
             </div>
-            <span class="text-2xl font-black tracking-tight text-slate-900 dark:text-white">TRELLIS</span>
+            <span class="text-2xl font-black tracking-tight text-slate-900">TRELLIS</span>
           </div>
-          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Mandatory Password Update</h2>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h2 class="text-lg font-bold text-slate-900">Mandatory Password Update</h2>
+          <p class="text-xs text-slate-500">
             For security compliance, you must set a new strong personal password before proceeding.
           </p>
         </div>
 
         @if (errorMessage()) {
-          <div role="alert" class="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/80 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs">
+          <div role="alert" class="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
             <p class="font-bold">Update Failed</p>
             <p>{{ errorMessage() }}</p>
           </div>
         }
 
         @if (successMessage()) {
-          <div role="alert" class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs">
+          <div role="alert" class="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs">
             <p class="font-bold">Password Updated</p>
             <p>{{ successMessage() }}</p>
           </div>
@@ -44,7 +44,7 @@ import { AuthService } from '../../core/services/auth.service';
 
         <form (ngSubmit)="handleChangePassword()" class="space-y-4" novalidate>
           <div>
-            <label for="currentPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+            <label for="currentPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
               Current / Temporary Password
             </label>
             <input
@@ -54,11 +54,11 @@ import { AuthService } from '../../core/services/auth.service';
               required
               [(ngModel)]="currentPassword"
               placeholder="••••••••••••"
-              class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#008FBB] transition" />
+              class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#008FBB] transition" />
           </div>
 
           <div>
-            <label for="newPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+            <label for="newPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
               New Password
             </label>
             <input
@@ -68,7 +68,7 @@ import { AuthService } from '../../core/services/auth.service';
               required
               [(ngModel)]="newPassword"
               placeholder="Minimum 8 characters"
-              class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#008FBB] transition" />
+              class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#008FBB] transition" />
             
             <!-- Password Strength Indicator -->
             <div class="mt-2 space-y-1">
@@ -76,14 +76,14 @@ import { AuthService } from '../../core/services/auth.service';
                 <span class="text-slate-500">Strength:</span>
                 <span class="font-bold" [ngClass]="strengthTextColor()">{{ strengthLabel() }}</span>
               </div>
-              <div class="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div class="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
                 <div class="h-full transition-all duration-300" [ngClass]="strengthBarColor()" [style.width.%]="strengthScore() * 25"></div>
               </div>
             </div>
           </div>
 
           <div>
-            <label for="confirmPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+            <label for="confirmPassword" class="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
               Confirm New Password
             </label>
             <input
@@ -93,7 +93,7 @@ import { AuthService } from '../../core/services/auth.service';
               required
               [(ngModel)]="confirmPassword"
               placeholder="Re-enter new password"
-              class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-[#008FBB] transition" />
+              class="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-[#008FBB] transition" />
           </div>
 
           <button

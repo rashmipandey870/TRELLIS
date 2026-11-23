@@ -56,15 +56,15 @@ function loadMonacoEditor(): Promise<any> {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="flex flex-col h-full border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden bg-white dark:bg-slate-950 shadow-sm">
+    <div class="flex flex-col h-full border border-slate-200 rounded-2xl overflow-hidden bg-white shadow-sm">
       <!-- Top Control Bar -->
-      <div class="px-3 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="px-3 py-2 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div class="flex items-center gap-2">
-          <label class="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Language:</label>
+          <label class="text-[11px] font-bold uppercase text-slate-500">Language:</label>
           <select
             [ngModel]="language"
             (ngModelChange)="onLanguageChange($event)"
-            class="px-2.5 py-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#008FBB]">
+            class="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008FBB]">
             <option value="python">Python 3</option>
             <option value="java">Java 21</option>
             <option value="javascript">JavaScript</option>
@@ -73,11 +73,11 @@ function loadMonacoEditor(): Promise<any> {
             <option value="sql">SQL</option>
           </select>
 
-          <label class="ml-2 text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">Font:</label>
+          <label class="ml-2 text-[11px] font-bold uppercase text-slate-500">Font:</label>
           <select
             [(ngModel)]="fontSize"
             (ngModelChange)="onFontSizeChange($event)"
-            class="px-2 py-1 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#008FBB]">
+            class="px-2 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008FBB]">
             <option [ngValue]="12">12px</option>
             <option [ngValue]="13">13px</option>
             <option [ngValue]="14">14px</option>
@@ -89,25 +89,18 @@ function loadMonacoEditor(): Promise<any> {
         <div class="flex items-center gap-2">
           <button
             type="button"
-            (click)="toggleTheme()"
-            class="px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-semibold transition">
-            {{ currentTheme === 'csm-light' ? '🌙 Dark Mode' : '☀️ CSM Light' }}
-          </button>
-
-          <button
-            type="button"
             (click)="onReset()"
             title="Reset code to default template"
-            class="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-[#D7182A] hover:bg-rose-100 text-xs font-bold transition">
+            class="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-[#D7182A] hover:bg-rose-100 text-xs font-bold transition">
             Reset Code
           </button>
         </div>
       </div>
 
       <!-- Editor Container -->
-      <div #editorContainer class="w-full flex-1 min-h-[360px] bg-white dark:bg-slate-950 relative">
+      <div #editorContainer class="w-full flex-1 min-h-[360px] bg-white relative">
         @if (isLoading) {
-          <div class="absolute inset-0 flex items-center justify-center bg-slate-50/50 dark:bg-slate-950/50 text-xs text-slate-400">
+          <div class="absolute inset-0 flex items-center justify-center bg-slate-50/50 text-xs text-slate-400">
             <span class="animate-spin mr-2">&#9696;</span> Loading Monaco Editor...
           </div>
         }
@@ -275,13 +268,6 @@ export class MonacoEditorComponent implements AfterViewInit, OnChanges, OnDestro
   onFontSizeChange(newSize: number): void {
     this.fontSize = newSize;
     this.editorInstance?.updateOptions({ fontSize: newSize });
-  }
-
-  toggleTheme(): void {
-    this.currentTheme = this.currentTheme === 'csm-light' ? 'vs-dark' : 'csm-light';
-    if (window.monaco) {
-      window.monaco.editor.setTheme(this.currentTheme);
-    }
   }
 
   onReset(): void {

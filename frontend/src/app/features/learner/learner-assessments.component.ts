@@ -16,8 +16,8 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
         <div class="space-y-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Assigned Assessments</h1>
-              <p class="text-xs text-slate-500 dark:text-slate-400">
+              <h1 class="text-2xl font-black text-slate-900 tracking-tight">Assigned Assessments</h1>
+              <p class="text-xs text-slate-500">
                 Formal examinations assigned to your cohort. Timed tests include autosave and tab-switch monitoring.
               </p>
             </div>
@@ -25,18 +25,18 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
 
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             @for (a of assignedList(); track a.id) {
-              <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 hover:border-[#008FBB] transition">
+              <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 hover:border-[#008FBB] transition">
                 <div class="flex items-start justify-between">
                   <div>
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
                       {{ a.field }} &bull; Passing {{ a.passing_score }}%
                     </span>
-                    <h3 class="text-base font-black text-slate-900 dark:text-white mt-1">{{ a.title }}</h3>
+                    <h3 class="text-base font-black text-slate-900 mt-1">{{ a.title }}</h3>
                   </div>
                   <span class="text-xs font-mono font-bold text-slate-500">{{ a.duration_minutes }} Mins</span>
                 </div>
 
-                <p class="text-xs text-slate-500 dark:text-slate-400">
+                <p class="text-xs text-slate-500">
                   {{ a.instructions || 'Proctored assessment covering architecture, fundamentals, and real-world problems.' }}
                 </p>
 
@@ -50,10 +50,10 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                 </div>
               </div>
             } @empty {
-              <div class="col-span-full p-12 text-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-2">
+              <div class="col-span-full p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
                 <span class="text-3xl block">📋</span>
-                <h4 class="text-sm font-bold text-slate-800 dark:text-slate-200">No Assessments Assigned</h4>
-                <p class="text-xs text-slate-500 dark:text-slate-400">You currently have no pending formal examinations scheduled for your cohort.</p>
+                <h4 class="text-sm font-bold text-slate-800">No Assessments Assigned</h4>
+                <p class="text-xs text-slate-500">You currently have no pending formal examinations scheduled for your cohort.</p>
               </div>
             }
           </div>
@@ -65,10 +65,10 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
         <div class="space-y-4 animate-in fade-in">
           
           <!-- Test Runner Bar -->
-          <div class="sticky top-16 z-30 p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-md flex items-center justify-between">
+          <div class="sticky top-16 z-30 p-4 rounded-2xl bg-white border border-slate-200 shadow-md flex items-center justify-between">
             <div class="flex items-center gap-4">
               <div>
-                <h2 class="text-sm font-black text-slate-900 dark:text-white leading-tight">{{ activeAttempt()?.title }}</h2>
+                <h2 class="text-sm font-black text-slate-900 leading-tight">{{ activeAttempt()?.title }}</h2>
                 <span class="text-[10px] text-slate-400">Question {{ currentQuestionIndex() + 1 }} of {{ activeAttempt()?.questions?.length }}</span>
               </div>
 
@@ -106,7 +106,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
           <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
             
             <!-- Question Palette (Step 4 Requirement: answered / flagged / unvisited) -->
-            <div class="lg:col-span-1 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div class="lg:col-span-1 p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
               <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Question Palette</h3>
               
               <div class="grid grid-cols-4 gap-2">
@@ -119,7 +119,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                       'ring-2 ring-[#008FBB] ring-offset-2': idx === currentQuestionIndex(),
                       'bg-emerald-500 text-white border-emerald-600': isAnswered(q.id),
                       'bg-amber-400 text-slate-950 border-amber-500': isFlagged(q.id),
-                      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700': !isAnswered(q.id) && !isFlagged(q.id)
+                      'bg-slate-100  text-slate-600  border-slate-200 ': !isAnswered(q.id) && !isFlagged(q.id)
                     }">
                     {{ idx + 1 }}
                   </button>
@@ -127,7 +127,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
               </div>
 
               <!-- Palette Legend -->
-              <div class="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-[10px] text-slate-500">
+              <div class="pt-3 border-t border-slate-100 space-y-1.5 text-[10px] text-slate-500">
                 <div class="flex items-center gap-2">
                   <span class="w-3 h-3 rounded bg-emerald-500"></span>
                   <span>Answered (Autosaved)</span>
@@ -137,7 +137,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                   <span>Flagged for Review</span>
                 </div>
                 <div class="flex items-center gap-2">
-                  <span class="w-3 h-3 rounded bg-slate-200 dark:bg-slate-800"></span>
+                  <span class="w-3 h-3 rounded bg-slate-200"></span>
                   <span>Unvisited</span>
                 </div>
               </div>
@@ -146,17 +146,17 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                 <button 
                   type="button" 
                   (click)="toggleFlagCurrent()"
-                  class="w-full py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-slate-700 dark:text-slate-300 transition">
+                  class="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition">
                   {{ isFlagged(currentQuestion()?.id || '') ? 'Unflag Question' : '🚩 Flag for Review' }}
                 </button>
               </div>
             </div>
 
             <!-- Question Execution Area (MCQ or Coding) -->
-            <div class="lg:col-span-3 p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+            <div class="lg:col-span-3 p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-6">
               
               <!-- Question Header -->
-              <div class="space-y-2 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div class="space-y-2 pb-4 border-b border-slate-100">
                 <div class="flex items-center justify-between">
                   <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                     [ngClass]="currentQuestion()?.question_type === 'CODING' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-[#008FBB]'">
@@ -164,8 +164,8 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                   </span>
                   <span class="text-xs font-mono font-bold text-slate-400">{{ currentQuestion()?.marks }} Marks</span>
                 </div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-white">{{ currentQuestion()?.title }}</h3>
-                <p class="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ currentQuestion()?.content }}</p>
+                <h3 class="text-base font-bold text-slate-900">{{ currentQuestion()?.title }}</h3>
+                <p class="text-xs text-slate-600 whitespace-pre-wrap">{{ currentQuestion()?.content }}</p>
               </div>
 
               <!-- MCQ Options Choice -->
@@ -174,7 +174,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                   @for (opt of currentQuestion()?.options; track opt.id) {
                     <label 
                       class="flex items-center gap-3 p-3.5 rounded-xl border text-xs cursor-pointer transition"
-                      [ngClass]="isSelectedOption(opt.id) ? 'bg-sky-50 dark:bg-sky-950/40 border-[#008FBB] text-[#008FBB] font-bold' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'">
+                      [ngClass]="isSelectedOption(opt.id) ? 'bg-sky-50  border-[#008FBB] text-[#008FBB] font-bold' : 'bg-slate-50  border-slate-200  text-slate-800 '">
                       <input 
                         type="radio" 
                         [name]="currentQuestion()?.id || 'mcq'"
@@ -217,36 +217,36 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                     (ngModelChange)="onTextChanged()"
                     rows="8" 
                     placeholder="Enter your detailed response or explanation here..."
-                    class="w-full text-xs p-4 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB] leading-relaxed"></textarea>
+                    class="w-full text-xs p-4 bg-slate-50 text-slate-900 border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB] leading-relaxed"></textarea>
                 </div>
               }
 
               <!-- File Upload Area -->
               @if (currentQuestion()?.question_type === 'FILE_UPLOAD') {
-                <div class="space-y-3 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950">
-                  <span class="text-xs font-bold text-slate-700 dark:text-slate-300 block">Deliverable Document / Asset URL</span>
+                <div class="space-y-3 p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                  <span class="text-xs font-bold text-slate-700 block">Deliverable Document / Asset URL</span>
                   <input 
                     type="text" 
                     [(ngModel)]="fileUrl" 
                     (ngModelChange)="onFileChanged()"
                     placeholder="https://drive.google.com/... or internal storage URL"
-                    class="w-full text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
+                    class="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
                   <input 
                     type="text" 
                     [(ngModel)]="fileName" 
                     (ngModelChange)="onFileChanged()"
                     placeholder="Document Name (e.g., architecture_v1.pdf)"
-                    class="w-full text-xs px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
+                    class="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
                 </div>
               }
 
               <!-- Navigation Footer -->
-              <div class="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div class="flex items-center justify-between pt-4 border-t border-slate-100">
                 <button 
                   type="button" 
                   [disabled]="currentQuestionIndex() === 0"
                   (click)="prevQuestion()"
-                  class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 disabled:opacity-40 text-xs font-bold text-slate-700 dark:text-slate-200">
+                  class="px-4 py-2 rounded-xl bg-slate-100 disabled:opacity-40 text-xs font-bold text-slate-700">
                   &larr; Previous Question
                 </button>
 

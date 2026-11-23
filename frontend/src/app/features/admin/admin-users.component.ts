@@ -12,8 +12,8 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">User Management</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">User Management</h1>
+          <p class="text-xs text-slate-500">
             Provision, manage, and govern accounts across ADMIN, MENTOR, and LEARNER roles.
           </p>
         </div>
@@ -21,7 +21,7 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
           <button 
             type="button" 
             (click)="showBulkImportModal.set(true)"
-            class="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition">
+            class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition">
             &uarr; CSV Bulk Import
           </button>
           <button 
@@ -34,14 +34,14 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
       </div>
 
       <!-- Filters & Search Bar -->
-      <div class="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <div class="p-4 rounded-2xl bg-white border border-slate-200 flex flex-col sm:flex-row gap-3 items-center justify-between">
         <div class="w-full sm:w-72">
           <input 
             type="text" 
             [(ngModel)]="searchQuery" 
             (ngModelChange)="applyFilters()"
             placeholder="Search by name or email..."
-            class="w-full px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
+            class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
         </div>
 
         <div class="flex items-center gap-2 w-full sm:w-auto">
@@ -49,7 +49,7 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
           <select 
             [(ngModel)]="selectedRole" 
             (ngModelChange)="applyFilters()"
-            class="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#008FBB]">
+            class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#008FBB]">
             <option value="">All Roles (3 Only)</option>
             <option value="ADMIN">ADMIN</option>
             <option value="MENTOR">MENTOR</option>
@@ -59,10 +59,10 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
       </div>
 
       <!-- Users Table -->
-      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+      <div class="rounded-2xl bg-white border border-slate-200 overflow-hidden shadow-sm">
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 dark:bg-slate-800/60 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200 dark:border-slate-800">
+            <thead class="bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-200">
               <tr>
                 <th class="py-3 px-4">User</th>
                 <th class="py-3 px-4">Role</th>
@@ -72,11 +72,11 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
                 <th class="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody class="divide-y divide-slate-100">
               @for (user of filteredUsers(); track user.id) {
-                <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition">
+                <tr class="hover:bg-slate-50/50 transition">
                   <td class="py-3 px-4">
-                    <div class="font-bold text-slate-900 dark:text-white">{{ user.full_name }}</div>
+                    <div class="font-bold text-slate-900">{{ user.full_name }}</div>
                     <div class="text-[11px] text-slate-400">{{ user.email }}</div>
                   </td>
                   <td class="py-3 px-4">
@@ -95,7 +95,7 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
                       {{ user.is_active ? 'Active' : 'Deactivated' }}
                     </span>
                   </td>
-                  <td class="py-3 px-4 font-mono font-bold text-slate-700 dark:text-slate-300">
+                  <td class="py-3 px-4 font-mono font-bold text-slate-700">
                     {{ user.streak_days || 0 }}d
                   </td>
                   <td class="py-3 px-4 text-slate-400">
@@ -128,24 +128,24 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
       <!-- Add User Modal -->
       @if (showAddUserModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Create New User</h3>
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">Create New User</h3>
               <button (click)="showAddUserModal.set(false)" class="text-slate-400 hover:text-slate-600">&times;</button>
             </div>
 
             <form (ngSubmit)="submitCreateUser()" class="space-y-3">
               <div>
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Full Name</label>
-                <input type="text" [(ngModel)]="newUser.full_name" name="name" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs" />
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Full Name</label>
+                <input type="text" [(ngModel)]="newUser.full_name" name="name" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
               </div>
               <div>
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Corporate Email</label>
-                <input type="email" [(ngModel)]="newUser.email" name="email" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs" />
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Corporate Email</label>
+                <input type="email" [(ngModel)]="newUser.email" name="email" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
               </div>
               <div>
-                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1">Role (Strict 3 Roles)</label>
-                <select [(ngModel)]="newUser.role" name="role" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+                <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Role (Strict 3 Roles)</label>
+                <select [(ngModel)]="newUser.role" name="role" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
                   <option value="LEARNER">LEARNER</option>
                   <option value="MENTOR">MENTOR</option>
                   <option value="ADMIN">ADMIN</option>
@@ -153,7 +153,7 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
               </div>
 
               <div class="flex justify-end gap-2 pt-4">
-                <button type="button" (click)="showAddUserModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                <button type="button" (click)="showAddUserModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Cancel</button>
                 <button type="submit" class="px-4 py-2 rounded-xl bg-[#008FBB] text-xs font-bold text-white hover:bg-[#007499]">Create Account</button>
               </div>
             </form>
@@ -164,30 +164,30 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
       <!-- CSV Bulk Import Modal -->
       @if (showBulkImportModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">CSV Bulk Import Users</h3>
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">CSV Bulk Import Users</h3>
               <button (click)="showBulkImportModal.set(false)" class="text-slate-400 hover:text-slate-600">&times;</button>
             </div>
 
-            <p class="text-xs text-slate-500 dark:text-slate-400">
-              Paste standard comma-separated lines. Format: <code class="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[11px]">email,full_name,role</code>
+            <p class="text-xs text-slate-500">
+              Paste standard comma-separated lines. Format: <code class="font-mono bg-slate-100 px-1 py-0.5 rounded text-[11px]">email,full_name,role</code>
             </p>
 
             <textarea 
               [(ngModel)]="bulkCsvContent" 
               rows="6" 
-              placeholder="priya.verma@csmtech.internal,Priya Verma,LEARNER&#10;amit.sharma@csmtech.internal,Amit Sharma,MENTOR"
-              class="w-full font-mono text-xs p-3 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
+              placeholder="priya.verma@example.com,Priya Verma,LEARNER&#10;amit.sharma@example.com,Amit Sharma,MENTOR"
+              class="w-full font-mono text-xs p-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
 
             @if (bulkImportMessage()) {
-              <div class="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200 text-xs font-bold">
+              <div class="p-3 rounded-xl bg-emerald-50 text-emerald-800 text-xs font-bold">
                 {{ bulkImportMessage() }}
               </div>
             }
 
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" (click)="showBulkImportModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Close</button>
+              <button type="button" (click)="showBulkImportModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Close</button>
               <button type="button" (click)="submitBulkImport()" [disabled]="!bulkCsvContent.trim()" class="px-4 py-2 rounded-xl bg-[#008FBB] text-xs font-bold text-white hover:bg-[#007499] disabled:opacity-50">Run Import</button>
             </div>
           </div>

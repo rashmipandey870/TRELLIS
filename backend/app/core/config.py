@@ -96,6 +96,10 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str = "notifications@csmtech.internal"
     EMAILS_FROM_NAME: str = "CSM TRELLIS Platform"
 
+    # Demo Convenience Configuration (Phase A3 - disabled by default)
+    DEMO_MODE: bool = False
+    DEMO_ACCOUNTS_JSON: str = ""
+
     @model_validator(mode="after")
     def validate_production_invariants(self) -> "Settings":
         """Strictly refuse startup in non-dev environments if secrets or keys are missing."""

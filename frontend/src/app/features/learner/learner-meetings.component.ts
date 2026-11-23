@@ -11,8 +11,8 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">My Mentoring Sessions &amp; Calendar</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">My Mentoring Sessions &amp; Calendar</h1>
+          <p class="text-xs text-slate-500">
             Join live cohort architecture sessions and export standardized .ics calendar invitations.
           </p>
         </div>
@@ -21,7 +21,7 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
       <!-- Meetings List -->
       <div class="space-y-4">
         @for (m of meetings(); track m.id) {
-          <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-[#008FBB] transition">
+          <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-[#008FBB] transition">
             
             <div class="space-y-2">
               <div class="flex items-center gap-2">
@@ -33,13 +33,13 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
                 </span>
               </div>
 
-              <h3 class="text-lg font-black text-slate-900 dark:text-white">{{ m.title }}</h3>
-              <p class="text-xs text-slate-500 dark:text-slate-400 max-w-xl">
+              <h3 class="text-lg font-black text-slate-900">{{ m.title }}</h3>
+              <p class="text-xs text-slate-500 max-w-xl">
                 {{ m.description || 'Cohort design walkthrough and code reviews with your assigned mentor.' }}
               </p>
 
               <div class="flex items-center gap-4 text-xs pt-1">
-                <span class="text-slate-400">Mentor: <strong class="text-slate-700 dark:text-slate-200">{{ m.mentor_name || 'Ananya Rao' }}</strong></span>
+                <span class="text-slate-400">Mentor: <strong class="text-slate-700">{{ m.mentor_name || 'Ananya Rao' }}</strong></span>
                 <span class="text-emerald-600 font-semibold">&bull; Starting in 2 hours</span>
               </div>
             </div>
@@ -49,7 +49,7 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
               <button 
                 type="button" 
                 (click)="downloadIcs(m)"
-                class="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition flex items-center justify-center gap-2">
+                class="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition flex items-center justify-center gap-2">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
@@ -66,7 +66,7 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
 
           </div>
         } @empty {
-          <div class="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+          <div class="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
             No upcoming sessions currently scheduled. Check back soon.
           </div>
         }

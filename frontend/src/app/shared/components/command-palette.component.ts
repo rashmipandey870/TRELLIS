@@ -25,11 +25,11 @@ interface CommandItem {
         (click)="closeOnBackdrop($event)">
         
         <div 
-          class="w-full max-w-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
+          class="w-full max-w-xl bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
           (click)="$event.stopPropagation()">
           
           <!-- Search Header -->
-          <div class="flex items-center px-4 py-3.5 border-b border-slate-200 dark:border-slate-800 gap-3">
+          <div class="flex items-center px-4 py-3.5 border-b border-slate-200 gap-3">
             <svg class="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -39,10 +39,10 @@ interface CommandItem {
               type="text"
               [(ngModel)]="searchQuery"
               placeholder="Type a command, page, or search action... (ESC to close)"
-              class="flex-1 bg-transparent border-none text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+              class="flex-1 bg-transparent border-none text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
               (keydown)="handleKeydown($event)" />
 
-            <kbd class="px-2 py-0.5 text-[10px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md">
+            <kbd class="px-2 py-0.5 text-[10px] font-semibold text-slate-500 bg-slate-100 border border-slate-200 rounded-md">
               ESC
             </kbd>
           </div>
@@ -61,19 +61,19 @@ interface CommandItem {
                 (click)="execute(cmd)"
                 (mouseenter)="selectedIndex.set(idx)"
                 class="w-full text-left px-3.5 py-2.5 rounded-xl flex items-center justify-between transition group"
-                [ngClass]="selectedIndex() === idx ? 'bg-sky-50 dark:bg-slate-800/80 text-[#008FBB] dark:text-sky-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/40'">
+                [ngClass]="selectedIndex() === idx ? 'bg-sky-50  text-[#008FBB] ' : 'text-slate-700  hover:bg-slate-50 '">
                 
                 <div class="flex items-center gap-3">
                   <div 
                     class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
-                    [ngClass]="selectedIndex() === idx ? 'bg-[#008FBB]/10 text-[#008FBB]' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'">
+                    [ngClass]="selectedIndex() === idx ? 'bg-[#008FBB]/10 text-[#008FBB]' : 'bg-slate-100  text-slate-500'">
                     {{ cmd.category[0] }}
                   </div>
                   <div>
                     <div class="text-xs font-semibold leading-tight flex items-center gap-2">
                       <span>{{ cmd.title }}</span>
                       @if (cmd.badge) {
-                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 font-normal">
+                        <span class="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-500 font-normal">
                           {{ cmd.badge }}
                         </span>
                       }
@@ -93,10 +93,10 @@ interface CommandItem {
           </div>
 
           <!-- Footer Hints -->
-          <div class="px-4 py-2.5 bg-slate-50 dark:bg-slate-950/60 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+          <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-400">
             <div class="flex items-center gap-3">
-              <span><kbd class="px-1 py-0.2 bg-white dark:bg-slate-800 border rounded text-[10px]">↑</kbd> <kbd class="px-1 py-0.2 bg-white dark:bg-slate-800 border rounded text-[10px]">↓</kbd> to navigate</span>
-              <span><kbd class="px-1 py-0.2 bg-white dark:bg-slate-800 border rounded text-[10px]">↵</kbd> to select</span>
+              <span><kbd class="px-1 py-0.2 bg-white border rounded text-[10px]">↑</kbd> <kbd class="px-1 py-0.2 bg-white border rounded text-[10px]">↓</kbd> to navigate</span>
+              <span><kbd class="px-1 py-0.2 bg-white border rounded text-[10px]">↵</kbd> to select</span>
             </div>
             <div class="flex items-center gap-1.5 font-semibold text-slate-500">
               <span class="w-1.5 h-1.5 rounded-full bg-[#008FBB]"></span>
@@ -210,61 +210,18 @@ export class CommandPaletteComponent {
     // Quick Actions
     commands.push(
       {
-        id: 'toggle-theme',
-        title: 'Toggle Dark / Light Theme',
-        subtitle: 'Switch between white and Ink dark theme',
-        category: 'Actions',
-        badge: 'Theme',
-        action: () => {
-          document.documentElement.classList.toggle('dark');
-        },
-      },
-      {
         id: 'change-password',
         title: 'Change Password',
-        subtitle: 'Update account credentials',
+        subtitle: 'Update account credentials and password',
         category: 'Actions',
         action: () => this.router.navigate(['/auth/change-password']),
       },
-    );
-
-    // Quick Role Switcher for seamless demo testing
-    commands.push(
       {
-        id: 'switch-learner',
-        title: 'Switch Role to Learner (Priya Sharma)',
-        subtitle: 'learner1@csmtech.internal',
-        category: 'Demo Switcher',
-        badge: 'Learner',
-        action: () => {
-          this.authService.login('learner1@csmtech.internal', 'CSMTrellis2026!').subscribe({
-            next: () => this.router.navigate(['/learner/dashboard']),
-          });
-        },
-      },
-      {
-        id: 'switch-mentor',
-        title: 'Switch Role to Mentor (Soumya Patnaik)',
-        subtitle: 'soumya.p@csmtech.internal',
-        category: 'Demo Switcher',
-        badge: 'Mentor',
-        action: () => {
-          this.authService.login('soumya.p@csmtech.internal', 'CSMTrellis2026!').subscribe({
-            next: () => this.router.navigate(['/mentor/dashboard']),
-          });
-        },
-      },
-      {
-        id: 'switch-admin',
-        title: 'Switch Role to Admin (Rajesh Mohanty)',
-        subtitle: 'admin@csmtech.internal',
-        category: 'Demo Switcher',
-        badge: 'Admin',
-        action: () => {
-          this.authService.login('admin@csmtech.internal', 'CSMTrellis2026!').subscribe({
-            next: () => this.router.navigate(['/admin/dashboard']),
-          });
-        },
+        id: 'sign-out',
+        title: 'Sign Out',
+        subtitle: 'Securely sign out of TRELLIS',
+        category: 'Actions',
+        action: () => this.authService.logout(),
       },
     );
 

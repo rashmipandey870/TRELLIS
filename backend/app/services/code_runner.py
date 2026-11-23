@@ -634,7 +634,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                 compile_error=f"Unsupported language '{language}'. Supported: Python, JavaScript, Java, C, C++, SQL.",
             )
 
-    def _get_preexec_fn(self, timeout_sec: float, memory_limit_mb: int):
+    def _get_preexec_fn(self, timeout_sec: float, memory_limit_mb: int, skip_rlimit_as: bool = False):
         """Set POSIX process limits for CPU, memory, file size, and process count."""
         if sys.platform == "win32" or resource is None:
             return None
@@ -644,8 +644,14 @@ class LocalSubprocessRunner(BaseCodeRunner):
             cpu_limit = max(1, int(timeout_sec) + 1)
             resource.setrlimit(resource.RLIMIT_CPU, (cpu_limit, cpu_limit + 1))
             # Address space / virtual memory in bytes
-            mem_bytes = memory_limit_mb * 1024 * 1024
-            resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
+            # NOTE (Phase B1): V8 (Node) and JVM (Java) reserve large virtual address spaces
+            # for CodeRange / thread stacks upfront. Applying RLIMIT_AS causes Node to crash with
+            # "Fatal process out of memory: Failed to reserve virtual memory for CodeRange".
+            # Therefore, RLIMIT_AS is not applied to Node or Java; Node uses --max-old-space-size
+            # and Java uses -Xmx instead.
+            if not skip_rlimit_as:
+                mem_bytes = memory_limit_mb * 1024 * 1024
+                resource.setrlimit(resource.RLIMIT_AS, (mem_bytes, mem_bytes))
             # File size limit (max 10MB file creation)
             resource.setrlimit(resource.RLIMIT_FSIZE, (10 * 1024 * 1024, 10 * 1024 * 1024))
             # Child process creation limit
@@ -707,7 +713,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
             node_env = {"SYSTEMROOT": os.environ.get("SYSTEMROOT", r"C:\Windows")} if sys.platform == "win32" else {}
 
             return self._evaluate_cases(
-                cmd=[node_bin, script_path],
+                cmd=[node_bin, f"--max-old-space-size={memory_limit_mb}", script_path],
                 cwd=tmpdir,
                 test_cases=test_cases,
                 timeout_sec=timeout_sec,
@@ -759,6 +765,19 @@ class LocalSubprocessRunner(BaseCodeRunner):
                     timeout=10,
                 )
                 if c_proc.returncode != 0:
+                    err_str = c_proc.stderr[: self.MAX_OUTPUT_BYTES]
+                    err_lower = err_str.lower()
+                    # Phase B2: Classify linker or broken toolchain failures as RUNNER_UNAVAILABLE
+                    if any(p in err_lower for p in ("cannot find 'ld'", "no such file or directory", "not found", "cannot execute")):
+                        return ExecutionResult(
+                            verdict="RUNNER_UNAVAILABLE",
+                            passed_cases=0,
+                            total_cases=len(test_cases),
+                            runtime_ms=0,
+                            memory_mb=0,
+                            score=0,
+                            compile_error=f"Toolchain missing or incomplete ({compiler}): {err_str}",
+                        )
                     return ExecutionResult(
                         verdict="COMPILATION_ERROR",
                         passed_cases=0,
@@ -766,7 +785,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                         runtime_ms=0,
                         memory_mb=0,
                         score=0,
-                        compile_error=c_proc.stderr[: self.MAX_OUTPUT_BYTES],
+                        compile_error=err_str,
                     )
             except subprocess.TimeoutExpired:
                 return ExecutionResult(
@@ -855,6 +874,19 @@ class LocalSubprocessRunner(BaseCodeRunner):
                     timeout=15,
                 )
                 if c_proc.returncode != 0:
+                    err_str = c_proc.stderr[: self.MAX_OUTPUT_BYTES]
+                    err_lower = err_str.lower()
+                    # Phase B2: Classify linker or broken toolchain failures as RUNNER_UNAVAILABLE
+                    if any(p in err_lower for p in ("cannot find 'ld'", "no such file or directory", "not found", "cannot execute")):
+                        return ExecutionResult(
+                            verdict="RUNNER_UNAVAILABLE",
+                            passed_cases=0,
+                            total_cases=len(test_cases),
+                            runtime_ms=0,
+                            memory_mb=0,
+                            score=0,
+                            compile_error=f"Toolchain missing or incomplete ({compiler}): {err_str}",
+                        )
                     return ExecutionResult(
                         verdict="COMPILATION_ERROR",
                         passed_cases=0,
@@ -862,7 +894,7 @@ class LocalSubprocessRunner(BaseCodeRunner):
                         runtime_ms=0,
                         memory_mb=0,
                         score=0,
-                        compile_error=c_proc.stderr[: self.MAX_OUTPUT_BYTES],
+                        compile_error=err_str,
                     )
             except subprocess.TimeoutExpired:
                 return ExecutionResult(
@@ -1023,7 +1055,8 @@ class LocalSubprocessRunner(BaseCodeRunner):
         first_fail = None
         custom_out = None
 
-        preexec = self._get_preexec_fn(timeout_sec, memory_limit_mb)
+        skip_as = any(vm in str(cmd[0]).lower() for vm in ("node", "java")) if cmd else False
+        preexec = self._get_preexec_fn(timeout_sec, memory_limit_mb, skip_rlimit_as=skip_as)
 
         for idx, tc in enumerate(test_cases):
             input_text = str(tc.get("input_data", "")).strip()

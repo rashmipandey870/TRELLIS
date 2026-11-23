@@ -12,8 +12,8 @@ import { MentorService } from '../../core/services/mentor.service';
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Talent Spotlight: AI Practice Alerts</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">Talent Spotlight: AI Practice Alerts</h1>
+          <p class="text-xs text-slate-500">
             Automated intelligence detecting high dedication and exceptional accuracy across your assigned learners.
           </p>
         </div>
@@ -25,7 +25,7 @@ import { MentorService } from '../../core/services/mentor.service';
       <!-- Alerts List -->
       <div class="space-y-4">
         @for (alert of alerts(); track alert.id) {
-          <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
             
             <!-- Alert Title & Evidence -->
             <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -34,10 +34,10 @@ import { MentorService } from '../../core/services/mentor.service';
                   <span class="w-2.5 h-2.5 rounded-full bg-[#FAA634] animate-ping"></span>
                   <span class="text-xs font-mono font-bold uppercase tracking-wider text-[#FAA634]">{{ alert.field }} PRACTICE TRACK</span>
                 </div>
-                <h3 class="text-lg font-black text-slate-900 dark:text-white mt-1">
+                <h3 class="text-lg font-black text-slate-900 mt-1">
                   {{ alert.learner_name }} has crossed high dedication thresholds!
                 </h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <p class="text-xs text-slate-500 mt-1">
                   {{ alert.message || 'Learner achieved >85% weighted accuracy across 18+ coding & MCQ challenges with a 14-day continuous streak.' }}
                 </p>
               </div>
@@ -55,20 +55,20 @@ import { MentorService } from '../../core/services/mentor.service';
             </div>
 
             <!-- Evidence Metric Pills -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3 border-y border-slate-100 dark:border-slate-800 text-xs">
-              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3 border-y border-slate-100 text-xs">
+              <div class="p-2.5 rounded-xl bg-slate-50">
                 <span class="text-slate-400 text-[10px] uppercase font-bold block">Active Days</span>
-                <span class="font-bold text-slate-800 dark:text-slate-200">{{ alert.active_days || 14 }} / 30 Days</span>
+                <span class="font-bold text-slate-800">{{ alert.active_days || 14 }} / 30 Days</span>
               </div>
-              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800">
+              <div class="p-2.5 rounded-xl bg-slate-50">
                 <span class="text-slate-400 text-[10px] uppercase font-bold block">Weighted Accuracy</span>
                 <span class="font-bold text-emerald-600">{{ alert.accuracy || 88 }}%</span>
               </div>
-              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800">
+              <div class="p-2.5 rounded-xl bg-slate-50">
                 <span class="text-slate-400 text-[10px] uppercase font-bold block">Problems Solved</span>
-                <span class="font-bold text-slate-800 dark:text-slate-200">{{ alert.problems_count || 18 }} items</span>
+                <span class="font-bold text-slate-800">{{ alert.problems_count || 18 }} items</span>
               </div>
-              <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800">
+              <div class="p-2.5 rounded-xl bg-slate-50">
                 <span class="text-slate-400 text-[10px] uppercase font-bold block">Dedication Score</span>
                 <span class="font-bold text-[#008FBB]">{{ alert.dedication_score || 92 }} / 100</span>
               </div>
@@ -98,7 +98,7 @@ import { MentorService } from '../../core/services/mentor.service';
                 <button 
                   type="button" 
                   (click)="takeAction(alert, 'DISMISS')"
-                  class="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold transition">
+                  class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition">
                   Dismiss Alert
                 </button>
               </div>
@@ -109,7 +109,7 @@ import { MentorService } from '../../core/services/mentor.service';
             }
           </div>
         } @empty {
-          <div class="p-8 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+          <div class="p-8 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
             No active Talent Spotlight alerts pending for your learners.
           </div>
         }

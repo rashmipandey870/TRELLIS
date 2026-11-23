@@ -26,8 +26,8 @@ interface TestCase {
       <!-- Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Assessment Builder &amp; Analytics</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">Assessment Builder &amp; Analytics</h1>
+          <p class="text-xs text-slate-500">
             Author MCQ &amp; sandboxed coding challenges, publish versioned assessments, and export results to CSV.
           </p>
         </div>
@@ -35,7 +35,7 @@ interface TestCase {
           <button 
             type="button" 
             (click)="openQuestionBank()"
-            class="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-bold text-slate-700 dark:text-slate-200 transition">
+            class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition">
             Question Bank
           </button>
           <button 
@@ -59,7 +59,7 @@ interface TestCase {
       <!-- Assessments List Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         @for (a of assessments(); track a.id) {
-          <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-start justify-between">
               <div>
                 <div class="flex items-center gap-2">
@@ -69,24 +69,24 @@ interface TestCase {
                   </span>
                   <span class="text-[10px] font-mono text-slate-400 uppercase">{{ a.field }}</span>
                 </div>
-                <h3 class="text-base font-bold text-slate-900 dark:text-white mt-1">{{ a.title }}</h3>
+                <h3 class="text-base font-bold text-slate-900 mt-1">{{ a.title }}</h3>
               </div>
               <span class="text-xs font-mono font-bold text-[#008FBB]">Pass: {{ a.passing_score }}%</span>
             </div>
 
             <!-- Stats (Zero Fallbacks - Real Data Only) -->
-            <div class="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 dark:border-slate-800 text-xs text-center">
+            <div class="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 text-xs text-center">
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Duration</span>
-                <span class="font-bold text-slate-800 dark:text-slate-200">{{ a.duration_minutes }} mins</span>
+                <span class="font-bold text-slate-800">{{ a.duration_minutes }} mins</span>
               </div>
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Questions</span>
-                <span class="font-bold text-slate-800 dark:text-slate-200">{{ a.questions_count }} items</span>
+                <span class="font-bold text-slate-800">{{ a.questions_count }} items</span>
               </div>
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Submissions</span>
-                <span class="font-bold text-slate-800 dark:text-slate-200">{{ a.submissions_count }} taken</span>
+                <span class="font-bold text-slate-800">{{ a.submissions_count }} taken</span>
               </div>
             </div>
 
@@ -96,7 +96,7 @@ interface TestCase {
             </div>
 
             @if (a.is_published && a.submissions_count > 0) {
-              <p class="text-[10px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2 rounded-lg">
+              <p class="text-[10px] text-amber-600 bg-amber-50 p-2 rounded-lg">
                 &bull; Submissions exist: In-place edit locked. Adding or modifying questions will produce Version {{ (a.version || 1) + 1 }}.
               </p>
             }
@@ -106,7 +106,7 @@ interface TestCase {
               <button 
                 type="button" 
                 (click)="openEditAssessment(a)"
-                class="flex-1 py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition text-center">
+                class="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition text-center">
                 {{ a.is_published ? 'View / New Version' : 'Edit &amp; Add Questions' }}
               </button>
               @if (!a.is_published) {
@@ -120,14 +120,14 @@ interface TestCase {
               <button 
                 type="button" 
                 (click)="openResultsAnalysis(a)"
-                class="flex-1 py-2 px-3 rounded-xl bg-sky-50 dark:bg-sky-950/60 hover:bg-sky-100 text-[#008FBB] border border-sky-200 dark:border-sky-800 text-xs font-bold transition text-center">
+                class="flex-1 py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#008FBB] border border-sky-200 text-xs font-bold transition text-center">
                 Results &rarr;
               </button>
             </div>
           </div>
         } @empty {
-          <div class="col-span-2 p-12 text-center bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-400 text-xs space-y-2">
-            <p class="font-bold text-slate-600 dark:text-slate-300">No assessments created yet.</p>
+          <div class="col-span-2 p-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs space-y-2">
+            <p class="font-bold text-slate-600">No assessments created yet.</p>
             <p>Click "+ New Assessment" to author your first MCQ or coding challenge assessment.</p>
           </div>
         }
@@ -136,10 +136,10 @@ interface TestCase {
       <!-- Assessment Authoring Studio Modal -->
       @if (showStudioModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
                   {{ activeStudioAssessment() ? 'Assessment Authoring Studio (' + activeStudioAssessment()?.title + ')' : 'New Assessment Setup' }}
                 </h3>
                 <p class="text-xs text-slate-500">Configure parameters, audience, and author MCQ and coding challenges.</p>
@@ -148,7 +148,7 @@ interface TestCase {
             </div>
 
             <!-- Tab Switcher: Details vs Staged Questions vs Question Authoring vs Preview -->
-            <div class="flex border-b border-slate-200 dark:border-slate-800 gap-2">
+            <div class="flex border-b border-slate-200 gap-2">
               <button 
                 type="button"
                 (click)="studioTab.set('details')"
@@ -163,7 +163,7 @@ interface TestCase {
                   [ngClass]="studioTab() === 'questions' ? 'border-[#FAA634] text-[#FAA634]' : 'border-transparent text-slate-500 hover:text-slate-700'"
                   class="pb-2 px-3 text-xs font-bold border-b-2 transition flex items-center gap-1.5">
                   <span>2. Attached Questions</span>
-                  <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 dark:bg-slate-800 font-mono">{{ stagedQuestions().length }}</span>
+                  <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 font-mono">{{ stagedQuestions().length }}</span>
                 </button>
                 <button 
                   type="button"
@@ -208,12 +208,12 @@ interface TestCase {
               <form (ngSubmit)="saveAssessmentDetails()" class="space-y-4 text-xs">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Assessment Title *</label>
-                    <input type="text" [(ngModel)]="assessmentForm.title" name="title" required placeholder="e.g. Asynchronous Microservices Assessment" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Assessment Title *</label>
+                    <input type="text" [(ngModel)]="assessmentForm.title" name="title" required placeholder="e.g. Asynchronous Microservices Assessment" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Discipline / Track</label>
-                    <select [(ngModel)]="assessmentForm.field" name="field" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl">
+                    <label class="block font-bold text-slate-700 mb-1">Discipline / Track</label>
+                    <select [(ngModel)]="assessmentForm.field" name="field" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl">
                       <option value="Python">Python</option>
                       <option value="Java">Java</option>
                       <option value="SQL">SQL</option>
@@ -227,24 +227,24 @@ interface TestCase {
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Duration (Minutes) *</label>
-                    <input type="number" [(ngModel)]="assessmentForm.duration_minutes" name="duration" required min="5" max="300" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Duration (Minutes) *</label>
+                    <input type="number" [(ngModel)]="assessmentForm.duration_minutes" name="duration" required min="5" max="300" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Passing Score (%) *</label>
-                    <input type="number" [(ngModel)]="assessmentForm.passing_score" name="passing" required min="1" max="100" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Passing Score (%) *</label>
+                    <input type="number" [(ngModel)]="assessmentForm.passing_score" name="passing" required min="1" max="100" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                 </div>
 
                 <!-- Audience Selection -->
-                <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
-                  <span class="block font-bold text-slate-800 dark:text-slate-200 uppercase text-[11px]">Assessment Audience</span>
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <span class="block font-bold text-slate-800 uppercase text-[11px]">Assessment Audience</span>
                   <div class="flex items-center gap-4">
-                    <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 dark:text-slate-300">
+                    <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
                       <input type="radio" [(ngModel)]="assessmentForm.audience_type" name="audience_type" value="BATCH" />
                       <span>Entire Batch</span>
                     </label>
-                    <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 dark:text-slate-300">
+                    <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700">
                       <input type="radio" [(ngModel)]="assessmentForm.audience_type" name="audience_type" value="LEARNERS" />
                       <span>Individual Selected Learners</span>
                     </label>
@@ -252,8 +252,8 @@ interface TestCase {
 
                   @if (assessmentForm.audience_type === 'BATCH') {
                     <div>
-                      <label class="block font-bold text-slate-600 dark:text-slate-400 mb-1">Assigned Batch</label>
-                      <select [(ngModel)]="assessmentForm.batch_id" name="batch_id" class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl">
+                      <label class="block font-bold text-slate-600 mb-1">Assigned Batch</label>
+                      <select [(ngModel)]="assessmentForm.batch_id" name="batch_id" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl">
                         <option value="">-- All Assigned Batches --</option>
                         @for (b of mentorBatches(); track b.id) {
                           <option [value]="b.id">{{ b.name }} ({{ b.field }})</option>
@@ -262,15 +262,15 @@ interface TestCase {
                     </div>
                   } @else {
                     <div class="space-y-2">
-                      <label class="block font-bold text-slate-600 dark:text-slate-400">Select Learners</label>
-                      <div class="max-h-36 overflow-y-auto space-y-1 p-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
+                      <label class="block font-bold text-slate-600">Select Learners</label>
+                      <div class="max-h-36 overflow-y-auto space-y-1 p-2 bg-white rounded-xl border border-slate-200">
                         @for (l of mentorLearners(); track l.id) {
-                          <label class="flex items-center gap-2 p-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer">
+                          <label class="flex items-center gap-2 p-1 hover:bg-slate-50 rounded cursor-pointer">
                             <input 
                               type="checkbox" 
                               [checked]="isLearnerSelected(l.id)"
                               (change)="toggleLearnerSelection(l.id)" />
-                            <span class="font-medium text-slate-800 dark:text-slate-200">{{ l.full_name || l.name }}</span>
+                            <span class="font-medium text-slate-800">{{ l.full_name || l.name }}</span>
                             <span class="text-[10px] text-slate-400 font-mono">({{ l.email }})</span>
                           </label>
                         } @empty {
@@ -282,12 +282,12 @@ interface TestCase {
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Instructions for Learners</label>
-                  <textarea [(ngModel)]="assessmentForm.instructions" name="instructions" rows="2" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" placeholder="Full proctoring active. Code will be validated with sandboxed test execution."></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Instructions for Learners</label>
+                  <textarea [(ngModel)]="assessmentForm.instructions" name="instructions" rows="2" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" placeholder="Full proctoring active. Code will be validated with sandboxed test execution."></textarea>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="closeStudioModal()" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Cancel</button>
+                  <button type="button" (click)="closeStudioModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Cancel</button>
                   <button type="submit" class="px-4 py-2 rounded-xl bg-[#FAA634] text-xs font-bold text-white hover:bg-[#e09228]">
                     {{ activeStudioAssessment() ? 'Save Details' : 'Create & Proceed to Questions' }}
                   </button>
@@ -298,16 +298,16 @@ interface TestCase {
             <!-- Tab 2: Attached Questions List -->
             @if (studioTab() === 'questions' && activeStudioAssessment()) {
               <div class="space-y-4 text-xs">
-                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+                <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
                   <div>
-                    <span class="font-bold text-slate-800 dark:text-slate-200 uppercase text-[11px]">Attached Questions ({{ stagedQuestions().length }})</span>
+                    <span class="font-bold text-slate-800 uppercase text-[11px]">Attached Questions ({{ stagedQuestions().length }})</span>
                     <span class="text-slate-400 block text-[10px]">Total Marks: {{ totalStagedMarks() }}</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <button 
                       type="button" 
                       (click)="openQuestionBankForActiveAssessment()"
-                      class="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-200 font-bold text-[11px]">
+                      class="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-[11px]">
                       + From Question Bank
                     </button>
                     <button 
@@ -340,7 +340,7 @@ interface TestCase {
                 <!-- List of Questions -->
                 <div class="space-y-2">
                   @for (q of stagedQuestions(); track q.id || q.bank_question_id; let idx = $index) {
-                    <div class="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shadow-xs">
+                    <div class="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-3 shadow-xs">
                       <div class="flex items-center gap-3">
                         <span class="font-mono text-xs font-bold text-slate-400 w-5">#{{ idx + 1 }}</span>
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
@@ -348,7 +348,7 @@ interface TestCase {
                           {{ q.type || 'MCQ' }}
                         </span>
                         <div>
-                          <h4 class="font-bold text-slate-800 dark:text-slate-200">{{ q.title }}</h4>
+                          <h4 class="font-bold text-slate-800">{{ q.title }}</h4>
                           @if (q.question_text) {
                             <p class="text-[11px] text-slate-500 line-clamp-1">{{ q.question_text }}</p>
                           }
@@ -356,20 +356,20 @@ interface TestCase {
                       </div>
 
                       <div class="flex items-center gap-3 shrink-0">
-                        <span class="font-mono font-bold text-slate-700 dark:text-slate-300">{{ q.marks }} marks</span>
+                        <span class="font-mono font-bold text-slate-700">{{ q.marks }} marks</span>
                         <div class="flex items-center gap-1">
                           <button 
                             type="button" 
                             [disabled]="idx === 0" 
                             (click)="moveQuestion(idx, -1)" 
-                            class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
+                            class="p-1 rounded hover:bg-slate-100 disabled:opacity-30">
                             &uarr;
                           </button>
                           <button 
                             type="button" 
                             [disabled]="idx === stagedQuestions().length - 1" 
                             (click)="moveQuestion(idx, 1)" 
-                            class="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30">
+                            class="p-1 rounded hover:bg-slate-100 disabled:opacity-30">
                             &darr;
                           </button>
                           <button 
@@ -382,7 +382,7 @@ interface TestCase {
                       </div>
                     </div>
                   } @empty {
-                    <div class="p-8 text-center text-slate-400 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                    <div class="p-8 text-center text-slate-400 bg-slate-50 rounded-xl">
                       No questions attached to this assessment yet. Add questions from the Question Bank or author new ones above.
                     </div>
                   }
@@ -393,24 +393,24 @@ interface TestCase {
             <!-- Tab 3: Author New MCQ -->
             @if (studioTab() === 'add_mcq') {
               <form (ngSubmit)="submitNewMcq()" class="space-y-4 text-xs">
-                <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl text-sky-800 dark:text-sky-300 font-medium">
+                <div class="p-3 bg-sky-50 rounded-xl text-sky-800 font-medium">
                   Author a conceptual Multiple Choice Question (MCQ). Provide 2 to 6 options and mark correct answers.
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Question Title / Topic *</label>
-                  <input type="text" [(ngModel)]="newMcq.title" name="mcq_title" required placeholder="e.g. Asynchronous Coroutines in Python" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                  <label class="block font-bold text-slate-700 mb-1">Question Title / Topic *</label>
+                  <input type="text" [(ngModel)]="newMcq.title" name="mcq_title" required placeholder="e.g. Asynchronous Coroutines in Python" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Question Statement *</label>
-                  <textarea [(ngModel)]="newMcq.question_text" name="mcq_statement" rows="3" required placeholder="What is the behavior of asyncio.gather() when one coroutine raises an unhandled exception?" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-mono text-xs"></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Question Statement *</label>
+                  <textarea [(ngModel)]="newMcq.question_text" name="mcq_statement" rows="3" required placeholder="What is the behavior of asyncio.gather() when one coroutine raises an unhandled exception?" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-mono text-xs"></textarea>
                 </div>
 
                 <!-- Options -->
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
-                    <label class="font-bold text-slate-700 dark:text-slate-300">Options (Check the correct answer) *</label>
+                    <label class="font-bold text-slate-700">Options (Check the correct answer) *</label>
                     @if (newMcq.options.length < 6) {
                       <button type="button" (click)="addOptionToMcq()" class="text-xs text-[#008FBB] font-bold">+ Add Option</button>
                     }
@@ -428,7 +428,7 @@ interface TestCase {
                         [name]="'opt_txt_' + optIdx" 
                         required 
                         placeholder="Option text..." 
-                        class="flex-1 px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs" />
+                        class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
                       @if (newMcq.options.length > 2) {
                         <button type="button" (click)="removeOptionFromMcq(optIdx)" class="text-rose-500 font-bold px-2">&times;</button>
                       }
@@ -438,12 +438,12 @@ interface TestCase {
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Marks Assigned *</label>
-                    <input type="number" [(ngModel)]="newMcq.marks" name="mcq_marks" min="1" max="50" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Marks Assigned *</label>
+                    <input type="number" [(ngModel)]="newMcq.marks" name="mcq_marks" min="1" max="50" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Difficulty</label>
-                    <select [(ngModel)]="newMcq.difficulty" name="mcq_diff" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl">
+                    <label class="block font-bold text-slate-700 mb-1">Difficulty</label>
+                    <select [(ngModel)]="newMcq.difficulty" name="mcq_diff" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl">
                       <option value="EASY">EASY</option>
                       <option value="MEDIUM">MEDIUM</option>
                       <option value="HARD">HARD</option>
@@ -452,12 +452,12 @@ interface TestCase {
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Explanation (Revealed during post-submit review)</label>
-                  <textarea [(ngModel)]="newMcq.explanation" name="mcq_exp" rows="2" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" placeholder="Detailed explanation..."></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Explanation (Revealed during post-submit review)</label>
+                  <textarea [(ngModel)]="newMcq.explanation" name="mcq_exp" rows="2" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" placeholder="Detailed explanation..."></textarea>
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Back</button>
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Back</button>
                   <button type="submit" class="px-4 py-2 rounded-xl bg-[#008FBB] text-xs font-bold text-white hover:bg-[#007499]">Save &amp; Attach MCQ</button>
                 </div>
               </form>
@@ -466,40 +466,40 @@ interface TestCase {
             <!-- Tab 4: Author New Coding Problem -->
             @if (studioTab() === 'add_coding') {
               <form (ngSubmit)="submitNewCoding()" class="space-y-4 text-xs">
-                <div class="p-3 bg-purple-50 dark:bg-purple-950/40 rounded-xl text-purple-800 dark:text-purple-300 font-medium">
+                <div class="p-3 bg-purple-50 rounded-xl text-purple-800 font-medium">
                   Author a real Coding Challenge. Test cases will be executed against learner code in the sandboxed runner.
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Title *</label>
-                    <input type="text" [(ngModel)]="newCoding.title" name="coding_title" required placeholder="e.g. Invert Binary Tree" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Problem Title *</label>
+                    <input type="text" [(ngModel)]="newCoding.title" name="coding_title" required placeholder="e.g. Invert Binary Tree" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Marks *</label>
-                    <input type="number" [(ngModel)]="newCoding.marks" name="coding_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Marks *</label>
+                    <input type="number" [(ngModel)]="newCoding.marks" name="coding_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Statement &amp; Constraints *</label>
-                  <textarea [(ngModel)]="newCoding.question_text" name="coding_statement" rows="3" required placeholder="Describe the problem, input format, and output format..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Problem Statement &amp; Constraints *</label>
+                  <textarea [(ngModel)]="newCoding.question_text" name="coding_statement" rows="3" required placeholder="Describe the problem, input format, and output format..." class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl"></textarea>
                 </div>
 
                 <!-- Starter Code Tabs -->
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Python Starter Code</label>
+                  <label class="block font-bold text-slate-700 mb-1">Python Starter Code</label>
                   <textarea [(ngModel)]="newCoding.starter_code_py" name="code_py" rows="3" class="w-full px-3 py-2 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl" placeholder="def solution(nums):&#10;    # Your code here&#10;    pass"></textarea>
                 </div>
 
                 <!-- Test Cases -->
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
-                    <label class="font-bold text-slate-700 dark:text-slate-300">Test Cases (Visible &amp; Hidden) *</label>
+                    <label class="font-bold text-slate-700">Test Cases (Visible &amp; Hidden) *</label>
                     <button type="button" (click)="addTestCaseToCoding()" class="text-xs text-purple-600 font-bold">+ Add Test Case</button>
                   </div>
                   @for (tc of newCoding.test_cases; track $index; let tcIdx = $index) {
-                    <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 space-y-2">
+                    <div class="p-2.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                       <div class="flex items-center justify-between">
                         <span class="font-bold font-mono text-[10px] uppercase">Test Case #{{ tcIdx + 1 }}</span>
                         <div class="flex items-center gap-3">
@@ -515,11 +515,11 @@ interface TestCase {
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <span class="block text-[10px] text-slate-400">Input Data</span>
-                          <input type="text" [(ngModel)]="tc.input_data" [name]="'tc_in_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" placeholder="e.g. 5&#10;1 2 3 4 5" />
+                          <input type="text" [(ngModel)]="tc.input_data" [name]="'tc_in_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white border border-slate-300 rounded-lg" placeholder="e.g. 5&#10;1 2 3 4 5" />
                         </div>
                         <div>
                           <span class="block text-[10px] text-slate-400">Expected Output</span>
-                          <input type="text" [(ngModel)]="tc.expected_output" [name]="'tc_out_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" placeholder="e.g. 15" />
+                          <input type="text" [(ngModel)]="tc.expected_output" [name]="'tc_out_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white border border-slate-300 rounded-lg" placeholder="e.g. 15" />
                         </div>
                       </div>
                     </div>
@@ -527,7 +527,7 @@ interface TestCase {
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Back</button>
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Back</button>
                   <button type="submit" class="px-4 py-2 rounded-xl bg-purple-600 text-xs font-bold text-white hover:bg-purple-700">Save &amp; Attach Coding Problem</button>
                 </div>
               </form>
@@ -536,44 +536,44 @@ interface TestCase {
             <!-- Tab: Author New SQL Challenge -->
             @if (studioTab() === 'add_sql') {
               <form (ngSubmit)="submitNewSql()" class="space-y-4 text-xs">
-                <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl text-sky-800 dark:text-sky-300 font-medium">
+                <div class="p-3 bg-sky-50 rounded-xl text-sky-800 font-medium">
                   Author a relational SQL query challenge. Learner queries will be validated against in-memory schemas.
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Title *</label>
-                    <input type="text" [(ngModel)]="newSql.title" name="sql_title" required placeholder="e.g. Department Average Salary" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Problem Title *</label>
+                    <input type="text" [(ngModel)]="newSql.title" name="sql_title" required placeholder="e.g. Department Average Salary" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Marks *</label>
-                    <input type="number" [(ngModel)]="newSql.marks" name="sql_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Marks *</label>
+                    <input type="number" [(ngModel)]="newSql.marks" name="sql_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Statement *</label>
-                  <textarea [(ngModel)]="newSql.question_text" name="sql_statement" rows="3" required placeholder="Write a query to calculate average salary per department..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Problem Statement *</label>
+                  <textarea [(ngModel)]="newSql.question_text" name="sql_statement" rows="3" required placeholder="Write a query to calculate average salary per department..." class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl"></textarea>
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Schema DDL (Tables &amp; Initial DDL) *</label>
+                  <label class="block font-bold text-slate-700 mb-1">Schema DDL (Tables &amp; Initial DDL) *</label>
                   <textarea [(ngModel)]="newSql.schema_ddl" name="sql_ddl" rows="4" required class="w-full px-3 py-2 bg-slate-900 text-sky-300 font-mono text-xs rounded-xl" placeholder="CREATE TABLE employees (id INT, department VARCHAR(50), salary INT);"></textarea>
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Reference Solution Query</label>
+                  <label class="block font-bold text-slate-700 mb-1">Reference Solution Query</label>
                   <textarea [(ngModel)]="newSql.solution_query" name="sql_sol" rows="3" class="w-full px-3 py-2 bg-slate-900 text-emerald-400 font-mono text-xs rounded-xl" placeholder="SELECT department, AVG(salary) FROM employees GROUP BY department;"></textarea>
                 </div>
 
                 <!-- Test Cases -->
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
-                    <label class="font-bold text-slate-700 dark:text-slate-300">Test Cases (Data Fixtures &amp; Expected Output)</label>
+                    <label class="font-bold text-slate-700">Test Cases (Data Fixtures &amp; Expected Output)</label>
                     <button type="button" (click)="addTestCaseToSql()" class="text-xs text-sky-600 font-bold">+ Add Fixture</button>
                   </div>
                   @for (tc of newSql.test_cases; track $index; let tcIdx = $index) {
-                    <div class="p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 space-y-2">
+                    <div class="p-2.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                       <div class="flex items-center justify-between">
                         <span class="font-bold font-mono text-[10px] uppercase">Fixture #{{ tcIdx + 1 }}</span>
                         <div class="flex items-center gap-3">
@@ -589,11 +589,11 @@ interface TestCase {
                       <div class="grid grid-cols-2 gap-2">
                         <div>
                           <span class="block text-[10px] text-slate-400">INSERT Statements (Seed Data)</span>
-                          <input type="text" [(ngModel)]="tc.input_data" [name]="'sql_tc_in_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" placeholder="INSERT INTO employees VALUES (1, 'Engineering', 80000);" />
+                          <input type="text" [(ngModel)]="tc.input_data" [name]="'sql_tc_in_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white border border-slate-300 rounded-lg" placeholder="INSERT INTO employees VALUES (1, 'Engineering', 80000);" />
                         </div>
                         <div>
                           <span class="block text-[10px] text-slate-400">Expected Result Rows</span>
-                          <input type="text" [(ngModel)]="tc.expected_output" [name]="'sql_tc_out_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" placeholder="Engineering|80000.0" />
+                          <input type="text" [(ngModel)]="tc.expected_output" [name]="'sql_tc_out_' + tcIdx" class="w-full px-2 py-1 font-mono text-xs bg-white border border-slate-300 rounded-lg" placeholder="Engineering|80000.0" />
                         </div>
                       </div>
                     </div>
@@ -601,7 +601,7 @@ interface TestCase {
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Back</button>
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Back</button>
                   <button type="submit" class="px-4 py-2 rounded-xl bg-sky-600 text-xs font-bold text-white hover:bg-sky-700">Save &amp; Attach SQL Challenge</button>
                 </div>
               </form>
@@ -610,14 +610,14 @@ interface TestCase {
             <!-- Tab: Author Subjective / Scenario / Communication / File Upload -->
             @if (studioTab() === 'add_subjective') {
               <form (ngSubmit)="submitNewSubjective()" class="space-y-4 text-xs">
-                <div class="p-3 bg-teal-50 dark:bg-teal-950/40 rounded-xl text-teal-800 dark:text-teal-300 font-medium">
+                <div class="p-3 bg-teal-50 rounded-xl text-teal-800 font-medium">
                   Author a subjective, scenario-based, or file-upload assignment. Mentor evaluates submission with rubric scoring.
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Assessment Category *</label>
-                    <select [(ngModel)]="newSubjective.type" name="subj_type" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl font-bold">
+                    <label class="block font-bold text-slate-700 mb-1">Assessment Category *</label>
+                    <select [(ngModel)]="newSubjective.type" name="subj_type" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold">
                       <option value="SHORT_ANSWER">SHORT ANSWER</option>
                       <option value="SCENARIO">SCENARIO ANALYSIS</option>
                       <option value="COMMUNICATION">COMMUNICATION</option>
@@ -625,29 +625,29 @@ interface TestCase {
                     </select>
                   </div>
                   <div class="sm:col-span-2">
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Question / Challenge Title *</label>
-                    <input type="text" [(ngModel)]="newSubjective.title" name="subj_title" required placeholder="e.g. Distributed Consensus Design Proposal" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Question / Challenge Title *</label>
+                    <input type="text" [(ngModel)]="newSubjective.title" name="subj_title" required placeholder="e.g. Distributed Consensus Design Proposal" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Problem Statement / Prompt *</label>
-                  <textarea [(ngModel)]="newSubjective.question_text" name="subj_statement" rows="4" required placeholder="Describe the business scenario, constraints, and instructions for the learner..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl"></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Problem Statement / Prompt *</label>
+                  <textarea [(ngModel)]="newSubjective.question_text" name="subj_statement" rows="4" required placeholder="Describe the business scenario, constraints, and instructions for the learner..." class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl"></textarea>
                 </div>
 
                 <div>
-                  <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Scoring Rubric &amp; Evaluation Criteria</label>
-                  <textarea [(ngModel)]="newSubjective.rubric_criteria" name="subj_rubric" rows="2" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" placeholder="e.g. Architecture clarity (40%), Failure handling (30%), Concise reasoning (30%)"></textarea>
+                  <label class="block font-bold text-slate-700 mb-1">Scoring Rubric &amp; Evaluation Criteria</label>
+                  <textarea [(ngModel)]="newSubjective.rubric_criteria" name="subj_rubric" rows="2" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" placeholder="e.g. Architecture clarity (40%), Failure handling (30%), Concise reasoning (30%)"></textarea>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Marks Assigned *</label>
-                    <input type="number" [(ngModel)]="newSubjective.marks" name="subj_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl" />
+                    <label class="block font-bold text-slate-700 mb-1">Marks Assigned *</label>
+                    <input type="number" [(ngModel)]="newSubjective.marks" name="subj_marks" min="5" max="100" required class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl" />
                   </div>
                   <div>
-                    <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Difficulty</label>
-                    <select [(ngModel)]="newSubjective.difficulty" name="subj_diff" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl">
+                    <label class="block font-bold text-slate-700 mb-1">Difficulty</label>
+                    <select [(ngModel)]="newSubjective.difficulty" name="subj_diff" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl">
                       <option value="EASY">EASY</option>
                       <option value="MEDIUM">MEDIUM</option>
                       <option value="HARD">HARD</option>
@@ -656,7 +656,7 @@ interface TestCase {
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300">Back</button>
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-600">Back</button>
                   <button type="submit" class="px-4 py-2 rounded-xl bg-teal-600 text-xs font-bold text-white hover:bg-teal-700">Save &amp; Attach Question</button>
                 </div>
               </form>
@@ -665,22 +665,22 @@ interface TestCase {
             <!-- Tab 5: Assessment Preview -->
             @if (studioTab() === 'preview' && activeStudioAssessment()) {
               <div class="space-y-4 text-xs">
-                <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                   <div class="flex items-center justify-between">
-                    <h2 class="text-base font-black text-slate-900 dark:text-white">{{ activeStudioAssessment()?.title }}</h2>
+                    <h2 class="text-base font-black text-slate-900">{{ activeStudioAssessment()?.title }}</h2>
                     <span class="font-mono text-xs font-bold text-emerald-600">{{ activeStudioAssessment()?.duration_minutes }} Mins &bull; Pass: {{ activeStudioAssessment()?.passing_score }}%</span>
                   </div>
-                  <p class="text-slate-600 dark:text-slate-300">{{ activeStudioAssessment()?.instructions || 'Standard assessment instructions.' }}</p>
+                  <p class="text-slate-600">{{ activeStudioAssessment()?.instructions || 'Standard assessment instructions.' }}</p>
                 </div>
 
                 <div class="space-y-3">
                   @for (q of stagedQuestions(); track q.id; let idx = $index) {
-                    <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2">
+                    <div class="p-4 rounded-xl border border-slate-200 bg-white space-y-2">
                       <div class="flex items-center justify-between">
-                        <span class="font-bold text-slate-700 dark:text-slate-300">Question {{ idx + 1 }}: {{ q.title }}</span>
+                        <span class="font-bold text-slate-700">Question {{ idx + 1 }}: {{ q.title }}</span>
                         <span class="font-mono text-xs text-slate-400 font-bold">{{ q.marks }} Marks</span>
                       </div>
-                      <p class="text-slate-600 dark:text-slate-300">{{ q.question_text || q.content }}</p>
+                      <p class="text-slate-600">{{ q.question_text || q.content }}</p>
                     </div>
                   } @empty {
                     <p class="text-slate-400 text-center py-4">No questions to preview.</p>
@@ -688,7 +688,7 @@ interface TestCase {
                 </div>
 
                 <div class="flex justify-end gap-2 pt-2">
-                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">Back to Questions</button>
+                  <button type="button" (click)="studioTab.set('questions')" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">Back to Questions</button>
                   @if (!activeStudioAssessment()?.is_published) {
                     <button type="button" (click)="publishAssessment(activeStudioAssessment()!)" class="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-bold text-white hover:bg-emerald-700">Publish to Learners</button>
                   }
@@ -702,11 +702,11 @@ interface TestCase {
       <!-- Results Analysis & CSV Export Drawer (Zero Demo Data - Live API) -->
       @if (selectedAssessmentForResults()) {
         <div class="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 w-full max-w-xl h-full overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl">
-            <div class="flex items-start justify-between pb-4 border-b border-slate-200 dark:border-slate-800">
+          <div class="bg-white border-l border-slate-200 w-full max-w-xl h-full overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl">
+            <div class="flex items-start justify-between pb-4 border-b border-slate-200">
               <div>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-[#FAA634]">Assessment Analytics</span>
-                <h2 class="text-xl font-black text-slate-900 dark:text-white">{{ selectedAssessmentForResults()?.title }}</h2>
+                <h2 class="text-xl font-black text-slate-900">{{ selectedAssessmentForResults()?.title }}</h2>
               </div>
               <button (click)="selectedAssessmentForResults.set(null)" class="text-2xl text-slate-400 font-bold">&times;</button>
             </div>
@@ -725,22 +725,22 @@ interface TestCase {
             @if (resultsData()) {
               <!-- Overall Metrics -->
               <div class="grid grid-cols-3 gap-3">
-                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center">
+                <div class="p-3 bg-slate-50 rounded-xl text-center">
                   <span class="text-[10px] font-bold uppercase text-slate-400 block">Total Attempts</span>
-                  <span class="text-lg font-black text-slate-800 dark:text-slate-100">{{ resultsData().total_attempts }}</span>
+                  <span class="text-lg font-black text-slate-800">{{ resultsData().total_attempts }}</span>
                 </div>
-                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center">
+                <div class="p-3 bg-slate-50 rounded-xl text-center">
                   <span class="text-[10px] font-bold uppercase text-slate-400 block">Average Score</span>
                   <span class="text-lg font-black text-[#008FBB]">{{ resultsData().average_score }}%</span>
                 </div>
-                <div class="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center">
+                <div class="p-3 bg-slate-50 rounded-xl text-center">
                   <span class="text-[10px] font-bold uppercase text-slate-400 block">Pass Rate</span>
                   <span class="text-lg font-black text-emerald-600">{{ resultsData().pass_rate }}%</span>
                 </div>
               </div>
 
               <!-- Score Distribution -->
-              <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2">
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                 <span class="text-xs font-bold uppercase text-slate-400">Score Distribution</span>
                 <div class="space-y-1.5 text-xs">
                   <div class="flex items-center justify-between">
@@ -764,15 +764,15 @@ interface TestCase {
 
               <!-- AI Cohort Distribution & Psychometrics Card -->
               @if (aiInsights()) {
-                <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-3">
                   <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase text-[11px]">AI Psychometric Distribution Curve</span>
+                    <span class="text-xs font-bold text-slate-800 uppercase text-[11px]">AI Psychometric Distribution Curve</span>
                     <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#008FBB] text-white">SciPy &amp; NumPy</span>
                   </div>
                   @if (aiInsights().charts?.distribution_curve_svg) {
-                    <div [innerHTML]="getSafeSvg(aiInsights().charts.distribution_curve_svg)" class="overflow-hidden rounded-lg bg-slate-50/50 dark:bg-slate-950 p-2 border border-slate-100 dark:border-slate-800"></div>
+                    <div [innerHTML]="getSafeSvg(aiInsights().charts.distribution_curve_svg)" class="overflow-hidden rounded-lg bg-slate-50/50 p-2 border border-slate-100"></div>
                   }
-                  <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed bg-amber-50/60 dark:bg-amber-950/30 p-2.5 rounded-lg border border-amber-200/60 dark:border-amber-900/40">
+                  <p class="text-xs text-slate-600 leading-relaxed bg-amber-50/60 p-2.5 rounded-lg border border-amber-200/60">
                     {{ aiInsights().ai_summary }}
                   </p>
                 </div>
@@ -782,10 +782,10 @@ interface TestCase {
               <div class="space-y-3 text-xs">
                 <span class="font-bold uppercase text-slate-400">Submitted Attempts</span>
                 @for (l of resultsData().learners; track l.attempt_id || l.id) {
-                  <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="space-y-1">
                       <div class="flex items-center gap-2">
-                        <span class="font-bold text-slate-800 dark:text-slate-200">{{ l.name }}</span>
+                        <span class="font-bold text-slate-800">{{ l.name }}</span>
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-bold"
                           [ngClass]="l.grading_status === 'GRADED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
                           {{ l.grading_status || 'GRADED' }}
@@ -825,7 +825,7 @@ interface TestCase {
                     </div>
                   </div>
                 } @empty {
-                  <div class="p-6 text-center text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-xs">
+                  <div class="p-6 text-center text-slate-400 bg-slate-50 rounded-xl text-xs">
                     No submissions recorded yet for this assessment. Submissions will appear here once learners complete their attempts.
                   </div>
                 }
@@ -835,7 +835,7 @@ interface TestCase {
             }
 
             <div class="pt-4 flex justify-end">
-              <button (click)="selectedAssessmentForResults.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold">
+              <button (click)="selectedAssessmentForResults.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">
                 Close
               </button>
             </div>
@@ -846,11 +846,11 @@ interface TestCase {
       <!-- Manual Grading & Attempt Review Modal -->
       @if (showGradingModal() && gradingData()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
-            <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-start justify-between pb-3 border-b border-slate-100">
               <div>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">Attempt Evaluation &amp; Grading</span>
-                <h3 class="text-base font-black text-slate-900 dark:text-white">
+                <h3 class="text-base font-black text-slate-900">
                   {{ gradingData()?.learner_name }} &bull; {{ gradingData()?.assessment_title }}
                 </h3>
                 <div class="flex items-center gap-2 mt-1">
@@ -858,7 +858,7 @@ interface TestCase {
                     [ngClass]="gradingData()?.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
                     Score: {{ gradingData()?.score }} / {{ gradingData()?.total_marks }} ({{ gradingData()?.passed ? 'PASSED' : 'NOT PASSED' }})
                   </span>
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">
                     Status: {{ gradingData()?.grading_status }}
                   </span>
                   @if (gradingData()?.report_status && gradingData()?.report_status !== 'NONE') {
@@ -874,7 +874,7 @@ interface TestCase {
             <!-- List of Answers for this Attempt -->
             <div class="space-y-4 text-xs">
               @for (ans of gradingData()?.answers; track ans.id; let qIdx = $index) {
-                <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 space-y-3">
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3">
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <span class="font-mono font-bold text-slate-400">#{{ qIdx + 1 }}</span>
@@ -888,14 +888,14 @@ interface TestCase {
                         }">
                         {{ ans.question_type }}
                       </span>
-                      <h4 class="font-bold text-slate-800 dark:text-slate-200">{{ ans.question_title }}</h4>
+                      <h4 class="font-bold text-slate-800">{{ ans.question_title }}</h4>
                     </div>
                     <span class="font-mono text-xs font-bold text-slate-500">Max {{ ans.marks }} Marks</span>
                   </div>
 
                   <!-- MCQ Details -->
                   @if (ans.question_type === 'MCQ') {
-                    <div class="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div class="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1">
                       <div class="flex items-center justify-between text-[11px]">
                         <span>Selected Option: <strong>{{ ans.selected_option_id || 'No selection' }}</strong></span>
                         <span class="font-mono font-bold" [ngClass]="ans.is_correct ? 'text-emerald-600' : 'text-rose-500'">
@@ -921,22 +921,22 @@ interface TestCase {
                   @if (ans.question_type === 'SHORT_ANSWER' || ans.question_type === 'SCENARIO' || ans.question_type === 'COMMUNICATION') {
                     <div class="space-y-2">
                       <span class="text-[10px] uppercase font-bold text-slate-400">Learner's Written Response</span>
-                      <p class="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                      <p class="p-3 bg-white border border-slate-200 rounded-lg text-slate-800 whitespace-pre-wrap leading-relaxed">
                         {{ ans.text_response || 'No written response submitted.' }}
                       </p>
                       @if (ans.rubric && ans.rubric.criteria) {
-                        <div class="p-2 rounded bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-[10px]">
+                        <div class="p-2 rounded bg-amber-50 text-amber-800 text-[10px]">
                           <strong>Rubric:</strong> {{ ans.rubric.criteria }}
                         </div>
                       }
                       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                         <div>
-                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Score Awarded (Max {{ ans.marks }})</label>
-                          <input type="number" [(ngModel)]="ans.score_awarded" min="0" [max]="ans.marks" class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold" />
+                          <label class="block font-bold text-slate-600 mb-0.5">Score Awarded (Max {{ ans.marks }})</label>
+                          <input type="number" [(ngModel)]="ans.score_awarded" min="0" [max]="ans.marks" class="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg font-mono font-bold" />
                         </div>
                         <div class="sm:col-span-2">
-                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Mentor Feedback</label>
-                          <input type="text" [(ngModel)]="ans.mentor_feedback" placeholder="Constructive guidance and notes..." class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" />
+                          <label class="block font-bold text-slate-600 mb-0.5">Mentor Feedback</label>
+                          <input type="text" [(ngModel)]="ans.mentor_feedback" placeholder="Constructive guidance and notes..." class="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg" />
                         </div>
                       </div>
                     </div>
@@ -946,9 +946,9 @@ interface TestCase {
                   @if (ans.question_type === 'FILE_UPLOAD') {
                     <div class="space-y-2">
                       <span class="text-[10px] uppercase font-bold text-slate-400">Uploaded Deliverable</span>
-                      <div class="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between">
+                      <div class="p-3 bg-white border border-slate-200 rounded-lg flex items-center justify-between">
                         <div>
-                          <span class="font-bold text-slate-800 dark:text-slate-200 block">{{ ans.file_name || 'Project Asset' }}</span>
+                          <span class="font-bold text-slate-800 block">{{ ans.file_name || 'Project Asset' }}</span>
                           <a [href]="ans.file_url" target="_blank" rel="noopener noreferrer" class="text-[#008FBB] underline text-[11px]">
                             {{ ans.file_url || 'No file URL provided' }}
                           </a>
@@ -957,12 +957,12 @@ interface TestCase {
                       </div>
                       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                         <div>
-                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Score Awarded (Max {{ ans.marks }})</label>
-                          <input type="number" [(ngModel)]="ans.score_awarded" min="0" [max]="ans.marks" class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-mono font-bold" />
+                          <label class="block font-bold text-slate-600 mb-0.5">Score Awarded (Max {{ ans.marks }})</label>
+                          <input type="number" [(ngModel)]="ans.score_awarded" min="0" [max]="ans.marks" class="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg font-mono font-bold" />
                         </div>
                         <div class="sm:col-span-2">
-                          <label class="block font-bold text-slate-600 dark:text-slate-400 mb-0.5">Mentor Feedback</label>
-                          <input type="text" [(ngModel)]="ans.mentor_feedback" placeholder="Feedback on project deliverable..." class="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg" />
+                          <label class="block font-bold text-slate-600 mb-0.5">Mentor Feedback</label>
+                          <input type="text" [(ngModel)]="ans.mentor_feedback" placeholder="Feedback on project deliverable..." class="w-full px-2 py-1 bg-white border border-slate-300 rounded-lg" />
                         </div>
                       </div>
                     </div>
@@ -971,7 +971,7 @@ interface TestCase {
               }
             </div>
 
-            <div class="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex items-center justify-between pt-3 border-t border-slate-200">
               <div>
                 @if (gradingData()?.report_status === 'PENDING_APPROVAL') {
                   <button 
@@ -986,7 +986,7 @@ interface TestCase {
                 <button 
                   type="button" 
                   (click)="closeGradingModal()" 
-                  class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs">
+                  class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs">
                   Cancel
                 </button>
                 <button 
@@ -1004,19 +1004,19 @@ interface TestCase {
       <!-- Question Bank Modal -->
       @if (showQuestionBankModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-3xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-3xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">Question Bank Repository</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400">Select verified MCQ and sandboxed Coding questions to stage directly into an assessment.</p>
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">Question Bank Repository</h3>
+                <p class="text-xs text-slate-500">Select verified MCQ and sandboxed Coding questions to stage directly into an assessment.</p>
               </div>
               <button (click)="showQuestionBankModal.set(false)" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
             </div>
 
             <!-- Target Assessment Selector -->
-            <div class="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-900 flex items-center justify-between gap-3 text-xs">
-              <span class="font-bold text-amber-800 dark:text-amber-300">Target Assessment:</span>
-              <select [(ngModel)]="targetAssessmentId" class="flex-1 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg font-bold">
+            <div class="p-3 bg-amber-50 rounded-xl border border-amber-200 flex items-center justify-between gap-3 text-xs">
+              <span class="font-bold text-amber-800">Target Assessment:</span>
+              <select [(ngModel)]="targetAssessmentId" class="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-lg font-bold">
                 @for (a of assessments(); track a.id) {
                   <option [value]="a.id">{{ a.title }} ({{ a.field }} - {{ a.is_published ? 'v' + a.version : 'Draft' }})</option>
                 }
@@ -1030,9 +1030,9 @@ interface TestCase {
                 [(ngModel)]="questionBankSearch" 
                 (ngModelChange)="filterQuestionBank()"
                 placeholder="Search questions by keyword..."
-                class="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs" />
+                class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs" />
               
-              <select [(ngModel)]="questionBankField" (ngModelChange)="filterQuestionBank()" class="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+              <select [(ngModel)]="questionBankField" (ngModelChange)="filterQuestionBank()" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
                 <option value="ALL">All Fields</option>
                 <option value="Python">Python</option>
                 <option value="Java">Java</option>
@@ -1043,7 +1043,7 @@ interface TestCase {
                 <option value="Data Analytics">Data Analytics</option>
               </select>
 
-              <select [(ngModel)]="questionBankType" (ngModelChange)="filterQuestionBank()" class="px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs">
+              <select [(ngModel)]="questionBankType" (ngModelChange)="filterQuestionBank()" class="px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
                 <option value="ALL">All Question Types</option>
                 <option value="MCQ">MCQ Concept</option>
                 <option value="CODING">Coding Challenge</option>
@@ -1060,7 +1060,7 @@ interface TestCase {
             <!-- Questions List -->
             <div class="flex-1 overflow-y-auto space-y-3 pr-1">
               @for (q of filteredQuestions(); track q.id) {
-                <div class="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 space-y-2">
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                   <div class="flex items-start justify-between gap-3">
                     <div class="space-y-1">
                       <div class="flex items-center gap-2">
@@ -1070,7 +1070,7 @@ interface TestCase {
                         </span>
                         <span class="text-[10px] font-mono text-slate-400 font-bold uppercase">{{ q.field }} &bull; {{ q.difficulty }}</span>
                       </div>
-                      <h4 class="text-xs font-bold text-slate-900 dark:text-white">{{ q.title }}</h4>
+                      <h4 class="text-xs font-bold text-slate-900">{{ q.title }}</h4>
                     </div>
 
                     <button 
@@ -1081,12 +1081,12 @@ interface TestCase {
                     </button>
                   </div>
 
-                  <p class="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{{ q.content }}</p>
+                  <p class="text-xs text-slate-600 whitespace-pre-wrap">{{ q.content }}</p>
 
                   @if (q.tags && q.tags.length > 0) {
                     <div class="flex flex-wrap gap-1 pt-1">
                       @for (t of q.tags; track t) {
-                        <span class="px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[10px] text-slate-500 font-mono">
+                        <span class="px-2 py-0.5 rounded bg-white border border-slate-200 text-[10px] text-slate-500 font-mono">
                           #{{ t }}
                         </span>
                       }
@@ -1094,14 +1094,14 @@ interface TestCase {
                   }
                 </div>
               } @empty {
-                <div class="p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-950 rounded-xl">
+                <div class="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
                   No questions found matching your filter criteria.
                 </div>
               }
             </div>
 
-            <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-              <button type="button" (click)="showQuestionBankModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200">
+            <div class="pt-3 border-t border-slate-100 flex justify-end">
+              <button type="button" (click)="showQuestionBankModal.set(false)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
                 Close Question Bank
               </button>
             </div>

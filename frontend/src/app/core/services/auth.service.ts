@@ -225,4 +225,13 @@ export class AuthService {
     }
     this.router.navigate(['/login']);
   }
+
+  /**
+   * Fetch demo accounts if backend DEMO_MODE is active (Phase A3).
+   */
+  getDemoAccounts(): Observable<{ enabled: boolean; accounts: Array<{ role: string; name: string; email: string; password?: string; description?: string }> }> {
+    return this.http
+      .get<{ enabled: boolean; accounts: Array<{ role: string; name: string; email: string; password?: string; description?: string }> }>('/api/v1/auth/demo-accounts')
+      .pipe(catchError(() => of({ enabled: false, accounts: [] })));
+  }
 }

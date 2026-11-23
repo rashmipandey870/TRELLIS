@@ -19,8 +19,8 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
       <!-- Title & Intro -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">AI Practice Lab &amp; Dedication Engine</h1>
-          <p class="text-xs text-slate-500 dark:text-slate-400">
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">AI Practice Lab &amp; Dedication Engine</h1>
+          <p class="text-xs text-slate-500">
             Ungraded adaptive practice powered by sandboxed code verification and real-time LLM feedback across 8 technical disciplines.
           </p>
         </div>
@@ -32,7 +32,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
       </div>
 
       <!-- Field Picker & Mode Selector -->
-      <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+      <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
         <div class="flex items-center justify-between">
           <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Select Practice Field (8 Disciplines)</h3>
           <span class="text-[10px] text-slate-400">Adaptive difficulty tracks your recent accuracy</span>
@@ -47,29 +47,29 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
               class="px-4 py-2 rounded-xl text-xs font-bold border transition"
               [ngClass]="selectedField() === field 
                 ? 'bg-[#008FBB] text-white border-[#008FBB] shadow-sm' 
-                : 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:border-slate-400'">
+                : 'bg-slate-50  text-slate-700  border-slate-200  hover:border-slate-400'">
               {{ field }}
             </button>
           }
         </div>
 
         <!-- Mode & Difficulty Selectors -->
-        <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
           <div class="flex items-center gap-3">
             <span class="text-xs font-bold text-slate-500">Mode:</span>
-            <div class="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 text-xs font-bold">
+            <div class="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
               <button 
                 type="button" 
                 (click)="onSelectMode('MCQ')"
                 class="px-3 py-1 rounded-lg transition"
-                [ngClass]="selectedMode() === 'MCQ' ? 'bg-white dark:bg-slate-900 text-[#008FBB] shadow-sm' : 'text-slate-500'">
+                [ngClass]="selectedMode() === 'MCQ' ? 'bg-white  text-[#008FBB] shadow-sm' : 'text-slate-500'">
                 MCQ Concept
               </button>
               <button 
                 type="button" 
                 (click)="onSelectMode('CODING')"
                 class="px-3 py-1 rounded-lg transition"
-                [ngClass]="selectedMode() === 'CODING' ? 'bg-white dark:bg-slate-900 text-purple-700 shadow-sm' : 'text-slate-500'">
+                [ngClass]="selectedMode() === 'CODING' ? 'bg-white  text-purple-700 shadow-sm' : 'text-slate-500'">
                 Coding Challenge
               </button>
             </div>
@@ -77,7 +77,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
           <div class="flex items-center gap-3">
             <span class="text-xs font-bold text-slate-500">Difficulty:</span>
-            <select [(ngModel)]="selectedDifficulty" (ngModelChange)="generateNewQuestion()" class="px-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-900 dark:text-white">
+            <select [(ngModel)]="selectedDifficulty" (ngModelChange)="generateNewQuestion()" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900">
               <option value="EASY">Easy</option>
               <option value="MEDIUM">Medium</option>
               <option value="HARD">Hard</option>
@@ -101,9 +101,9 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
       <!-- Active Practice Question Box -->
       @if (activeQuestion()) {
-        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5">
           
-          <div class="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div class="flex items-start justify-between pb-3 border-b border-slate-100">
             <div>
               <div class="flex items-center gap-2">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
@@ -116,18 +116,18 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
                     ✨ Generated by TRELLIS AI
                   </span>
                 } @else {
-                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 flex items-center gap-1">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200 flex items-center gap-1">
                     📚 Practice bank
                   </span>
                 }
 
                 <span class="text-[10px] text-emerald-600 font-bold">&check; Sandbox Pre-Verified Solution</span>
               </div>
-              <h3 class="text-base font-black text-slate-900 dark:text-white mt-1">{{ activeQuestion()?.title }}</h3>
+              <h3 class="text-base font-black text-slate-900 mt-1">{{ activeQuestion()?.title }}</h3>
             </div>
           </div>
 
-          <div class="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed font-sans">
+          <div class="text-xs text-slate-700 whitespace-pre-wrap leading-relaxed font-sans">
             {{ getQuestionContent() }}
           </div>
 
@@ -137,7 +137,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
               @for (opt of getQuestionOptions(); track opt.id) {
                 <label 
                   class="flex items-center gap-3 p-3.5 rounded-xl border text-xs cursor-pointer transition select-none"
-                  [ngClass]="selectedOptionId === opt.id ? 'bg-sky-50 dark:bg-sky-950/40 border-[#008FBB] text-[#008FBB] font-bold shadow-sm' : 'bg-slate-50 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:border-slate-400'">
+                  [ngClass]="selectedOptionId === opt.id ? 'bg-sky-50  border-[#008FBB] text-[#008FBB] font-bold shadow-sm' : 'bg-slate-50  border-slate-200  text-slate-800  hover:border-slate-400'">
                   <input type="radio" name="practice_opt" [value]="opt.id" [(ngModel)]="selectedOptionId" class="text-[#008FBB] focus:ring-[#008FBB]" />
                   <span>{{ opt.option_text }}</span>
                 </label>
@@ -149,8 +149,8 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
           @if (isCoding()) {
             <div class="space-y-3">
               @if (activeQuestion()?.constraints) {
-                <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-[11px] text-slate-600 dark:text-slate-400">
-                  <strong class="text-slate-700 dark:text-slate-200">Constraints:</strong> {{ activeQuestion()?.constraints }}
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600">
+                  <strong class="text-slate-700">Constraints:</strong> {{ activeQuestion()?.constraints }}
                 </div>
               }
 
@@ -172,7 +172,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
               type="button" 
               (click)="showNextHint()"
               [disabled]="currentHintIndex() >= (activeQuestion()?.hints?.length || 0)"
-              class="px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-[#FAA634] text-xs font-bold border border-amber-200 disabled:opacity-40 transition">
+              class="px-3.5 py-1.5 rounded-xl bg-amber-50 text-[#FAA634] text-xs font-bold border border-amber-200 disabled:opacity-40 transition">
               💡 Request Progressive Hint ({{ currentHintIndex() }} / {{ activeQuestion()?.hints?.length || 2 }})
             </button>
 
@@ -192,7 +192,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
           <!-- Progressive Hint Box -->
           @if (activeHint()) {
-            <div class="p-3.5 rounded-xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200 text-xs text-amber-900 dark:text-amber-200 space-y-1">
+            <div class="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1">
               <span class="font-bold text-[10px] uppercase text-[#FAA634] block">Progressive Hint</span>
               <p>{{ activeHint() }}</p>
             </div>
@@ -201,7 +201,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
           <!-- Post-Attempt Feedback (Reveals Explanation and Verdict strictly after submission) -->
           @if (attemptResult()) {
             <div class="p-4 rounded-xl border text-xs space-y-2"
-              [ngClass]="attemptResult()?.correct ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 text-emerald-900 dark:text-emerald-100' : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 text-rose-900 dark:text-rose-100'">
+              [ngClass]="attemptResult()?.correct ? 'bg-emerald-50  border-emerald-300 text-emerald-900 ' : 'bg-rose-50  border-rose-300 text-rose-900 '">
               <div class="flex items-center justify-between">
                 <span class="font-bold uppercase text-[10px]">
                   {{ attemptResult()?.correct ? '✓ Correct Solution' : '✗ Incorrect Attempt' }}
@@ -221,10 +221,10 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
       }
 
       <!-- Dedication Score & Talent Spotlight Qualification Tracker -->
-      <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-        <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+      <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <div>
-            <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+            <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
               Talent Spotlight Dedication Metrics
             </h3>
             <p class="text-xs text-slate-400">
@@ -238,7 +238,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
           @for (score of dedicationScores(); track score.field) {
-            <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
               <div class="flex items-center justify-between">
                 <span class="text-slate-400 text-[10px] uppercase font-bold block">{{ score.field }} Track</span>
                 @if (score.talent_spotlight_qualified) {
@@ -253,7 +253,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
             </div>
           } @empty {
             <!-- Clean Empty State (Zero Hardcoded Demo Numbers) -->
-            <div class="col-span-3 p-8 text-center text-xs text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+            <div class="col-span-3 p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
               No practice sessions recorded yet. Solve practice problems above to start accumulating dedication points!
             </div>
           }
@@ -263,10 +263,10 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
       <!-- Weekly AI Study Plan & Practice History -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <!-- Weekly AI Study Plan -->
-        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
-              <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+              <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
                 Weekly AI Study Plan
               </h3>
               <p class="text-xs text-slate-400">
@@ -278,14 +278,14 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
           @if (studyPlan(); as plan) {
             <div class="space-y-3 text-xs">
-              <div class="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl text-sky-900 dark:text-sky-200 font-medium">
+              <div class="p-3 bg-sky-50 rounded-xl text-sky-900 font-medium">
                 {{ plan.advice }}
               </div>
               <div class="space-y-2">
                 @for (d of plan.schedule; track d.day) {
-                  <div class="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                     <div>
-                      <strong class="text-slate-800 dark:text-slate-200 block">{{ d.day }} &bull; {{ d.focus_field }}</strong>
+                      <strong class="text-slate-800 block">{{ d.day }} &bull; {{ d.focus_field }}</strong>
                       <span class="text-[10px] text-slate-400">{{ d.recommended_topics.join(', ') }}</span>
                     </div>
                     <span class="text-[10px] font-mono font-bold text-slate-500">{{ d.estimated_minutes }} mins</span>
@@ -299,10 +299,10 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
         </div>
 
         <!-- Recent Practice History -->
-        <div class="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-          <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
             <div>
-              <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+              <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider">
                 Practice Attempt History
               </h3>
               <p class="text-xs text-slate-400">
@@ -313,14 +313,14 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
 
           <div class="space-y-2 max-h-80 overflow-y-auto text-xs">
             @for (h of practiceHistory(); track h.id) {
-              <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
                 <div>
                   <div class="flex items-center gap-2">
                     <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
                       [ngClass]="h.is_correct ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
                       {{ h.is_correct ? 'PASSED' : 'RETRY' }}
                     </span>
-                    <strong class="text-slate-800 dark:text-slate-200">{{ h.field }} ({{ h.difficulty }})</strong>
+                    <strong class="text-slate-800">{{ h.field }} ({{ h.difficulty }})</strong>
                   </div>
                   <span class="text-[10px] text-slate-400 block mt-0.5">{{ h.created_at | date:'short' }}</span>
                 </div>
@@ -329,7 +329,7 @@ import { MonacoEditorComponent } from '../../shared/components/monaco-editor.com
                 </span>
               </div>
             } @empty {
-              <div class="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+              <div class="py-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 rounded-xl">
                 No historical practice attempts recorded yet.
               </div>
             }
