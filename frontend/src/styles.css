@@ -60,6 +60,25 @@
   --role-glow: var(--cerulean-glow);
 }
 
+/* 10.3 INK DARK THEME (Phase 2.8) */
+html.dark, :root[data-theme="dark"], .dark {
+  --bg-page: #0B0F17;
+  --bg-subtle: #121824;
+  --bg-card: #161D2B;
+  --bg-hover: #1E2738;
+  --bg-footer: #080B11;
+  --border-inset: #232C3D;
+  --border-dark: #374359;
+  --line-faint: rgba(255, 255, 255, 0.08);
+  --line-medium: rgba(255, 255, 255, 0.14);
+
+  --text-primary: #F8FAFC;
+  --text-secondary: #E2E8F0;
+  --text-muted: #94A3B8;
+  --text-dim: #64748B;
+  --text-disabled: #475569;
+}
+
 /* 10.7 ROLE TONE SYSTEM */
 [data-tone="learner"] {
   --role-tone: var(--cerulean);
