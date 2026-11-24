@@ -2408,6 +2408,12 @@ def get_learners_needs_attention(
     mentor: User = Depends(require_mentor),
 ) -> list[dict[str, Any]]:
     """Identify trainees with failing assessment attempts, pending grading, or broken streaks."""
+    from app.core.cache import fast_cache
+    cache_key = f"mentor:needs-attention:{mentor.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Find assigned learners
     learner_query = select(MentorLearnerAssignment.learner_id).where(
         MentorLearnerAssignment.mentor_id == mentor.id
@@ -2417,54 +2423,69 @@ def get_learners_needs_attention(
     if not assigned_learner_ids:
         return []
 
-    attention_items = []
+    # Fetch all learners in one query
     learners = db.execute(select(User).where(User.id.in_(assigned_learner_ids))).scalars().all()
+    learner_map = {l.id: l for l in learners}
 
-    for l in learners:
-        # Check for unreviewed subjective answers
-        pending_att = db.execute(
-            select(AssessmentAttempt)
-            .where(
-                AssessmentAttempt.learner_id == l.id,
-                AssessmentAttempt.status == "SUBMITTED",
-                AssessmentAttempt.grading_status == "PENDING_REVIEW",
-            )
-        ).scalars().first()
+    # Fetch all pending review attempts for these learners in ONE query
+    pending_attempts = db.execute(
+        select(AssessmentAttempt)
+        .options(joinedload(AssessmentAttempt.assessment))
+        .where(
+            AssessmentAttempt.learner_id.in_(assigned_learner_ids),
+            AssessmentAttempt.status == "SUBMITTED",
+            AssessmentAttempt.grading_status == "PENDING_REVIEW",
+        )
+    ).scalars().all()
 
-        if pending_att:
+    pending_map: dict[str, AssessmentAttempt] = {}
+    for pa in pending_attempts:
+        if pa.learner_id not in pending_map:
+            pending_map[pa.learner_id] = pa
+
+    # Fetch failed attempts in ONE query
+    failed_attempts = db.execute(
+        select(AssessmentAttempt)
+        .options(joinedload(AssessmentAttempt.assessment))
+        .where(
+            AssessmentAttempt.learner_id.in_(assigned_learner_ids),
+            AssessmentAttempt.status == "SUBMITTED",
+            AssessmentAttempt.passed == False,
+        )
+        .order_by(AssessmentAttempt.submit_time.desc())
+    ).scalars().all()
+
+    failed_map: dict[str, AssessmentAttempt] = {}
+    for fa in failed_attempts:
+        if fa.learner_id not in failed_map:
+            failed_map[fa.learner_id] = fa
+
+    attention_items = []
+    for lid, l in learner_map.items():
+        if lid in pending_map:
+            pa = pending_map[lid]
             attention_items.append({
                 "learner_id": l.id,
                 "learner_name": l.full_name,
                 "learner_email": l.email,
                 "urgency": "HIGH",
-                "reason": f"Pending subjective grading on '{pending_att.assessment.title if pending_att.assessment else 'Assessment'}'",
-                "attempt_id": pending_att.id,
+                "reason": f"Pending subjective grading on '{pa.assessment.title if pa.assessment else 'Assessment'}'",
+                "attempt_id": pa.id,
                 "action_type": "GRADE_SUBMISSION",
             })
-            continue
-
-        # Check for recent failed assessment
-        latest_att = db.execute(
-            select(AssessmentAttempt)
-            .where(AssessmentAttempt.learner_id == l.id, AssessmentAttempt.status == "SUBMITTED")
-            .order_by(AssessmentAttempt.submit_time.desc())
-        ).scalars().first()
-
-        if latest_att and not latest_att.passed:
-            score_pct = (float(latest_att.score) / float(latest_att.total_marks or 100.0)) * 100.0
+        elif lid in failed_map:
+            fa = failed_map[lid]
+            score_pct = (float(fa.score) / float(fa.total_marks or 100.0)) * 100.0
             attention_items.append({
                 "learner_id": l.id,
                 "learner_name": l.full_name,
                 "learner_email": l.email,
                 "urgency": "HIGH",
-                "reason": f"Failed '{latest_att.assessment.title if latest_att.assessment else 'Assessment'}' with {score_pct:.1f}%",
-                "attempt_id": latest_att.id,
+                "reason": f"Failed '{fa.assessment.title if fa.assessment else 'Assessment'}' with {score_pct:.1f}%",
+                "attempt_id": fa.id,
                 "action_type": "SCHEDULE_1ON1",
             })
-            continue
-
-        # Check for inactive streak
-        if l.streak_days == 0:
+        elif l.streak_days == 0:
             attention_items.append({
                 "learner_id": l.id,
                 "learner_name": l.full_name,
@@ -2475,6 +2496,7 @@ def get_learners_needs_attention(
                 "action_type": "SEND_NUDGE",
             })
 
+    fast_cache.set(cache_key, attention_items, ttl_seconds=30.0)
     return attention_items
 
 
