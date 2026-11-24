@@ -160,6 +160,7 @@ def get_learner_dashboard(
             for m in meetings
         ],
         "live_assessments": live_assessments,
+        "assigned_assessments": live_assessments,
         "completed_assessments": completed_assessments,
         "streak_days": streak_days,
         "practice_scores": [

@@ -37,11 +37,11 @@ import { LearnerDashboardData, LearnerService } from '../../core/services/learne
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#008FBB]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Assessments</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900">{{ data()?.assigned_assessments?.length ?? 0 }}</span>
+            <span class="text-3xl font-black text-slate-900">{{ getPendingAssessmentsCount() }}</span>
             <span class="text-xs font-semibold text-[#008FBB]">Pending</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400 truncate">
-            {{ data()?.assigned_assessments?.[0]?.title || 'All caught up' }}
+            {{ getFirstPendingAssessmentTitle() }}
           </p>
         </div>
 
@@ -114,8 +114,8 @@ import { LearnerDashboardData, LearnerService } from '../../core/services/learne
             </a>
           </div>
 
-          @if (data()?.assigned_assessments?.length) {
-            @for (a of data()?.assigned_assessments; track a.id) {
+          @if (getPendingAssessments().length) {
+            @for (a of getPendingAssessments(); track a.id) {
               <div class="p-4 rounded-xl bg-sky-50/70 border border-sky-200 space-y-3">
                 <div class="flex items-start justify-between">
                   <div>
@@ -203,6 +203,21 @@ export class LearnerDashboardComponent implements OnInit {
       next: (res) => this.data.set(res),
       error: () => {},
     });
+  }
+
+  getPendingAssessments(): any[] {
+    const d = this.data() as any;
+    if (!d) return [];
+    return d.assigned_assessments || d.live_assessments || [];
+  }
+
+  getPendingAssessmentsCount(): number {
+    return this.getPendingAssessments().length;
+  }
+
+  getFirstPendingAssessmentTitle(): string {
+    const list = this.getPendingAssessments();
+    return list.length > 0 && list[0]?.title ? list[0].title : 'All caught up';
   }
 
   getAverageScore(): number {

@@ -76,14 +76,17 @@ def get_sync_engine() -> Any:
             })
             if "postgresql" in db_url or "postgres" in db_url:
                 connect_args: dict[str, Any] = {
-                    "connect_timeout": 20,
+                    "connect_timeout": 35,
                     "keepalives": 1,
                 }
                 if "sslmode" not in db_url:
                     connect_args["sslmode"] = "require"
                 if "neon.tech" in db_url or "52.76." in db_url or "13.251." in db_url:
+                    h = "ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech"
+                    if f"@{h}/" in db_url:
+                        db_url = db_url.replace(f"@{h}/", f"@{h},{h},{h}/")
                     connect_args["options"] = "endpoint=ep-weathered-base-az6lrn9p"
-                    connect_args["hostaddr"] = "52.76.108.241"
+                    connect_args["hostaddr"] = "13.251.213.89,52.76.108.241,52.76.128.157"
                 engine_kwargs["connect_args"] = connect_args
 
         _sync_engine = create_engine(db_url, **engine_kwargs)

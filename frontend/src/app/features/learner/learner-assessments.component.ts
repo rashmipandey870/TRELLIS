@@ -53,59 +53,73 @@ import { AssessmentNote, NotesService } from '../../core/services/notes.service'
 
           <!-- TAB 1: Assigned Assessments -->
           @if (activeTab() === 'assessments') {
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              @for (a of assignedList(); track a.id) {
-                <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 hover:border-[#008FBB] transition flex flex-col justify-between">
-                  <div class="space-y-3">
-                    <div class="flex items-start justify-between gap-2">
-                      <span class="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
-                        {{ a.field }} &bull; Passing {{ a.passing_score }}%
-                      </span>
-                      <span class="text-xs font-mono font-bold text-slate-500 shrink-0">{{ a.duration_minutes }} Mins</span>
-                    </div>
-                    
-                    <div>
-                      <h3 class="text-base font-black text-slate-900">{{ a.title }}</h3>
-                      <p class="text-xs text-slate-500 mt-1 line-clamp-2">
-                        {{ a.instructions || 'Proctored assessment covering architecture, fundamentals, and real-world problem solving.' }}
-                      </p>
-                    </div>
-
-                    <div class="flex items-center gap-4 text-[11px] text-slate-500 font-medium pt-1">
-                      <span>📝 {{ a.questions_count || 'Multi-question' }} Questions</span>
-                      @if (a.notes_count && a.notes_count > 0) {
-                        <span class="text-[#008FBB] font-bold flex items-center gap-1">
-                          📖 {{ a.notes_count }} Study Guide{{ a.notes_count > 1 ? 's' : '' }} Available
-                        </span>
-                      }
-                    </div>
+            @if (loadingAssessments()) {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm animate-pulse space-y-4">
+                  <div class="flex justify-between items-center">
+                    <div class="h-4 bg-slate-200 rounded w-1/4"></div>
+                    <div class="h-4 bg-slate-200 rounded w-16"></div>
                   </div>
+                  <div class="h-6 bg-slate-200 rounded w-2/3"></div>
+                  <div class="h-3 bg-slate-200 rounded w-full"></div>
+                  <div class="h-10 bg-slate-200 rounded-xl w-full"></div>
+                </div>
+              </div>
+            } @else {
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                @for (a of assignedList(); track a.id) {
+                  <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 hover:border-[#008FBB] transition flex flex-col justify-between">
+                    <div class="space-y-3">
+                      <div class="flex items-start justify-between gap-2">
+                        <span class="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
+                          {{ a.field }} &bull; Passing {{ a.passing_score }}%
+                        </span>
+                        <span class="text-xs font-mono font-bold text-slate-500 shrink-0">{{ a.duration_minutes }} Mins</span>
+                      </div>
+                      
+                      <div>
+                        <h3 class="text-base font-black text-slate-900">{{ a.title }}</h3>
+                        <p class="text-xs text-slate-500 mt-1 line-clamp-2">
+                          {{ a.instructions || 'Proctored assessment covering architecture, fundamentals, and real-world problem solving.' }}
+                        </p>
+                      </div>
 
-                  <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
-                    @if (a.notes_count && a.notes_count > 0) {
+                      <div class="flex items-center gap-4 text-[11px] text-slate-500 font-medium pt-1">
+                        <span>📝 {{ a.questions_count || 'Multi-question' }} Questions</span>
+                        @if (a.notes_count && a.notes_count > 0) {
+                          <span class="text-[#008FBB] font-bold flex items-center gap-1">
+                            📖 {{ a.notes_count }} Study Guide{{ a.notes_count > 1 ? 's' : '' }} Available
+                          </span>
+                        }
+                      </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
+                      @if (a.notes_count && a.notes_count > 0) {
+                        <button 
+                          type="button" 
+                          (click)="openNotesForAssessment(a.id, a.title)"
+                          class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center gap-1.5">
+                          <span>📖 Study Notes</span>
+                        </button>
+                      }
                       <button 
                         type="button" 
-                        (click)="openNotesForAssessment(a.id, a.title)"
-                        class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center gap-1.5">
-                        <span>📖 Study Notes</span>
+                        (click)="startTest(a.id)"
+                        class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#008FBB] to-[#007499] hover:from-[#007499] hover:to-[#005e7c] text-white text-xs font-bold shadow-md transition text-center">
+                        Start Timed Assessment &rarr;
                       </button>
-                    }
-                    <button 
-                      type="button" 
-                      (click)="startTest(a.id)"
-                      class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#008FBB] to-[#007499] hover:from-[#007499] hover:to-[#005e7c] text-white text-xs font-bold shadow-md transition text-center">
-                      Start Timed Assessment &rarr;
-                    </button>
+                    </div>
                   </div>
-                </div>
-              } @empty {
-                <div class="col-span-full p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
-                  <span class="text-3xl block">📋</span>
-                  <h4 class="text-sm font-bold text-slate-800">No Assessments Assigned</h4>
-                  <p class="text-xs text-slate-500">You currently have no pending formal examinations scheduled for your cohort.</p>
-                </div>
-              }
-            </div>
+                } @empty {
+                  <div class="col-span-full p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
+                    <span class="text-3xl block">📋</span>
+                    <h4 class="text-sm font-bold text-slate-800">No Assessments Assigned</h4>
+                    <p class="text-xs text-slate-500">You currently have no pending formal examinations scheduled for your cohort.</p>
+                  </div>
+                }
+              </div>
+            }
           }
 
           <!-- TAB 2: Module Study Guides & Notes -->
@@ -532,6 +546,7 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
 
   readonly assignedList = signal<any[]>([]);
   readonly activeTab = signal<'assessments' | 'notes'>('assessments');
+  readonly loadingAssessments = signal<boolean>(true);
 
   // Study Notes state
   readonly studyNotes = signal<AssessmentNote[]>([]);
@@ -580,8 +595,11 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
     this.learnerService.getAssessments().subscribe({
       next: (list) => {
         this.assignedList.set(list || []);
+        this.loadingAssessments.set(false);
       },
-      error: () => {},
+      error: () => {
+        this.loadingAssessments.set(false);
+      },
     });
   }
 
