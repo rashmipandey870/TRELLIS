@@ -8,11 +8,19 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+_REPO_DIR = _BASE_DIR.parent
+
+
 class Settings(BaseSettings):
     """Centralized application settings loaded from environment variables and .env file."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            str(_BASE_DIR / ".env"),
+            str(_REPO_DIR / ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         case_sensitive=True,
         extra="ignore",

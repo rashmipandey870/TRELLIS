@@ -487,14 +487,30 @@ def populate_scale_data(session: Session | None = None, db_path: str = "trellis_
 
     # Ensure EVERY learner across all 200 learners has >= 6 submitted attempts with answer rows, >= 3 coding submissions, and attendance
     all_coding_probs = session.execute(select(CodingProblem)).scalars().all()
+    default_cp = all_coding_probs[0] if all_coding_probs else None
+
+    # Preload questions, options, and assessment questions to avoid tens of thousands of WAN round-trips
+    all_q_map = {q.id: q for q in session.execute(select(QuestionBank)).scalars().all()}
+    all_opts = session.execute(select(McqOption)).scalars().all()
+    all_opts_map: dict[str, list[McqOption]] = {}
+    for o in all_opts:
+        all_opts_map.setdefault(o.question_id, []).append(o)
+
+    all_aqs = session.execute(select(AssessmentQuestion).order_by(AssessmentQuestion.sequence_order)).scalars().all()
+    aqs_by_assessment: dict[str, list[AssessmentQuestion]] = {}
+    for aq in all_aqs:
+        aqs_by_assessment.setdefault(aq.assessment_id, []).append(aq)
+
+    existing_attempts_by_learner: dict[str, set[str]] = {}
+    for att_l_id, att_a_id in session.execute(
+        select(AssessmentAttempt.learner_id, AssessmentAttempt.assessment_id).where(AssessmentAttempt.status == "SUBMITTED")
+    ).all():
+        existing_attempts_by_learner.setdefault(att_l_id, set()).add(att_a_id)
+
     print("Verifying all 200 learners have >= 6 submitted attempts, >= 3 coding submissions, and attendance...")
     for l_idx, l in enumerate(learners):
-        existing_att_count = session.execute(
-            select(func.count(AssessmentAttempt.id)).where(
-                AssessmentAttempt.learner_id == l.id,
-                AssessmentAttempt.status == "SUBMITTED",
-            )
-        ).scalar() or 0
+        l_existing_atts = existing_attempts_by_learner.get(l.id, set())
+        existing_att_count = len(l_existing_atts)
 
         if existing_att_count < 6:
             needed = 6 - existing_att_count
@@ -502,28 +518,18 @@ def populate_scale_data(session: Session | None = None, db_path: str = "trellis_
                 title_idx = (l_idx * 3 + k) % len(closed_assessment_titles)
                 a_title = closed_assessment_titles[title_idx]
                 a_obj = assessments.get(a_title)
-                if not a_obj:
-                    continue
-                att_exists = session.execute(
-                    select(AssessmentAttempt).where(
-                        AssessmentAttempt.assessment_id == a_obj.id,
-                        AssessmentAttempt.learner_id == l.id,
-                    )
-                ).scalars().first()
-                if att_exists:
+                if not a_obj or a_obj.id in l_existing_atts:
                     continue
 
                 is_priya = (l.id == learners[0].id)
                 mean_ability = 92.0 if is_priya else (74.0 + ((l_idx * 5) % 20))
-                aq_list = session.execute(
-                    select(AssessmentQuestion).where(AssessmentQuestion.assessment_id == a_obj.id).order_by(AssessmentQuestion.sequence_order)
-                ).scalars().all()
+                aq_list = aqs_by_assessment.get(a_obj.id, [])
 
                 earned_marks = 0.0
                 total_marks = 0.0
                 answers = []
                 for aq in aq_list:
-                    q = session.get(QuestionBank, aq.bank_question_id)
+                    q = all_q_map.get(aq.bank_question_id)
                     if not q:
                         continue
                     q_marks = aq.marks or 10.0
@@ -534,7 +540,7 @@ def populate_scale_data(session: Session | None = None, db_path: str = "trellis_
                     earned_marks += earned
 
                     chosen_opt_ids = []
-                    opts = session.execute(select(McqOption).where(McqOption.question_id == q.id)).scalars().all()
+                    opts = all_opts_map.get(q.id, [])
                     if opts:
                         corr_opt = next((o for o in opts if o.is_correct), opts[0])
                         w_opts = [o for o in opts if not o.is_correct]
@@ -586,10 +592,18 @@ def populate_scale_data(session: Session | None = None, db_path: str = "trellis_
                     session.add(ans)
                     total_answers_created += 1
 
+    # Preload submission counts and meeting attendance sets
+    sub_count_by_learner: dict[str, int] = dict(
+        session.execute(select(Submission.learner_id, func.count(Submission.id)).group_by(Submission.learner_id)).all()
+    )
+    learners_with_attnd: set[str] = set(
+        session.execute(select(MeetingAttendance.learner_id)).scalars().all()
+    )
+    all_meetings_cached = session.execute(select(Meeting)).scalars().all()
+
+    for l in learners:
         # Coding Submissions: ensure >= 3
-        existing_subs = session.execute(
-            select(func.count(Submission.id)).where(Submission.learner_id == l.id)
-        ).scalar() or 0
+        existing_subs = sub_count_by_learner.get(l.id, 0)
         if existing_subs < 3 and all_coding_probs:
             for cp in all_coding_probs[:3]:
                 is_priya = (l.id == learners[0].id)
@@ -610,12 +624,8 @@ def populate_scale_data(session: Session | None = None, db_path: str = "trellis_
                 total_submissions_created += 1
 
         # Attendance: ensure MeetingAttendance exists
-        ex_attnd = session.execute(
-            select(MeetingAttendance).where(MeetingAttendance.learner_id == l.id)
-        ).first()
-        if not ex_attnd:
-            all_meetings = session.execute(select(Meeting)).scalars().all()
-            for m_item in all_meetings[:4]:
+        if l.id not in learners_with_attnd and all_meetings_cached:
+            for m_item in all_meetings_cached[:4]:
                 session.add(MeetingAttendance(
                     meeting_id=m_item.id,
                     learner_id=l.id,

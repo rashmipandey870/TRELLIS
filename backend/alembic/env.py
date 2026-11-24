@@ -1,5 +1,24 @@
 import asyncio
+import socket
 from logging.config import fileConfig
+
+try:
+    _orig_getaddrinfo = socket.getaddrinfo
+    _NEON_FALLBACKS = {
+        'ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech': '52.76.128.157',
+        'ep-weathered-base-az6lrn9p-pooler.c-3.ap-southeast-1.aws.neon.tech': '52.76.128.157',
+        'c-3.ap-southeast-1.aws.neon.tech': '52.76.128.157'
+    }
+    def _neon_safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
+        try:
+            return _orig_getaddrinfo(host, port, family, type, proto, flags)
+        except socket.gaierror:
+            if host in _NEON_FALLBACKS:
+                return _orig_getaddrinfo(_NEON_FALLBACKS[host], port, family, type, proto, flags)
+            raise
+    socket.getaddrinfo = _neon_safe_getaddrinfo
+except Exception:
+    pass
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -77,7 +96,13 @@ def run_migrations_online() -> None:
         sync_url = url
         if sync_url.startswith("postgresql://") and not sync_url.startswith("postgresql+"):
             sync_url = sync_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-        connectable = create_engine(sync_url, poolclass=pool.NullPool)
+        connect_args = {}
+        if "neon.tech" in sync_url or "52.76.128.157" in sync_url:
+            connect_args = {
+                "options": "endpoint=ep-weathered-base-az6lrn9p",
+                "hostaddr": "52.76.128.157",
+            }
+        connectable = create_engine(sync_url, poolclass=pool.NullPool, connect_args=connect_args)
         with connectable.connect() as connection:
             do_run_migrations(connection)
         connectable.dispose()
