@@ -21,3 +21,5 @@ scipy==1.18.1
 statsmodels==0.15.0
 reportlab==5.1.0
 python-multipart>=0.0.9
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0

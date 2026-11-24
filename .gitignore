@@ -5,6 +5,8 @@ __pycache__/
 *.so
 .Python
 *.db
+!trellis_demo.db
+backend/trellis_demo.db
 *.db-shm
 *.db-wal
 *.sqlite
