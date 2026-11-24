@@ -128,16 +128,26 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
               Assign Mentor to {{ selectedBatchForAssignment()?.name }}
             </h3>
             <div class="space-y-2">
-              <label class="block text-xs font-semibold text-slate-600">Select Mentor:</label>
-              <select [(ngModel)]="selectedUserId" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
-                @for (m of mentorOptions(); track m.id) {
-                  <option [value]="m.id">{{ m.full_name }} ({{ m.email }})</option>
-                }
-              </select>
+              <label class="block text-xs font-bold text-slate-700">Select Dedicated Mentor:</label>
+              @if (mentorOptions().length > 0) {
+                <div class="relative">
+                  <select 
+                    [(ngModel)]="selectedUserId" 
+                    class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#FAA634] focus:border-transparent cursor-pointer">
+                    @for (m of mentorOptions(); track m.id) {
+                      <option [value]="m.id">{{ m.full_name }} ({{ m.email }})</option>
+                    }
+                  </select>
+                </div>
+              } @else {
+                <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                  Loading mentors or no mentors found in system...
+                </div>
+              }
             </div>
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">Cancel</button>
-              <button type="button" (click)="confirmAssignMentor()" class="px-4 py-2 rounded-xl bg-[#FAA634] text-xs font-bold text-white">Assign Mentor</button>
+              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200 transition">Cancel</button>
+              <button type="button" (click)="confirmAssignMentor()" [disabled]="!selectedUserId" class="px-4 py-2 rounded-xl bg-[#FAA634] hover:bg-[#e09228] text-xs font-bold text-white transition disabled:opacity-50">Assign Mentor</button>
             </div>
           </div>
         </div>
@@ -151,16 +161,26 @@ import { AdminService, BatchSummary, UserSummary } from '../../core/services/adm
               Assign Learner to {{ selectedBatchForAssignment()?.name }}
             </h3>
             <div class="space-y-2">
-              <label class="block text-xs font-semibold text-slate-600">Select Learner:</label>
-              <select [(ngModel)]="selectedUserId" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs">
-                @for (l of learnerOptions(); track l.id) {
-                  <option [value]="l.id">{{ l.full_name }} ({{ l.email }})</option>
-                }
-              </select>
+              <label class="block text-xs font-bold text-slate-700">Select Cohort Learner:</label>
+              @if (learnerOptions().length > 0) {
+                <div class="relative">
+                  <select 
+                    [(ngModel)]="selectedUserId" 
+                    class="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#008FBB] focus:border-transparent cursor-pointer">
+                    @for (l of learnerOptions(); track l.id) {
+                      <option [value]="l.id">{{ l.full_name }} ({{ l.email }})</option>
+                    }
+                  </select>
+                </div>
+              } @else {
+                <div class="p-3 rounded-xl bg-sky-50 border border-sky-200 text-xs text-[#008FBB]">
+                  Loading learners or no learners found in system...
+                </div>
+              }
             </div>
             <div class="flex justify-end gap-2 pt-2">
-              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">Cancel</button>
-              <button type="button" (click)="confirmAssignLearner()" class="px-4 py-2 rounded-xl bg-[#008FBB] text-xs font-bold text-white">Assign Learner</button>
+              <button type="button" (click)="closeAssignmentModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-700 hover:bg-slate-200 transition">Cancel</button>
+              <button type="button" (click)="confirmAssignLearner()" [disabled]="!selectedUserId" class="px-4 py-2 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-xs font-bold text-white transition disabled:opacity-50">Assign Learner</button>
             </div>
           </div>
         </div>
@@ -211,13 +231,31 @@ export class AdminBatchesComponent {
   openAssignMentor(batch: BatchSummary): void {
     this.selectedBatchForAssignment.set(batch);
     this.assignmentType.set('MENTOR');
-    this.selectedUserId = this.mentorOptions()[0]?.id || '';
+    if (this.mentorOptions().length === 0) {
+      this.adminService.getUsers('MENTOR').subscribe({
+        next: (list) => {
+          this.mentorOptions.set(list || []);
+          this.selectedUserId = list?.[0]?.id || '';
+        },
+      });
+    } else {
+      this.selectedUserId = this.mentorOptions()[0]?.id || '';
+    }
   }
 
   openAssignLearner(batch: BatchSummary): void {
     this.selectedBatchForAssignment.set(batch);
     this.assignmentType.set('LEARNER');
-    this.selectedUserId = this.learnerOptions()[0]?.id || '';
+    if (this.learnerOptions().length === 0) {
+      this.adminService.getUsers('LEARNER').subscribe({
+        next: (list) => {
+          this.learnerOptions.set(list || []);
+          this.selectedUserId = list?.[0]?.id || '';
+        },
+      });
+    } else {
+      this.selectedUserId = this.learnerOptions()[0]?.id || '';
+    }
   }
 
   closeAssignmentModal(): void {

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 export interface AdminDashboardData {
   total_learners: number;
@@ -121,7 +121,9 @@ export class AdminService {
     let params = new HttpParams();
     if (role) params = params.set('role', role);
     if (search) params = params.set('search', search);
-    return this.http.get<UserSummary[]>('/api/v1/admin/users', { params });
+    return this.http.get<any>('/api/v1/admin/users', { params }).pipe(
+      map((res) => (Array.isArray(res) ? res : res?.users || []))
+    );
   }
 
   createUser(payload: { email: string; full_name: string; role: string; password?: string }): Observable<UserSummary> {
