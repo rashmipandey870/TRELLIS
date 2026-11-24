@@ -48,7 +48,7 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="absolute top-0 left-0 right-0 h-1 bg-[#008FBB]"></div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cohort Percentile Rank</span>
               <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-3xl font-black text-slate-900">{{ diagnostic()?.percentile ?? 84 }}th</span>
+                <span class="text-3xl font-black text-slate-900">{{ diagnostic()?.percentile != null ? diagnostic()?.percentile + 'th' : 'N/A' }}</span>
                 <span class="text-xs font-semibold text-[#008FBB]">Percentile</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Relative to active cohort</p>
@@ -59,9 +59,9 @@ import { LearnerService } from '../../core/services/learner.service';
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Score Trajectory Velocity</span>
               <div class="mt-2 flex items-baseline gap-2">
                 <span class="text-3xl font-black text-emerald-600">
-                  {{ (diagnostic()?.learning_velocity?.slope ?? 1.2) > 0 ? '+' : '' }}{{ diagnostic()?.learning_velocity?.slope ?? 1.2 }}%
+                  {{ diagnostic()?.learning_velocity?.slope != null ? ((diagnostic()?.learning_velocity?.slope > 0 ? '+' : '') + diagnostic()?.learning_velocity?.slope + '%') : 'N/A' }}
                 </span>
-                <span class="text-xs font-semibold text-emerald-600">Improving</span>
+                <span class="text-xs font-semibold text-emerald-600">{{ diagnostic()?.learning_velocity?.trend_label || 'Calculated' }}</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Linear regression slope</p>
             </div>
@@ -70,8 +70,8 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="absolute top-0 left-0 right-0 h-1 bg-[#FAA634]"></div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Session Attendance</span>
               <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-3xl font-black text-slate-900">95%</span>
-                <span class="text-xs font-semibold text-[#FAA634]">High</span>
+                <span class="text-3xl font-black text-slate-900">{{ diagnostic()?.attendance_rate != null ? diagnostic()?.attendance_rate + '%' : 'N/A' }}</span>
+                <span class="text-xs font-semibold text-[#FAA634]">Sync Rate</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Cohort sync attendance</p>
             </div>
@@ -80,7 +80,7 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="absolute top-0 left-0 right-0 h-1 bg-purple-500"></div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Coding Acceptance</span>
               <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-3xl font-black text-purple-600">89%</span>
+                <span class="text-3xl font-black text-purple-600">{{ diagnostic()?.coding_acceptance_rate != null ? diagnostic()?.coding_acceptance_rate + '%' : 'N/A' }}</span>
                 <span class="text-xs font-semibold text-purple-600">First-Pass</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Sandboxed test suite runs</p>
@@ -91,7 +91,7 @@ import { LearnerService } from '../../core/services/learner.service';
           <!-- Charts Row 1: Bell Curve & Competency Breakdown -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            <!-- Gaussian Normal Distribution Curve -->
+            <!-- Cohort Distribution Curve -->
             <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4">
               <div class="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div>
@@ -99,10 +99,10 @@ import { LearnerService } from '../../core/services/learner.service';
                     <span class="w-2.5 h-2.5 rounded-full bg-[#008FBB]"></span>
                     Cohort Score Distribution
                   </h3>
-                  <p class="text-[11px] text-slate-400">Gaussian normal distribution curve benchmark</p>
+                  <p class="text-[11px] text-slate-400">Relative score benchmark across batch peers</p>
                 </div>
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-[#008FBB] border border-sky-200">
-                  SciPy Norm
+                  Distribution
                 </span>
               </div>
 
@@ -115,9 +115,11 @@ import { LearnerService } from '../../core/services/learner.service';
                 </div>
               }
 
-              <p class="text-xs text-slate-600 bg-sky-50/60 p-3 rounded-xl border border-sky-200/60 leading-relaxed">
-                Your performance ranks in the top tier of your cohort with sustained consistency across all evaluated assessment domains.
-              </p>
+              @if (diagnostic()?.ai_narrative) {
+                <p class="text-xs text-slate-600 bg-sky-50/60 p-3 rounded-xl border border-sky-200/60 leading-relaxed">
+                  {{ diagnostic()?.ai_narrative }}
+                </p>
+              }
             </div>
 
             <!-- Multi-Track Competency Breakdown -->
@@ -147,11 +149,11 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="grid grid-cols-2 gap-2 text-xs pt-1">
                 <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                   <span class="text-[10px] text-slate-400 font-bold uppercase block">Core Strength</span>
-                  <strong class="text-slate-800">Algorithms &amp; Python (92%)</strong>
+                  <strong class="text-slate-800">{{ diagnostic()?.top_strengths?.[0] || 'Domain Fundamentals' }}</strong>
                 </div>
                 <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
                   <span class="text-[10px] text-slate-400 font-bold uppercase block">Next Target</span>
-                  <strong class="text-slate-800">Distributed Architecture</strong>
+                  <strong class="text-slate-800">{{ diagnostic()?.blindspots?.[0] || 'Advanced Systems Architecture' }}</strong>
                 </div>
               </div>
             </div>
@@ -183,8 +185,8 @@ import { LearnerService } from '../../core/services/learner.service';
             }
 
             <div class="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-500 pt-1 border-t border-slate-100 gap-2">
-              <span>Trajectory Slope: <strong class="text-slate-800">{{ diagnostic()?.learning_velocity?.slope ?? 1.2 }} points per assessment</strong></span>
-              <span class="text-slate-400">Formula: Ordinary Least Squares (OLS) Regression</span>
+              <span>Trajectory Slope: <strong class="text-slate-800">{{ diagnostic()?.learning_velocity?.slope != null ? diagnostic()?.learning_velocity?.slope + ' points per assessment' : 'Computed across submitted attempts' }}</strong></span>
+              <span class="text-slate-400">Statistical Linear Regression</span>
             </div>
           </div>
 

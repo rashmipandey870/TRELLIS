@@ -1,7 +1,9 @@
 """TRELLIS FastAPI Request Dependencies & Authentication Guards."""
 
 import contextlib
+import os
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status

@@ -130,7 +130,7 @@ class AIGateway:
         # Ladder Step 3: Resilient procedural generation (truthfully labeled as procedural/practice bank)
         logger.info("Generating %s/%s practice question via procedural engine", fld, norm_mode)
         if norm_mode == "MCQ":
-            mcq = self.procedural.generate_mcq(field=fld, difficulty=diff)
+            mcq = self.procedural.generate_mcq(field=fld, difficulty=diff, seen_hashes=hashes)
             verify_mcq_quality(mcq)
             mcq.source = "procedural"
             mcq.provenance.provider = "procedural"
@@ -140,7 +140,7 @@ class AIGateway:
             return mcq.model_dump()
         else:
             lang = language or ("sql" if "sql" in fld.lower() else ("java" if "java" in fld.lower() else ("javascript" if "javascript" in fld.lower() or "web" in fld.lower() else "python")))
-            coding = self.procedural.generate_coding(field=fld, difficulty=diff, language=lang)
+            coding = self.procedural.generate_coding(field=fld, difficulty=diff, language=lang, seen_hashes=hashes)
             passes = verify_coding_quality(coding)
             coding.source = "procedural"
             coding.provenance.provider = "procedural"

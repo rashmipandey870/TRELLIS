@@ -37,15 +37,10 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
             [(ngModel)]="selectedBatch" 
             (ngModelChange)="applyFilters()"
             class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800">
-            <option value="">All 8 Enterprise Cohorts</option>
-            <option value="Batch Alpha">Batch Alpha (Full-Stack)</option>
-            <option value="Batch Beta">Batch Beta (Cloud &amp; DevOps)</option>
-            <option value="Batch Gamma">Batch Gamma (AI &amp; ML)</option>
-            <option value="Batch Delta">Batch Delta (Data Platform)</option>
-            <option value="Batch Epsilon">Batch Epsilon (Cybersecurity)</option>
-            <option value="Batch Zeta">Batch Zeta (Mobile &amp; IoT)</option>
-            <option value="Batch Eta">Batch Eta (Distributed Systems)</option>
-            <option value="Batch Theta">Batch Theta (Enterprise Systems)</option>
+            <option value="">All Cohorts</option>
+            @for (b of batches(); track b.id) {
+              <option [value]="b.name">{{ b.name }}</option>
+            }
           </select>
         </div>
       </div>
@@ -79,11 +74,11 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
             <div class="py-2 border-y border-slate-100 grid grid-cols-2 gap-2 text-[11px]">
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Assigned Batch</span>
-                <span class="font-bold text-slate-700 truncate block">{{ l.batch || 'Batch Alpha' }}</span>
+                <span class="font-bold text-slate-700 truncate block">{{ l.batch || 'Unassigned' }}</span>
               </div>
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Mentor</span>
-                <span class="font-bold text-slate-700 truncate block">{{ l.mentor || 'Ananya Rao' }}</span>
+                <span class="font-bold text-slate-700 truncate block">{{ l.mentor || 'Unassigned' }}</span>
               </div>
             </div>
 
@@ -114,7 +109,7 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
               <div>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">Learner Dossier &bull; Read-Only Audit</span>
                 <h2 class="text-xl font-black text-slate-900">{{ selectedLearnerDetail()?.full_name }}</h2>
-                <p class="text-xs text-slate-400">{{ selectedLearnerDetail()?.email }} &bull; {{ selectedLearnerDetail()?.batch || 'Batch Alpha' }}</p>
+                <p class="text-xs text-slate-400">{{ selectedLearnerDetail()?.email }} &bull; {{ selectedLearnerDetail()?.batch || 'Unassigned' }}</p>
               </div>
               <button (click)="selectedLearnerDetail.set(null)" class="text-2xl text-slate-400 hover:text-slate-600 font-bold">&times;</button>
             </div>
@@ -124,7 +119,7 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
               <div class="p-4 rounded-xl bg-sky-50 border border-sky-200 text-center">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Batch Percentile</span>
                 <p class="text-2xl font-black text-[#008FBB] mt-1">
-                  Top {{ selectedLearnerDetail()?.performance_analysis?.batch_percentile ?? 15 }}%
+                  {{ selectedLearnerDetail()?.performance_analysis?.batch_percentile != null ? 'Top ' + selectedLearnerDetail()?.performance_analysis?.batch_percentile + '%' : 'N/A' }}
                 </p>
               </div>
               <div class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-center">
@@ -251,6 +246,7 @@ export class AdminLearnersComponent {
 
   readonly learners = signal<any[]>([]);
   readonly filteredLearners = signal<any[]>([]);
+  readonly batches = signal<any[]>([]);
   readonly selectedLearnerDetail = signal<LearnerDetailData | null>(null);
 
   searchQuery = '';
@@ -261,6 +257,13 @@ export class AdminLearnersComponent {
       next: (list) => {
         this.learners.set(list || []);
         this.applyFilters();
+      },
+      error: () => {},
+    });
+    this.adminService.getBatches().subscribe({
+      next: (data: any) => {
+        const list = Array.isArray(data) ? data : (data?.items || []);
+        this.batches.set(list);
       },
       error: () => {},
     });

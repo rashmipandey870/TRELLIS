@@ -145,11 +145,19 @@ export class AdminSettingsComponent {
   thresholdProblems = 15;
   cooldownDays = 14;
 
-  readonly auditLogs = signal<any[]>([
-    { id: '1', created_at: new Date(Date.now() - 3600000).toISOString(), action: 'USER_CREATED', actor_role: 'ADMIN', details: 'Created learner Priya Sharma' },
-    { id: '2', created_at: new Date(Date.now() - 7200000).toISOString(), action: 'BATCH_ASSIGNED', actor_role: 'ADMIN', details: 'Assigned Ananya Rao to Batch Alpha' },
-    { id: '3', created_at: new Date(Date.now() - 14400000).toISOString(), action: 'SETTINGS_UPDATED', actor_role: 'ADMIN', details: 'Set practice accuracy threshold to 70%' },
-  ]);
+  readonly auditLogs = signal<any[]>([]);
+
+  ngOnInit(): void {
+    this.adminService.getAuditLogs().subscribe({
+      next: (res: any) => {
+        const list = Array.isArray(res) ? res : (res?.items || []);
+        this.auditLogs.set(list);
+      },
+      error: () => {
+        this.auditLogs.set([]);
+      },
+    });
+  }
 
   saveThresholds(): void {
     alert('Global alert thresholds saved successfully.');

@@ -111,7 +111,7 @@ def generate_cohort_bell_curve_svg(
 
   <!-- Pass Threshold Line -->
   <line x1="{pass_x:.1f}" y1="{padding_y}" x2="{pass_x:.1f}" y2="{height - padding_y}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3"/>
-  <text x="{pass_x + 4:.1f}" y="{padding_y + 10}" fill="#10b981" font-size="9" font-weight="700">Pass Cutoff ({passing_score:.0f}%)</text>
+  <text x="{pass_x + 4:.1f}" y="{padding_y + 10}" fill="#10b981" font-size="9" font-weight="700">PASS ({passing_score:.0f}%)</text>
 
   <!-- Learner Score Marker -->
   <line x1="{learner_x:.1f}" y1="{learner_y:.1f}" x2="{learner_x:.1f}" y2="{height - padding_y}" stroke="#FAA634" stroke-width="2.5"/>

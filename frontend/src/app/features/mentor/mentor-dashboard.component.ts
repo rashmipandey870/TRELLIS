@@ -30,27 +30,27 @@ import { MentorDashboardData, MentorService } from '../../core/services/mentor.s
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#FAA634]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Assigned Learners</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900">{{ data()?.assigned_learners_count ?? 3 }}</span>
+            <span class="text-3xl font-black text-slate-900">{{ data()?.assigned_learners_count ?? 0 }}</span>
             <span class="text-xs font-semibold text-emerald-500">Engineers</span>
           </div>
-          <p class="mt-1 text-[11px] text-slate-400">Batch Alpha</p>
+          <p class="mt-1 text-[11px] text-slate-400">Assigned Cohorts</p>
         </div>
 
         <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#008FBB]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Upcoming Meetings</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900">{{ data()?.upcoming_meetings?.length ?? 1 }}</span>
+            <span class="text-3xl font-black text-slate-900">{{ data()?.upcoming_meetings?.length ?? 0 }}</span>
             <span class="text-xs font-semibold text-[#008FBB]">Scheduled</span>
           </div>
-          <p class="mt-1 text-[11px] text-slate-400">Next: System Architecture Standup</p>
+          <p class="mt-1 text-[11px] text-slate-400">Scheduled syncs</p>
         </div>
 
         <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
           <div class="absolute top-0 left-0 right-0 h-1 bg-purple-500"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Live Assessments</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900">{{ data()?.live_assessments?.length ?? 1 }}</span>
+            <span class="text-3xl font-black text-slate-900">{{ data()?.live_assessments?.length ?? 0 }}</span>
             <span class="text-xs font-semibold text-purple-600">Active</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400">MCQ &bull; Coding Tests</p>
@@ -60,7 +60,7 @@ import { MentorDashboardData, MentorService } from '../../core/services/mentor.s
           <div class="absolute top-0 left-0 right-0 h-1 bg-[#D7182A]"></div>
           <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Talent Alerts</span>
           <div class="mt-2 flex items-baseline gap-2">
-            <span class="text-3xl font-black text-slate-900">{{ data()?.new_practice_alerts?.length ?? 1 }}</span>
+            <span class="text-3xl font-black text-slate-900">{{ data()?.new_practice_alerts?.length ?? 0 }}</span>
             <span class="text-xs font-semibold text-[#D7182A]">Pending Action</span>
           </div>
           <p class="mt-1 text-[11px] text-slate-400">Practice Threshold Qualified</p>
@@ -84,20 +84,26 @@ import { MentorDashboardData, MentorService } from '../../core/services/mentor.s
             </a>
           </div>
 
-          <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold text-slate-900">Priya Sharma &bull; Python Practice Track</span>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-[#FAA634]">14d Streak</span>
+          @if (data()?.new_practice_alerts && (data()?.new_practice_alerts)!.length > 0) {
+            <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-900">{{ (data()?.new_practice_alerts)![0].learner_name }} &bull; {{ (data()?.new_practice_alerts)![0].field }} Track</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-[#FAA634]">{{ (data()?.new_practice_alerts)![0].active_days || (data()?.new_practice_alerts)![0].streak || 14 }}d Active</span>
+              </div>
+              <p class="text-xs text-slate-600">
+                {{ (data()?.new_practice_alerts)![0].message }}
+              </p>
+              <div class="pt-2 flex gap-2">
+                <a routerLink="/mentor/spotlight" class="px-3 py-1.5 rounded-lg bg-[#FAA634] text-white text-xs font-bold hover:bg-[#e09228] transition">
+                  Triage Alert
+                </a>
+              </div>
             </div>
-            <p class="text-xs text-slate-600">
-              Crossed criteria: 14 active days in 30d window, 88% weighted accuracy across 18 problems.
-            </p>
-            <div class="pt-2 flex gap-2">
-              <a routerLink="/mentor/spotlight" class="px-3 py-1.5 rounded-lg bg-[#FAA634] text-white text-xs font-bold hover:bg-[#e09228] transition">
-                Triage Alert
-              </a>
+          } @else {
+            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">
+              No pending Talent Spotlight alerts across your assigned cohorts.
             </div>
-          </div>
+          }
         </div>
 
         <!-- Upcoming Meeting Schedule -->
@@ -112,15 +118,21 @@ import { MentorDashboardData, MentorService } from '../../core/services/mentor.s
           </div>
 
           <div class="space-y-2.5">
-            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-              <div>
-                <p class="text-xs font-bold text-slate-900">Architecture &amp; Clean Code Review</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">Today &bull; 16:00 - 17:00 IST &bull; Batch Alpha</p>
+            @for (m of data()?.upcoming_meetings; track m.id) {
+              <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                <div>
+                  <p class="text-xs font-bold text-slate-900">{{ m.title }}</p>
+                  <p class="text-[11px] text-slate-400 mt-0.5">{{ m.meeting_date || m.start_time | date:'short' }} &bull; {{ m.batch_name || 'Assigned Cohort' }}</p>
+                </div>
+                <a [href]="m.meeting_link" target="_blank" class="px-3 py-1.5 rounded-lg bg-[#008FBB] hover:bg-[#007499] text-white text-xs font-bold transition">
+                  Launch Link
+                </a>
               </div>
-              <a href="https://teams.microsoft.com/l/meetup-join/sample" target="_blank" class="px-3 py-1.5 rounded-lg bg-[#008FBB] hover:bg-[#007499] text-white text-xs font-bold transition">
-                Launch Link
-              </a>
-            </div>
+            } @empty {
+              <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500 text-center">
+                No upcoming sessions scheduled.
+              </div>
+            }
           </div>
         </div>
 

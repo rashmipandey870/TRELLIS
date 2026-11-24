@@ -177,7 +177,7 @@ import { AdminService, UserSummary } from '../../core/services/admin.service';
             <textarea 
               [(ngModel)]="bulkCsvContent" 
               rows="6" 
-              placeholder="priya.verma@example.com,Priya Verma,LEARNER&#10;amit.sharma@example.com,Amit Sharma,MENTOR"
+              placeholder="user1@company.internal,Alex Taylor,LEARNER&#10;user2@company.internal,Jordan Smith,MENTOR"
               class="w-full font-mono text-xs p-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
 
             @if (bulkImportMessage()) {

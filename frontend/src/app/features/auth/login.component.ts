@@ -77,7 +77,6 @@ interface DemoAccount {
               <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-slate-700">
                 Password
               </label>
-              <span class="text-[10px] text-slate-400 font-mono font-medium">Demo: CSMTrellis2026!</span>
             </div>
             <input 
               id="password" 

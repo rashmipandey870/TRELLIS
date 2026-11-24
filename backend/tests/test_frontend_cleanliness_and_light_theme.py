@@ -68,3 +68,31 @@ def test_light_theme_only_and_no_dark_classes():
         "Dark theme classes/tokens found in frontend source (Light theme only enforced):\n"
         + "\n".join(dark_violations)
     )
+
+
+def test_no_fake_person_or_batch_names_in_templates():
+    """Fails if hard-coded learner names, mentor names, fake audit rows or mock batch fallbacks exist in templates."""
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    frontend_app = repo_root / "frontend" / "src" / "app"
+
+    forbidden_literals = [
+        "Priya Sharma",
+        "Ananya Rao",
+        "Batch Alpha",
+        "Created learner Priya Sharma",
+        "Assigned Ananya Rao to Batch Alpha",
+    ]
+
+    violations = []
+    if frontend_app.exists():
+        files = list(frontend_app.rglob("*.ts")) + list(frontend_app.rglob("*.html"))
+        for f in files:
+            content = f.read_text(encoding="utf-8", errors="ignore")
+            for lit in forbidden_literals:
+                if lit in content:
+                    violations.append(f"Found hard-coded mock '{lit}' in template: {f.relative_to(repo_root)}")
+
+    assert not violations, (
+        "Hard-coded fake student/mentor/batch strings found in templates:\n"
+        + "\n".join(violations)
+    )

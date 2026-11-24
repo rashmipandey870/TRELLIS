@@ -907,6 +907,7 @@ def publish_assessment(
     assessment_id: str,
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     assessment = db.get(Assessment, assessment_id)
     if not assessment or assessment.mentor_id != mentor.id:

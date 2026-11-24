@@ -62,6 +62,20 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'learners/:id/report',
+        loadComponent: () =>
+          import('./features/mentor/mentor-learner-analytics.component').then(
+            (m) => m.MentorLearnerAnalyticsComponent
+          ),
+      },
+      {
+        path: 'learners/:id/reports',
+        loadComponent: () =>
+          import('./features/mentor/mentor-learner-analytics.component').then(
+            (m) => m.MentorLearnerAnalyticsComponent
+          ),
+      },
+      {
         path: 'learners/:id',
         loadComponent: () =>
           import('./features/mentor/mentor-learner-analytics.component').then(

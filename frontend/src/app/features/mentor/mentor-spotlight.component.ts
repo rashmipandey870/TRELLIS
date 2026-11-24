@@ -120,41 +120,16 @@ import { MentorService } from '../../core/services/mentor.service';
 export class MentorSpotlightComponent {
   private readonly mentorService = inject(MentorService);
 
-  readonly alerts = signal<any[]>([
-    {
-      id: 'alert_1',
-      field: 'Python',
-      learner_name: 'Priya Sharma',
-      learner_id: 'l1',
-      active_days: 14,
-      accuracy: 88,
-      problems_count: 18,
-      dedication_score: 92,
-      status: 'PENDING',
-      message: 'Priya Sharma has maintained a 14-day practice streak with 88% weighted accuracy in Python algorithms and asynchronous paradigms.',
-    },
-    {
-      id: 'alert_2',
-      field: 'SQL',
-      learner_name: 'Sneha Mukherjee',
-      learner_id: 'l3',
-      active_days: 19,
-      accuracy: 94,
-      problems_count: 24,
-      dedication_score: 96,
-      status: 'PENDING',
-      message: 'Sneha Mukherjee has demonstrated exceptional query design and index tuning in the SQL practice track.',
-    },
-  ]);
+  readonly alerts = signal<any[]>([]);
 
   ngOnInit(): void {
     this.mentorService.getTalentAlerts().subscribe({
       next: (data) => {
-        if (data && data.length > 0) {
-          this.alerts.set(data);
-        }
+        this.alerts.set(data || []);
       },
-      error: () => {},
+      error: () => {
+        this.alerts.set([]);
+      },
     });
   }
 

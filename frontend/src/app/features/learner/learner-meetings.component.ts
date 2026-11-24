@@ -39,8 +39,7 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
               </p>
 
               <div class="flex items-center gap-4 text-xs pt-1">
-                <span class="text-slate-400">Mentor: <strong class="text-slate-700">{{ m.mentor_name || 'Ananya Rao' }}</strong></span>
-                <span class="text-emerald-600 font-semibold">&bull; Starting in 2 hours</span>
+                <span class="text-slate-400">Mentor: <strong class="text-slate-700">{{ m.mentor_name || 'Assigned Mentor' }}</strong></span>
               </div>
             </div>
 
@@ -77,27 +76,16 @@ import { LearnerMeetingItem, LearnerService } from '../../core/services/learner.
 export class LearnerMeetingsComponent {
   private readonly learnerService = inject(LearnerService);
 
-  readonly meetings = signal<LearnerMeetingItem[]>([
-    {
-      id: 'm1',
-      title: 'Distributed Systems & Clean Architecture Review',
-      description: 'Reviewing microservice design, Docker sandboxing, and idempotent REST endpoints.',
-      meeting_link: 'https://teams.microsoft.com/l/meetup-join/csm-session',
-      start_time: new Date(Date.now() + 7200000).toISOString(),
-      end_time: new Date(Date.now() + 10800000).toISOString(),
-      status: 'SCHEDULED',
-      mentor_name: 'Ananya Rao (Lead Cloud Architect)',
-    },
-  ]);
+  readonly meetings = signal<LearnerMeetingItem[]>([]);
 
   ngOnInit(): void {
     this.learnerService.getMeetings().subscribe({
       next: (list) => {
-        if (list && list.length > 0) {
-          this.meetings.set(list);
-        }
+        this.meetings.set(list || []);
       },
-      error: () => {},
+      error: () => {
+        this.meetings.set([]);
+      },
     });
   }
 
