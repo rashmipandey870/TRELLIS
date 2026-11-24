@@ -62,6 +62,7 @@ def get_learner_context(db: Session, user: User) -> dict[str, Any]:
     ]
 
     now = datetime.now(UTC)
+    now_date = now.strftime("%Y-%m-%d")
     meetings = (
         db.execute(
             select(Meeting)
@@ -69,9 +70,9 @@ def get_learner_context(db: Session, user: User) -> dict[str, Any]:
             .where(
                 MeetingAudience.learner_id == user.id,
                 Meeting.status == "SCHEDULED",
-                Meeting.start_time >= now,
+                Meeting.meeting_date >= now_date,
             )
-            .order_by(Meeting.start_time.asc())
+            .order_by(Meeting.meeting_date.asc(), Meeting.start_time.asc())
             .limit(3)
         )
         .scalars()
@@ -81,7 +82,7 @@ def get_learner_context(db: Session, user: User) -> dict[str, Any]:
     upcoming_meetings = [
         {
             "title": m.title,
-            "start_time": m.start_time.isoformat() if m.start_time else None,
+            "start_time": f"{m.meeting_date} {m.start_time}",
             "meeting_link": m.meeting_link,
         }
         for m in meetings
@@ -137,15 +138,16 @@ def get_mentor_context(db: Session, user: User) -> dict[str, Any]:
 
     # Upcoming mentor meetings
     now = datetime.now(UTC)
+    now_date = now.strftime("%Y-%m-%d")
     meetings = (
         db.execute(
             select(Meeting)
             .where(
                 Meeting.mentor_id == user.id,
                 Meeting.status == "SCHEDULED",
-                Meeting.start_time >= now,
+                Meeting.meeting_date >= now_date,
             )
-            .order_by(Meeting.start_time.asc())
+            .order_by(Meeting.meeting_date.asc(), Meeting.start_time.asc())
             .limit(3)
         )
         .scalars()
@@ -155,7 +157,7 @@ def get_mentor_context(db: Session, user: User) -> dict[str, Any]:
     upcoming_meetings = [
         {
             "title": m.title,
-            "start_time": m.start_time.isoformat() if m.start_time else None,
+            "start_time": f"{m.meeting_date} {m.start_time}",
             "meeting_link": m.meeting_link,
         }
         for m in meetings

@@ -14,7 +14,7 @@ from collections.abc import Hashable
 class InMemoryTTLCache:
     """Thread-safe in-memory cache with per-item TTL."""
 
-    def __init__(self, default_ttl_seconds: float = 30.0):
+    def __init__(self, default_ttl_seconds: float = 300.0):
         self._cache: dict[str, tuple[float, Any]] = {}
         self.default_ttl = default_ttl_seconds
 
@@ -44,4 +44,4 @@ class InMemoryTTLCache:
 
 
 # Global cache instance
-fast_cache = InMemoryTTLCache(default_ttl_seconds=30.0)
+fast_cache = InMemoryTTLCache(default_ttl_seconds=300.0)

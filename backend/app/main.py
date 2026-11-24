@@ -30,12 +30,12 @@ from app.core.config import settings
 
 
 async def _neon_keepalive_loop() -> None:
-    """Background task that pings Neon PostgreSQL every 30 seconds to keep compute active and connection pool warm."""
+    """Background task that pings Neon PostgreSQL every 60 seconds to keep compute active and connection pool warm."""
     from sqlalchemy import text
     from app.api.deps import get_sync_engine
     while True:
         try:
-            await asyncio.sleep(30)
+            await asyncio.sleep(60)
             engine = get_sync_engine()
             def _ping() -> None:
                 with engine.connect() as conn:

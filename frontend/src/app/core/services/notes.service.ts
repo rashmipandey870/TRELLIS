@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { Observable, shareReplay, tap } from 'rxjs';
 
 export interface RecommendedReadingItem {
   title: string;
@@ -43,17 +43,29 @@ export interface CreateAssessmentNoteRequest {
 })
 export class NotesService {
   private readonly http = inject(HttpClient);
+  private notesCache$?: Observable<AssessmentNote[]>;
 
-  // Learner methods
-  getLearnerNotes(search?: string, field?: string): Observable<AssessmentNote[]> {
+  // Learner methods with instantaneous client-side cache
+  getLearnerNotes(search?: string, field?: string, forceRefresh = false): Observable<AssessmentNote[]> {
+    if (!search && !field && this.notesCache$ && !forceRefresh) {
+      return this.notesCache$;
+    }
     let params = new HttpParams();
     if (search) params = params.set('search', search);
     if (field) params = params.set('field', field);
-    return this.http.get<AssessmentNote[]>('/api/v1/learner/notes', { params });
+    const req$ = this.http.get<AssessmentNote[]>('/api/v1/learner/notes', { params }).pipe(
+      shareReplay({ bufferSize: 1, refCount: false })
+    );
+    if (!search && !field) {
+      this.notesCache$ = req$;
+    }
+    return req$;
   }
 
   getLearnerAssessmentNotes(assessmentId: string): Observable<AssessmentNote[]> {
-    return this.http.get<AssessmentNote[]>(`/api/v1/learner/assessments/${assessmentId}/notes`);
+    return this.http.get<AssessmentNote[]>(`/api/v1/learner/assessments/${assessmentId}/notes`).pipe(
+      shareReplay({ bufferSize: 1, refCount: false })
+    );
   }
 
   // Mentor methods
@@ -62,14 +74,26 @@ export class NotesService {
   }
 
   createAssessmentNote(assessmentId: string, note: CreateAssessmentNoteRequest): Observable<AssessmentNote> {
-    return this.http.post<AssessmentNote>(`/api/v1/mentor/assessments/${assessmentId}/notes`, note);
+    return this.http.post<AssessmentNote>(`/api/v1/mentor/assessments/${assessmentId}/notes`, note).pipe(
+      tap(() => {
+        this.notesCache$ = undefined;
+      })
+    );
   }
 
   updateAssessmentNote(noteId: string, note: Partial<CreateAssessmentNoteRequest>): Observable<AssessmentNote> {
-    return this.http.put<AssessmentNote>(`/api/v1/mentor/notes/${noteId}`, note);
+    return this.http.put<AssessmentNote>(`/api/v1/mentor/notes/${noteId}`, note).pipe(
+      tap(() => {
+        this.notesCache$ = undefined;
+      })
+    );
   }
 
   deleteAssessmentNote(noteId: string): Observable<{ status: string; message: string; id: string }> {
-    return this.http.delete<{ status: string; message: string; id: string }>(`/api/v1/mentor/notes/${noteId}`);
+    return this.http.delete<{ status: string; message: string; id: string }>(`/api/v1/mentor/notes/${noteId}`).pipe(
+      tap(() => {
+        this.notesCache$ = undefined;
+      })
+    );
   }
 }
