@@ -33,6 +33,7 @@ from app.models.assessments import (
     Assessment,
     AssessmentAttempt,
     AssessmentAudience,
+    AssessmentNote,
     AssessmentQuestion,
     CodingProblem,
     McqOption,
@@ -47,6 +48,7 @@ from app.models.practice import AlertAction, PracticeScore, TalentAlert
 from app.models.reviews import MentorRemark
 from app.models.user import User
 from app.schemas.category import AssessmentCategory
+from app.schemas.notes import AssessmentNoteCreate, AssessmentNoteUpdate
 from app.services.email_service import dispatch_email_notification
 
 router = APIRouter(prefix="/mentor", tags=["Mentor Portal"])
@@ -739,6 +741,7 @@ def list_mentor_assessments(
             .options(
                 joinedload(Assessment.batch),
                 selectinload(Assessment.attempts),
+                selectinload(Assessment.notes),
                 selectinload(Assessment.audience_learners),
                 selectinload(Assessment.questions).joinedload(AssessmentQuestion.question),
             )
@@ -759,6 +762,7 @@ def list_mentor_assessments(
             "status": a.status,
             "is_published": a.status == "PUBLISHED",
             "version": a.version,
+            "notes_count": len(a.notes),
             "questions_count": len(a.questions),
             "total_marks": sum(float(q.marks) for q in a.questions),
             "submissions_count": sum(1 for att in a.attempts if att.status == "SUBMITTED"),
@@ -1309,6 +1313,156 @@ def remove_question_from_assessment(
     db.delete(aq)
     db.commit()
     return {"status": "deleted", "message": "Question detached from assessment.", "id": aq.id}
+
+
+@router.get("/assessments/{assessment_id}/notes", summary="List mentor study notes for an assessment")
+def list_assessment_notes(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+) -> list[dict[str, Any]]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    notes = (
+        db.execute(
+            select(AssessmentNote)
+            .options(joinedload(AssessmentNote.author))
+            .where(AssessmentNote.assessment_id == assessment_id)
+            .order_by(AssessmentNote.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": n.id,
+            "assessment_id": n.assessment_id,
+            "assessment_title": assessment.title,
+            "author_id": n.author_id,
+            "author_name": n.author.full_name if n.author else mentor.full_name,
+            "title": n.title,
+            "module_name": n.module_name,
+            "summary": n.summary,
+            "content": n.content,
+            "key_takeaways": n.key_takeaways or [],
+            "recommended_reading": n.recommended_reading or [],
+            "estimated_read_time_minutes": n.estimated_read_time_minutes,
+            "is_published": n.is_published,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+            "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+        }
+        for n in notes
+    ]
+
+
+@router.post("/assessments/{assessment_id}/notes", status_code=status.HTTP_201_CREATED, summary="Create study note for an assessment module")
+def create_assessment_note(
+    assessment_id: str,
+    payload: AssessmentNoteCreate,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    note = AssessmentNote(
+        assessment_id=assessment.id,
+        author_id=mentor.id,
+        title=payload.title,
+        module_name=payload.module_name or assessment.title,
+        summary=payload.summary,
+        content=payload.content,
+        key_takeaways=payload.key_takeaways or [],
+        recommended_reading=payload.recommended_reading or [],
+        estimated_read_time_minutes=payload.estimated_read_time_minutes,
+        is_published=payload.is_published,
+    )
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return {
+        "id": note.id,
+        "assessment_id": note.assessment_id,
+        "assessment_title": assessment.title,
+        "author_id": note.author_id,
+        "author_name": mentor.full_name,
+        "title": note.title,
+        "module_name": note.module_name,
+        "summary": note.summary,
+        "content": note.content,
+        "key_takeaways": note.key_takeaways,
+        "recommended_reading": note.recommended_reading,
+        "estimated_read_time_minutes": note.estimated_read_time_minutes,
+        "is_published": note.is_published,
+        "created_at": note.created_at.isoformat(),
+        "updated_at": note.updated_at.isoformat(),
+    }
+
+
+@router.put("/notes/{note_id}", summary="Update a study note")
+def update_assessment_note(
+    note_id: str,
+    payload: AssessmentNoteUpdate,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    note = db.get(AssessmentNote, note_id)
+    if not note:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study note not found.")
+
+    if payload.title is not None:
+        note.title = payload.title
+    if payload.module_name is not None:
+        note.module_name = payload.module_name
+    if payload.summary is not None:
+        note.summary = payload.summary
+    if payload.content is not None:
+        note.content = payload.content
+    if payload.key_takeaways is not None:
+        note.key_takeaways = payload.key_takeaways
+    if payload.recommended_reading is not None:
+        note.recommended_reading = payload.recommended_reading
+    if payload.estimated_read_time_minutes is not None:
+        note.estimated_read_time_minutes = payload.estimated_read_time_minutes
+    if payload.is_published is not None:
+        note.is_published = payload.is_published
+
+    db.commit()
+    db.refresh(note)
+    return {
+        "id": note.id,
+        "assessment_id": note.assessment_id,
+        "author_id": note.author_id,
+        "title": note.title,
+        "module_name": note.module_name,
+        "summary": note.summary,
+        "content": note.content,
+        "key_takeaways": note.key_takeaways,
+        "recommended_reading": note.recommended_reading,
+        "estimated_read_time_minutes": note.estimated_read_time_minutes,
+        "is_published": note.is_published,
+        "updated_at": note.updated_at.isoformat(),
+    }
+
+
+@router.delete("/notes/{note_id}", summary="Delete a study note")
+def delete_assessment_note(
+    note_id: str,
+    db: Session = Depends(get_db),
+    mentor: User = Depends(require_mentor),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    note = db.get(AssessmentNote, note_id)
+    if not note:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study note not found.")
+    db.delete(note)
+    db.commit()
+    return {"status": "deleted", "message": "Study note removed successfully.", "id": note_id}
 
 
 @router.post("/questions", status_code=status.HTTP_201_CREATED, summary="Create Question in Question Bank (Unified route)")

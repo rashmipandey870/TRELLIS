@@ -161,6 +161,9 @@ class Assessment(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     audience_learners: Mapped[list["AssessmentAudience"]] = relationship(
         "AssessmentAudience", back_populates="assessment", cascade="all, delete-orphan"
     )
+    notes: Mapped[list["AssessmentNote"]] = relationship(
+        "AssessmentNote", back_populates="assessment", cascade="all, delete-orphan", order_by="AssessmentNote.created_at.desc()"
+    )
 
 
 class AssessmentAudience(Base, UUIDPrimaryKeyMixin, TimestampMixin):
@@ -305,3 +308,28 @@ class Submission(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     attempt: Mapped["AssessmentAttempt | None"] = relationship("AssessmentAttempt", back_populates="submissions")
     problem: Mapped["CodingProblem"] = relationship("CodingProblem")
     learner: Mapped["User"] = relationship("User", foreign_keys=[learner_id])
+
+
+class AssessmentNote(Base, UUIDPrimaryKeyMixin, TimestampMixin):
+    """Study guides, module notes, and preparation resources authored by Mentors for assessment modules."""
+
+    __tablename__ = "assessment_notes"
+
+    assessment_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("assessments.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    author_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("users.id", ondelete="RESTRICT"), index=True, nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    module_name: Mapped[str] = mapped_column(String(255), default="Core Module", nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    key_takeaways: Mapped[list[str] | None] = mapped_column(JSON, default=list, nullable=True)
+    recommended_reading: Mapped[list[dict[str, str]] | None] = mapped_column(JSON, default=list, nullable=True)
+    estimated_read_time_minutes: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
+    is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Relationships
+    assessment: Mapped["Assessment"] = relationship("Assessment", back_populates="notes")
+    author: Mapped["User"] = relationship("User", foreign_keys=[author_id])

@@ -31,6 +31,7 @@ export interface AssessmentItem {
   is_published: boolean;
   version: number;
   questions_count: number;
+  notes_count?: number;
   total_marks?: number;
   submissions_count: number;
   batch_id?: string;

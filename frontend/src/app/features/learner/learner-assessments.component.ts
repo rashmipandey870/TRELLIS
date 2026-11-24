@@ -3,6 +3,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/learner.service';
+import { AssessmentNote, NotesService } from '../../core/services/notes.service';
 
 @Component({
   selector: 'app-learner-assessments',
@@ -11,51 +12,307 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
   template: `
     <div class="space-y-6">
       
-      <!-- Normal View: List of assigned assessments -->
+      <!-- Normal View: Tabs for Assessments & Module Study Notes -->
       @if (!activeAttempt()) {
         <div class="space-y-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          
+          <!-- Top Navigation Header & Tabs -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
             <div>
-              <h1 class="text-2xl font-black text-slate-900 tracking-tight">Assigned Assessments</h1>
+              <h1 class="text-2xl font-black text-slate-900 tracking-tight">Assessments & Study Center</h1>
               <p class="text-xs text-slate-500">
-                Formal examinations assigned to your cohort. Timed tests include autosave and tab-switch monitoring.
+                Official examinations and mentor-authored study guides curated for your engineering track.
               </p>
+            </div>
+
+            <!-- View Switcher Tabs -->
+            <div class="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl border border-slate-200">
+              <button 
+                type="button" 
+                (click)="activeTab.set('assessments')"
+                [ngClass]="activeTab() === 'assessments' ? 'bg-white text-slate-900 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800 font-medium'"
+                class="px-3.5 py-1.5 rounded-lg text-xs transition flex items-center gap-2">
+                <span>📋 Assigned Tests</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-sky-100 text-[#008FBB] font-bold">
+                  {{ assignedList().length }}
+                </span>
+              </button>
+
+              <button 
+                type="button" 
+                (click)="activeTab.set('notes')"
+                [ngClass]="activeTab() === 'notes' ? 'bg-white text-slate-900 font-bold shadow-sm' : 'text-slate-500 hover:text-slate-800 font-medium'"
+                class="px-3.5 py-1.5 rounded-lg text-xs transition flex items-center gap-2">
+                <span>📖 Module Notes & Guides</span>
+                <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-bold">
+                  {{ studyNotes().length }}
+                </span>
+              </button>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            @for (a of assignedList(); track a.id) {
-              <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 hover:border-[#008FBB] transition">
-                <div class="flex items-start justify-between">
-                  <div>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
-                      {{ a.field }} &bull; Passing {{ a.passing_score }}%
-                    </span>
-                    <h3 class="text-base font-black text-slate-900 mt-1">{{ a.title }}</h3>
+          <!-- TAB 1: Assigned Assessments -->
+          @if (activeTab() === 'assessments') {
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              @for (a of assignedList(); track a.id) {
+                <div class="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-4 hover:border-[#008FBB] transition flex flex-col justify-between">
+                  <div class="space-y-3">
+                    <div class="flex items-start justify-between gap-2">
+                      <span class="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
+                        {{ a.field }} &bull; Passing {{ a.passing_score }}%
+                      </span>
+                      <span class="text-xs font-mono font-bold text-slate-500 shrink-0">{{ a.duration_minutes }} Mins</span>
+                    </div>
+                    
+                    <div>
+                      <h3 class="text-base font-black text-slate-900">{{ a.title }}</h3>
+                      <p class="text-xs text-slate-500 mt-1 line-clamp-2">
+                        {{ a.instructions || 'Proctored assessment covering architecture, fundamentals, and real-world problem solving.' }}
+                      </p>
+                    </div>
+
+                    <div class="flex items-center gap-4 text-[11px] text-slate-500 font-medium pt-1">
+                      <span>📝 {{ a.questions_count || 'Multi-question' }} Questions</span>
+                      @if (a.notes_count && a.notes_count > 0) {
+                        <span class="text-[#008FBB] font-bold flex items-center gap-1">
+                          📖 {{ a.notes_count }} Study Guide{{ a.notes_count > 1 ? 's' : '' }} Available
+                        </span>
+                      }
+                    </div>
                   </div>
-                  <span class="text-xs font-mono font-bold text-slate-500">{{ a.duration_minutes }} Mins</span>
+
+                  <div class="pt-4 border-t border-slate-100 flex items-center gap-3">
+                    @if (a.notes_count && a.notes_count > 0) {
+                      <button 
+                        type="button" 
+                        (click)="openNotesForAssessment(a.id, a.title)"
+                        class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition flex items-center gap-1.5">
+                        <span>📖 Study Notes</span>
+                      </button>
+                    }
+                    <button 
+                      type="button" 
+                      (click)="startTest(a.id)"
+                      class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#008FBB] to-[#007499] hover:from-[#007499] hover:to-[#005e7c] text-white text-xs font-bold shadow-md transition text-center">
+                      Start Timed Assessment &rarr;
+                    </button>
+                  </div>
+                </div>
+              } @empty {
+                <div class="col-span-full p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
+                  <span class="text-3xl block">📋</span>
+                  <h4 class="text-sm font-bold text-slate-800">No Assessments Assigned</h4>
+                  <p class="text-xs text-slate-500">You currently have no pending formal examinations scheduled for your cohort.</p>
+                </div>
+              }
+            </div>
+          }
+
+          <!-- TAB 2: Module Study Guides & Notes -->
+          @if (activeTab() === 'notes') {
+            <div class="space-y-6">
+              
+              <!-- Search & Filters -->
+              <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
+                <div class="relative w-full md:w-96">
+                  <span class="absolute left-3.5 top-2.5 text-slate-400 text-sm">🔍</span>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="noteSearchQuery" 
+                    (ngModelChange)="applyNoteFilters()"
+                    placeholder="Search by module title, concept, or keywords..."
+                    class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-[#008FBB]" />
                 </div>
 
-                <p class="text-xs text-slate-500">
-                  {{ a.instructions || 'Proctored assessment covering architecture, fundamentals, and real-world problems.' }}
-                </p>
-
-                <div class="pt-2">
+                <!-- Field / Domain Filter Pills -->
+                <div class="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
                   <button 
                     type="button" 
-                    (click)="startTest(a.id)"
-                    class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#008FBB] to-[#007499] hover:from-[#007499] hover:to-[#005e7c] text-white text-xs font-bold shadow-md transition text-center">
-                    Start Timed Assessment &rarr;
+                    (click)="setFieldFilter('ALL')"
+                    [ngClass]="selectedFieldFilter() === 'ALL' ? 'bg-[#008FBB] text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'"
+                    class="px-3 py-1.5 rounded-lg text-xs transition shrink-0">
+                    All Modules
                   </button>
+                  @for (f of availableFields(); track f) {
+                    <button 
+                      type="button" 
+                      (click)="setFieldFilter(f)"
+                      [ngClass]="selectedFieldFilter() === f ? 'bg-[#008FBB] text-white font-bold' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 font-medium'"
+                      class="px-3 py-1.5 rounded-lg text-xs transition shrink-0">
+                      {{ f }}
+                    </button>
+                  }
                 </div>
               </div>
-            } @empty {
-              <div class="col-span-full p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
-                <span class="text-3xl block">📋</span>
-                <h4 class="text-sm font-bold text-slate-800">No Assessments Assigned</h4>
-                <p class="text-xs text-slate-500">You currently have no pending formal examinations scheduled for your cohort.</p>
+
+              <!-- Notes Grid -->
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @for (note of filteredNotes(); track note.id) {
+                  <div class="p-5 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-3 hover:border-[#008FBB] transition flex flex-col justify-between">
+                    <div class="space-y-2">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB] truncate max-w-[180px]">
+                          {{ note.module_name }}
+                        </span>
+                        <span class="text-[10px] font-mono font-bold text-slate-400">
+                          ⏱️ {{ note.estimated_read_time_minutes }}m read
+                        </span>
+                      </div>
+
+                      <h3 class="text-sm font-black text-slate-900 line-clamp-2 leading-snug">{{ note.title }}</h3>
+                      
+                      <p class="text-xs text-slate-500 line-clamp-3 leading-relaxed">
+                        {{ note.summary || 'Essential technical reference, architecture principles, and assessment readiness checklist.' }}
+                      </p>
+
+                      <!-- Takeaways Preview Pills -->
+                      @if (note.key_takeaways && note.key_takeaways.length > 0) {
+                        <div class="pt-1 flex flex-wrap gap-1">
+                          @for (t of note.key_takeaways.slice(0, 2); track t) {
+                            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-600 truncate max-w-full">
+                              &bull; {{ t }}
+                            </span>
+                          }
+                          @if (note.key_takeaways.length > 2) {
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 font-bold">
+                              +{{ note.key_takeaways.length - 2 }} more
+                            </span>
+                          }
+                        </div>
+                      }
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <span class="text-[11px] font-medium text-slate-400">
+                        👨‍🏫 {{ note.author_name || 'Mentor' }}
+                      </span>
+                      <button 
+                        type="button" 
+                        (click)="readNote(note)"
+                        class="px-3 py-1.5 rounded-lg bg-sky-50 text-[#008FBB] hover:bg-sky-100 text-xs font-bold transition flex items-center gap-1">
+                        <span>Read Guide &rarr;</span>
+                      </button>
+                    </div>
+                  </div>
+                } @empty {
+                  <div class="col-span-full p-12 text-center rounded-2xl bg-white border border-slate-200 space-y-2">
+                    <span class="text-3xl block">📚</span>
+                    <h4 class="text-sm font-bold text-slate-800">No Study Guides Found</h4>
+                    <p class="text-xs text-slate-500">Try adjusting your search terms or filter criteria.</p>
+                  </div>
+                }
               </div>
-            }
+
+            </div>
+          }
+
+        </div>
+      }
+
+      <!-- FULL STUDY GUIDE READER MODAL -->
+      @if (activeReaderNote()) {
+        <div class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto animate-in fade-in">
+          <div class="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden my-auto">
+            
+            <!-- Modal Header -->
+            <div class="p-6 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-[#008FBB] text-white">
+                    {{ activeReaderNote()?.module_name }}
+                  </span>
+                  @if (activeReaderNote()?.assessment_title) {
+                    <span class="text-[11px] text-slate-500">
+                      Module for: <span class="font-bold text-slate-700">{{ activeReaderNote()?.assessment_title }}</span>
+                    </span>
+                  }
+                </div>
+                <h2 class="text-xl font-black text-slate-900 mt-1">{{ activeReaderNote()?.title }}</h2>
+                <div class="flex items-center gap-4 text-xs text-slate-500 pt-1">
+                  <span>👨‍🏫 Authored by <strong class="text-slate-800">{{ activeReaderNote()?.author_name || 'Mentor' }}</strong></span>
+                  <span>&bull;</span>
+                  <span>⏱️ {{ activeReaderNote()?.estimated_read_time_minutes }} min read</span>
+                </div>
+              </div>
+
+              <button 
+                type="button" 
+                (click)="activeReaderNote.set(null)"
+                class="w-8 h-8 rounded-full bg-white hover:bg-slate-200 text-slate-600 flex items-center justify-center font-bold text-sm shadow-sm transition">
+                ✕
+              </button>
+            </div>
+
+            <!-- Modal Scrollable Content -->
+            <div class="p-6 overflow-y-auto space-y-6 text-slate-800 leading-relaxed text-sm">
+              
+              <!-- Executive Summary -->
+              @if (activeReaderNote()?.summary) {
+                <div class="p-4 rounded-2xl bg-sky-50 border-l-4 border-[#008FBB] space-y-1">
+                  <h4 class="text-xs font-black uppercase tracking-wider text-[#008FBB]">Module Synopsis</h4>
+                  <p class="text-xs text-slate-700 leading-relaxed">{{ activeReaderNote()?.summary }}</p>
+                </div>
+              }
+
+              <!-- Key Takeaways -->
+              @if (activeReaderNote()?.key_takeaways && activeReaderNote()!.key_takeaways.length > 0) {
+                <div class="space-y-3">
+                  <h4 class="text-xs font-black uppercase tracking-wider text-slate-400">Key Engineering Takeaways</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    @for (item of activeReaderNote()!.key_takeaways; track item) {
+                      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-start gap-2.5">
+                        <span class="text-emerald-500 font-black mt-0.5">✓</span>
+                        <span class="text-slate-800 font-medium">{{ item }}</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
+              <!-- Study Content & Technical Deep Dive -->
+              <div class="space-y-3 pt-2 border-t border-slate-100">
+                <h4 class="text-xs font-black uppercase tracking-wider text-slate-400">Technical Breakdown & Study Guide</h4>
+                <div class="prose prose-sm max-w-none text-slate-800 whitespace-pre-wrap font-sans text-xs sm:text-sm bg-slate-50 p-5 rounded-2xl border border-slate-200 leading-relaxed overflow-x-auto">
+                  {{ activeReaderNote()?.content }}
+                </div>
+              </div>
+
+              <!-- Recommended Reading & Documentation Links -->
+              @if (activeReaderNote()?.recommended_reading && activeReaderNote()!.recommended_reading.length > 0) {
+                <div class="space-y-3 pt-2 border-t border-slate-100">
+                  <h4 class="text-xs font-black uppercase tracking-wider text-slate-400">Recommended Reading & References</h4>
+                  <div class="space-y-2">
+                    @for (ref of activeReaderNote()!.recommended_reading; track ref.title) {
+                      <a 
+                        [href]="ref.url || '#'" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        class="p-3 rounded-xl bg-white border border-slate-200 hover:border-[#008FBB] flex items-center justify-between group transition">
+                        <div>
+                          <span class="text-xs font-bold text-[#008FBB] group-hover:underline block">{{ ref.title }}</span>
+                          @if (ref.description) {
+                            <span class="text-[11px] text-slate-500">{{ ref.description }}</span>
+                          }
+                        </div>
+                        <span class="text-xs text-slate-400 group-hover:text-[#008FBB]">↗</span>
+                      </a>
+                    }
+                  </div>
+                </div>
+              }
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
+              <button 
+                type="button" 
+                (click)="activeReaderNote.set(null)"
+                class="px-5 py-2.5 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-white text-xs font-bold transition shadow-sm">
+                Close Guide
+              </button>
+            </div>
+
           </div>
         </div>
       }
@@ -119,7 +376,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                       'ring-2 ring-[#008FBB] ring-offset-2': idx === currentQuestionIndex(),
                       'bg-emerald-500 text-white border-emerald-600': isAnswered(q.id),
                       'bg-amber-400 text-slate-950 border-amber-500': isFlagged(q.id),
-                      'bg-slate-100  text-slate-600  border-slate-200 ': !isAnswered(q.id) && !isFlagged(q.id)
+                      'bg-slate-100 text-slate-600 border-slate-200': !isAnswered(q.id) && !isFlagged(q.id)
                     }">
                     {{ idx + 1 }}
                   </button>
@@ -270,10 +527,21 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
 })
 export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   private readonly learnerService = inject(LearnerService);
+  private readonly notesService = inject(NotesService);
   private readonly router = inject(Router);
 
   readonly assignedList = signal<any[]>([]);
+  readonly activeTab = signal<'assessments' | 'notes'>('assessments');
 
+  // Study Notes state
+  readonly studyNotes = signal<AssessmentNote[]>([]);
+  readonly filteredNotes = signal<AssessmentNote[]>([]);
+  readonly availableFields = signal<string[]>([]);
+  readonly selectedFieldFilter = signal<string>('ALL');
+  readonly activeReaderNote = signal<AssessmentNote | null>(null);
+  noteSearchQuery = '';
+
+  // Active attempt state
   readonly activeAttempt = signal<ActiveAssessmentAttempt | null>(null);
   readonly currentQuestionIndex = signal<number>(0);
   readonly remainingSeconds = signal<number>(3600);
@@ -291,12 +559,8 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   private tabListener: any = null;
 
   ngOnInit(): void {
-    this.learnerService.getAssessments().subscribe({
-      next: (list) => {
-        this.assignedList.set(list || []);
-      },
-      error: () => {},
-    });
+    this.loadAssessments();
+    this.loadNotes();
 
     // Tab switch listener (Step 4 proctoring requirement)
     this.tabListener = () => {
@@ -310,6 +574,80 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.timerInterval) clearInterval(this.timerInterval);
     if (this.tabListener) document.removeEventListener('visibilitychange', this.tabListener);
+  }
+
+  loadAssessments(): void {
+    this.learnerService.getAssessments().subscribe({
+      next: (list) => {
+        this.assignedList.set(list || []);
+      },
+      error: () => {},
+    });
+  }
+
+  loadNotes(): void {
+    this.notesService.getLearnerNotes().subscribe({
+      next: (notes) => {
+        this.studyNotes.set(notes || []);
+        
+        // Extract distinct fields
+        const fields = Array.from(new Set(notes.map((n) => n.assessment_field).filter((f): f is string => !!f)));
+        this.availableFields.set(fields);
+        this.applyNoteFilters();
+      },
+      error: () => {},
+    });
+  }
+
+  setFieldFilter(field: string): void {
+    this.selectedFieldFilter.set(field);
+    this.applyNoteFilters();
+  }
+
+  applyNoteFilters(): void {
+    const q = this.noteSearchQuery.trim().toLowerCase();
+    const f = this.selectedFieldFilter();
+
+    let result = this.studyNotes();
+    if (f !== 'ALL') {
+      result = result.filter((n) => n.assessment_field === f);
+    }
+
+    if (q) {
+      result = result.filter(
+        (n) =>
+          n.title.toLowerCase().includes(q) ||
+          n.module_name.toLowerCase().includes(q) ||
+          (n.summary && n.summary.toLowerCase().includes(q)) ||
+          (n.assessment_title && n.assessment_title.toLowerCase().includes(q)) ||
+          (n.key_takeaways && n.key_takeaways.some((t) => t.toLowerCase().includes(q)))
+      );
+    }
+
+    this.filteredNotes.set(result);
+  }
+
+  openNotesForAssessment(assessmentId: string, title?: string): void {
+    this.notesService.getLearnerAssessmentNotes(assessmentId).subscribe({
+      next: (notes) => {
+        if (notes && notes.length > 0) {
+          this.readNote(notes[0]);
+        } else {
+          this.activeTab.set('notes');
+          if (title) {
+            this.noteSearchQuery = title;
+            this.applyNoteFilters();
+          }
+        }
+      },
+      error: () => {
+        this.activeTab.set('notes');
+      },
+    });
+  }
+
+  readNote(note: AssessmentNote): void {
+    this.activeReaderNote.set(note);
   }
 
   currentQuestion(): any {
@@ -353,11 +691,17 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   }
 
   getQuestionType(q: any): string {
-    return (q?.type || q?.question_type || 'MCQ').toUpperCase();
+    const rawType = (q?.type || q?.question_type || 'MCQ').toUpperCase();
+    if (rawType.includes('CODING')) return 'CODING';
+    if (rawType.includes('SQL')) return 'SQL';
+    if (rawType.includes('LIKERT')) return 'LIKERT';
+    if (rawType.includes('SHORT_ANSWER') || rawType.includes('WRITTEN')) return 'WRITTEN';
+    if (rawType.includes('FILE_UPLOAD')) return 'FILE_UPLOAD';
+    return 'MCQ';
   }
 
   getQuestionText(q: any): string {
-    return q?.text || q?.content || q?.statement || q?.description || '';
+    return q?.text || q?.question_text || q?.content || q?.statement || q?.description || '';
   }
 
   jumpToQuestion(idx: number): void {

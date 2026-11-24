@@ -24,6 +24,7 @@ from app.models.assessments import (
     Assessment,
     AssessmentAttempt,
     AssessmentAudience,
+    AssessmentNote,
     AssessmentQuestion,
     CodingProblem,
     McqOption,
@@ -517,7 +518,9 @@ def list_learner_assessments(
     )
 
     published = db.execute(
-        select(Assessment).where(Assessment.status == "PUBLISHED")
+        select(Assessment)
+        .options(selectinload(Assessment.questions), selectinload(Assessment.notes))
+        .where(Assessment.status == "PUBLISHED")
     ).scalars().all()
 
     assigned_assessments = []
@@ -542,8 +545,103 @@ def list_learner_assessments(
             "passing_score": a.passing_score,
             "instructions": a.instructions,
             "questions_count": len(a.questions),
+            "notes_count": len([n for n in a.notes if n.is_published]),
         }
         for a in assigned_assessments
+    ]
+
+
+@router.get("/assessments/{assessment_id}/notes", summary="Get mentor study notes for an assessment")
+def get_learner_assessment_notes(
+    assessment_id: str,
+    db: Session = Depends(get_db),
+    learner: User = Depends(require_learner),
+) -> list[dict[str, Any]]:
+    assessment = db.get(Assessment, assessment_id)
+    if not assessment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found.")
+
+    notes = (
+        db.execute(
+            select(AssessmentNote)
+            .options(joinedload(AssessmentNote.author))
+            .where(
+                AssessmentNote.assessment_id == assessment_id,
+                AssessmentNote.is_published == True,
+            )
+            .order_by(AssessmentNote.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": n.id,
+            "assessment_id": n.assessment_id,
+            "assessment_title": assessment.title,
+            "assessment_field": assessment.field,
+            "author_id": n.author_id,
+            "author_name": n.author.full_name if n.author else "Mentor",
+            "title": n.title,
+            "module_name": n.module_name,
+            "summary": n.summary,
+            "content": n.content,
+            "key_takeaways": n.key_takeaways or [],
+            "recommended_reading": n.recommended_reading or [],
+            "estimated_read_time_minutes": n.estimated_read_time_minutes,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+            "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+        }
+        for n in notes
+    ]
+
+
+@router.get("/notes", summary="List all published module study notes accessible to the learner")
+def list_learner_study_notes(
+    search: str | None = None,
+    field: str | None = None,
+    db: Session = Depends(get_db),
+    learner: User = Depends(require_learner),
+) -> list[dict[str, Any]]:
+    query = (
+        select(AssessmentNote)
+        .join(Assessment, Assessment.id == AssessmentNote.assessment_id)
+        .options(joinedload(AssessmentNote.author), joinedload(AssessmentNote.assessment))
+        .where(
+            AssessmentNote.is_published == True,
+            Assessment.status != "DRAFT",
+        )
+        .order_by(AssessmentNote.created_at.desc())
+    )
+    if field:
+        query = query.where(Assessment.field == field)
+    if search:
+        query = query.where(
+            (AssessmentNote.title.ilike(f"%{search}%"))
+            | (AssessmentNote.content.ilike(f"%{search}%"))
+            | (AssessmentNote.module_name.ilike(f"%{search}%"))
+            | (Assessment.title.ilike(f"%{search}%"))
+        )
+    notes = db.execute(query).scalars().all()
+    return [
+        {
+            "id": n.id,
+            "assessment_id": n.assessment_id,
+            "assessment_title": n.assessment.title if n.assessment else None,
+            "assessment_field": n.assessment.field if n.assessment else None,
+            "author_id": n.author_id,
+            "author_name": n.author.full_name if n.author else "Mentor",
+            "title": n.title,
+            "module_name": n.module_name,
+            "summary": n.summary,
+            "content": n.content,
+            "key_takeaways": n.key_takeaways or [],
+            "recommended_reading": n.recommended_reading or [],
+            "estimated_read_time_minutes": n.estimated_read_time_minutes,
+            "created_at": n.created_at.isoformat() if n.created_at else None,
+            "updated_at": n.updated_at.isoformat() if n.updated_at else None,
+        }
+        for n in notes
     ]
 
 

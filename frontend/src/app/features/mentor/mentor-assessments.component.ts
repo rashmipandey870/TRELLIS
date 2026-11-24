@@ -3,6 +3,7 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { AssessmentItem, MentorService, QuestionBankItem } from '../../core/services/mentor.service';
+import { AssessmentNote, NotesService } from '../../core/services/notes.service';
 
 interface QuestionOption {
   option_id: string;
@@ -106,8 +107,15 @@ interface TestCase {
               <button 
                 type="button" 
                 (click)="openEditAssessment(a)"
-                class="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition text-center">
+                class="flex-1 py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition text-center">
                 {{ a.is_published ? 'View / New Version' : 'Edit &amp; Add Questions' }}
+              </button>
+              <button 
+                type="button" 
+                (click)="openNotesModal(a)"
+                class="py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-[#FAA634] border border-amber-200 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                <span>📖 Notes</span>
+                <span class="px-1.5 py-0.2 rounded-full bg-amber-200 text-amber-900 text-[10px] font-bold">{{ a.notes_count || 0 }}</span>
               </button>
               @if (!a.is_published) {
                 <button 
@@ -120,7 +128,7 @@ interface TestCase {
               <button 
                 type="button" 
                 (click)="openResultsAnalysis(a)"
-                class="flex-1 py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#008FBB] border border-sky-200 text-xs font-bold transition text-center">
+                class="py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#008FBB] border border-sky-200 text-xs font-bold transition text-center">
                 Results &rarr;
               </button>
             </div>
@@ -1108,12 +1116,205 @@ interface TestCase {
           </div>
         </div>
       }
+
+      <!-- Module Study Notes Modal for Mentors -->
+      @if (showNotesModal()) {
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full p-6 space-y-5 max-h-[92vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-100 text-[#FAA634]">
+                  Module Study Notes &amp; Preparation Guides
+                </span>
+                <h3 class="text-base font-black text-slate-900 mt-1">{{ activeNotesAssessment()?.title }}</h3>
+              </div>
+              <button 
+                type="button" 
+                (click)="closeNotesModal()" 
+                class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 font-bold">
+                &times;
+              </button>
+            </div>
+
+            <!-- Notes List / Action Toolbar -->
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500">
+                Published Study Notes ({{ assessmentNotes().length }})
+              </span>
+              <button 
+                type="button" 
+                (click)="toggleCreateNoteForm()"
+                class="px-3 py-1.5 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-white text-xs font-bold flex items-center gap-1.5 transition">
+                <span>{{ isCreatingNote() ? 'Cancel' : '+ Add Study Note' }}</span>
+              </button>
+            </div>
+
+            <!-- Form: Create New Study Note -->
+            @if (isCreatingNote()) {
+              <div class="p-5 rounded-xl border border-sky-200 bg-sky-50/50 space-y-4">
+                <h4 class="text-xs font-black text-slate-800 uppercase tracking-wider">Author New Module Study Note</h4>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Note Title *</label>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="noteForm.title" 
+                      placeholder="e.g., Core Architecture &amp; Failure Modes"
+                      class="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#008FBB]" />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Module Name</label>
+                    <input 
+                      type="text" 
+                      [(ngModel)]="noteForm.module_name" 
+                      placeholder="e.g., Module 1: Distributed Core"
+                      class="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#008FBB]" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">Executive Summary</label>
+                  <input 
+                    type="text" 
+                    [(ngModel)]="noteForm.summary" 
+                    placeholder="Brief 1-2 sentence overview of what learners must grasp before taking this test..."
+                    class="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#008FBB]" />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] font-bold text-slate-600 mb-1">Detailed Content (Markdown &amp; Code Supported) *</label>
+                  <textarea 
+                    rows="8"
+                    [(ngModel)]="noteForm.content" 
+                    placeholder="Provide full technical notes, code snippets, architectural trade-offs, and invariants..."
+                    class="w-full text-xs font-mono p-3 bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#008FBB]"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Key Takeaways (one per line)</label>
+                    <textarea 
+                      rows="3"
+                      [(ngModel)]="noteForm.key_takeaways_raw" 
+                      placeholder="Never store JWT in localStorage&#10;Use exponential backoff with jitter&#10;Verify input bounds before loops"
+                      class="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#008FBB]"></textarea>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Recommended Reading (Title | URL per line)</label>
+                    <textarea 
+                      rows="3"
+                      [(ngModel)]="noteForm.recommended_reading_raw" 
+                      placeholder="FastAPI Lifespan | https://fastapi.tiangolo.com&#10;Postgres MVCC | https://postgresql.org"
+                      class="w-full text-xs p-2.5 bg-white border border-slate-300 rounded-xl focus:ring-1 focus:ring-[#008FBB]"></textarea>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                  <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-600 font-bold">Est. Read Time (mins):</label>
+                    <input 
+                      type="number" 
+                      [(ngModel)]="noteForm.estimated_read_time_minutes" 
+                      min="1" max="120"
+                      class="w-20 text-xs px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl" />
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <button 
+                      type="button" 
+                      (click)="saveNewNote()"
+                      class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition">
+                      Publish Note to Learners
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <!-- Notes List -->
+            <div class="space-y-3">
+              @for (note of assessmentNotes(); track note.id) {
+                <div class="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2">
+                  <div class="flex items-start justify-between">
+                    <div>
+                      <div class="flex items-center gap-2">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-sky-100 text-[#008FBB]">
+                          {{ note.module_name }}
+                        </span>
+                        <span class="text-[10px] text-slate-400 font-mono">
+                          &bull; {{ note.estimated_read_time_minutes }} mins read
+                        </span>
+                      </div>
+                      <h4 class="text-sm font-bold text-slate-900 mt-1">{{ note.title }}</h4>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      (click)="deleteNote(note.id)"
+                      class="text-xs font-bold text-rose-500 hover:text-rose-700 p-1">
+                      Delete
+                    </button>
+                  </div>
+
+                  @if (note.summary) {
+                    <p class="text-xs text-slate-600">{{ note.summary }}</p>
+                  }
+
+                  @if (note.key_takeaways && note.key_takeaways.length > 0) {
+                    <div class="p-2.5 rounded-lg bg-white border border-slate-200 text-xs space-y-1">
+                      <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Core Takeaways</span>
+                      <ul class="list-disc list-inside text-[11px] text-slate-700 space-y-0.5">
+                        @for (kt of note.key_takeaways; track kt) {
+                          <li>{{ kt }}</li>
+                        }
+                      </ul>
+                    </div>
+                  }
+
+                  <div class="text-[10px] text-slate-400 flex items-center justify-between pt-1">
+                    <span>Author: <strong>{{ note.author_name || 'Mentor' }}</strong></span>
+                    <span>Updated: {{ note.updated_at | date:'mediumDate' }}</span>
+                  </div>
+                </div>
+              } @empty {
+                <div class="p-8 text-center text-xs text-slate-400 bg-slate-50 rounded-xl">
+                  No notes published for this module yet. Click "+ Add Study Note" to create one for learners.
+                </div>
+              }
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 flex justify-end">
+              <button type="button" (click)="closeNotesModal()" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
 })
 export class MentorAssessmentsComponent {
   private readonly mentorService = inject(MentorService);
+  private readonly notesService = inject(NotesService);
   private readonly sanitizer = inject(DomSanitizer);
+
+  readonly showNotesModal = signal<boolean>(false);
+  readonly activeNotesAssessment = signal<AssessmentItem | null>(null);
+  readonly assessmentNotes = signal<AssessmentNote[]>([]);
+  readonly isCreatingNote = signal<boolean>(false);
+
+  noteForm = {
+    title: '',
+    module_name: '',
+    summary: '',
+    content: '',
+    key_takeaways_raw: '',
+    recommended_reading_raw: '',
+    estimated_read_time_minutes: 10,
+    is_published: true,
+  };
 
   readonly assessments = signal<AssessmentItem[]>([]);
   readonly showStudioModal = signal<boolean>(false);
@@ -1229,6 +1430,106 @@ export class MentorAssessmentsComponent {
     this.mentorService.getLearners().subscribe({
       next: (data) => this.mentorLearners.set(data || []),
       error: () => {},
+    });
+  }
+
+  openNotesModal(a: AssessmentItem): void {
+    this.activeNotesAssessment.set(a);
+    this.showNotesModal.set(true);
+    this.isCreatingNote.set(false);
+    this.resetNoteForm(a);
+    this.loadAssessmentNotes(a.id);
+  }
+
+  closeNotesModal(): void {
+    this.showNotesModal.set(false);
+    this.loadAssessments();
+  }
+
+  loadAssessmentNotes(assessmentId: string): void {
+    this.notesService.getMentorAssessmentNotes(assessmentId).subscribe({
+      next: (notes) => this.assessmentNotes.set(notes || []),
+      error: () => this.assessmentNotes.set([]),
+    });
+  }
+
+  toggleCreateNoteForm(): void {
+    this.isCreatingNote.update((v) => !v);
+  }
+
+  resetNoteForm(a?: AssessmentItem): void {
+    const title = a?.title || '';
+    this.noteForm = {
+      title: '',
+      module_name: title ? `${title} Core` : 'Core Module',
+      summary: '',
+      content: '',
+      key_takeaways_raw: '',
+      recommended_reading_raw: '',
+      estimated_read_time_minutes: 10,
+      is_published: true,
+    };
+  }
+
+  saveNewNote(): void {
+    const a = this.activeNotesAssessment();
+    if (!a) return;
+    if (!this.noteForm.title || !this.noteForm.content) {
+      alert('Please provide a title and detailed content for the study note.');
+      return;
+    }
+
+    const takeaways = this.noteForm.key_takeaways_raw
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const readings = this.noteForm.recommended_reading_raw
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((line) => {
+        const parts = line.split('|');
+        return {
+          title: parts[0]?.trim() || line,
+          url: parts[1]?.trim() || undefined,
+        };
+      });
+
+    this.notesService
+      .createAssessmentNote(a.id, {
+        title: this.noteForm.title,
+        module_name: this.noteForm.module_name || a.title,
+        summary: this.noteForm.summary,
+        content: this.noteForm.content,
+        key_takeaways: takeaways,
+        recommended_reading: readings,
+        estimated_read_time_minutes: this.noteForm.estimated_read_time_minutes || 10,
+        is_published: this.noteForm.is_published,
+      })
+      .subscribe({
+        next: (created) => {
+          this.assessmentNotes.update((list) => [created, ...list]);
+          this.isCreatingNote.set(false);
+          this.resetNoteForm(a);
+          this.showToast('Module study note published for learners!');
+        },
+        error: (err) => {
+          alert(err?.error?.detail || 'Failed to save study note.');
+        },
+      });
+  }
+
+  deleteNote(noteId: string): void {
+    if (!confirm('Are you sure you want to delete this module study note?')) return;
+    this.notesService.deleteAssessmentNote(noteId).subscribe({
+      next: () => {
+        this.assessmentNotes.update((list) => list.filter((n) => n.id !== noteId));
+        this.showToast('Study note deleted.');
+      },
+      error: (err) => {
+        alert(err?.error?.detail || 'Failed to delete note.');
+      },
     });
   }
 
