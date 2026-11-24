@@ -62,7 +62,7 @@ import { NotificationService } from '../../core/services/notification.service';
                 <a routerLink="/learner/dashboard" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Dashboard</a>
                 <a routerLink="/learner/meetings" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Meetings</a>
                 <a routerLink="/learner/assessments" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Assessments</a>
-                <a routerLink="/learner/results" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Results &amp; Analytics</a>
+                <a routerLink="/learner/results" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition whitespace-nowrap">Results</a>
                 <a routerLink="/learner/coding" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">Coding Lab</a>
                 <a routerLink="/learner/practice" routerLinkActive="text-[#008FBB] bg-sky-50" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900 transition">AI Practice</a>
               }

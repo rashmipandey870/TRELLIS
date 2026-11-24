@@ -605,7 +605,9 @@ def start_assessment(
             "id": bq.id,
             "title": bq.title,
             "text": bq.question_text,
+            "content": bq.question_text,
             "type": bq.question_type,
+            "question_type": bq.question_type,
             "marks": aq.marks,
             "order": aq.sequence_order,
         }
@@ -616,12 +618,12 @@ def start_assessment(
             opts_list = list(bq.options)
             random.Random(seed_int).shuffle(opts_list)
             q_item["options"] = [
-                {"id": opt.id, "text": opt.option_text, "order": idx + 1}
+                {"id": opt.id, "text": opt.option_text, "option_text": opt.option_text, "order": idx + 1}
                 for idx, opt in enumerate(opts_list)
             ]
         elif bq.question_type == "LIKERT":
             q_item["options"] = [
-                {"id": opt.id, "text": opt.option_text, "order": opt.sequence_order}
+                {"id": opt.id, "text": opt.option_text, "option_text": opt.option_text, "order": opt.sequence_order}
                 for opt in sorted(bq.options, key=lambda o: o.sequence_order)
             ]
             q_item["rubric"] = bq.rubric_json or {}

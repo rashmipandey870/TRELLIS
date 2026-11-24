@@ -159,40 +159,40 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
               <div class="space-y-2 pb-4 border-b border-slate-100">
                 <div class="flex items-center justify-between">
                   <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
-                    [ngClass]="currentQuestion()?.question_type === 'CODING' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-[#008FBB]'">
-                    {{ currentQuestion()?.question_type }} CHALLENGE
+                    [ngClass]="getQuestionType(currentQuestion()) === 'CODING' || getQuestionType(currentQuestion()) === 'SQL' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-[#008FBB]'">
+                    {{ getQuestionType(currentQuestion()) }}
                   </span>
                   <span class="text-xs font-mono font-bold text-slate-400">{{ currentQuestion()?.marks }} Marks</span>
                 </div>
                 <h3 class="text-base font-bold text-slate-900">{{ currentQuestion()?.title }}</h3>
-                <p class="text-xs text-slate-600 whitespace-pre-wrap">{{ currentQuestion()?.content }}</p>
+                <p class="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{{ getQuestionText(currentQuestion()) }}</p>
               </div>
 
               <!-- MCQ Options Choice -->
-              @if (currentQuestion()?.question_type === 'MCQ') {
+              @if (getQuestionType(currentQuestion()) === 'MCQ' || getQuestionType(currentQuestion()) === 'LIKERT') {
                 <div class="space-y-2.5">
                   @for (opt of currentQuestion()?.options; track opt.id) {
                     <label 
                       class="flex items-center gap-3 p-3.5 rounded-xl border text-xs cursor-pointer transition"
-                      [ngClass]="isSelectedOption(opt.id) ? 'bg-sky-50  border-[#008FBB] text-[#008FBB] font-bold' : 'bg-slate-50  border-slate-200  text-slate-800 '">
+                      [ngClass]="isSelectedOption(opt.id) ? 'bg-sky-50 border-[#008FBB] text-[#008FBB] font-bold' : 'bg-slate-50 border-slate-200 text-slate-800'">
                       <input 
                         type="radio" 
                         [name]="currentQuestion()?.id || 'mcq'"
                         [checked]="isSelectedOption(opt.id)"
                         (change)="selectOption(opt.id)"
                         class="text-[#008FBB] focus:ring-[#008FBB]" />
-                      <span>{{ opt.option_text }}</span>
+                      <span>{{ opt.text || opt.option_text || opt.title || opt.label }}</span>
                     </label>
                   }
                 </div>
               }
 
               <!-- Coding / SQL Editor Area -->
-              @if (currentQuestion()?.question_type === 'CODING' || currentQuestion()?.question_type === 'SQL') {
+              @if (getQuestionType(currentQuestion()) === 'CODING' || getQuestionType(currentQuestion()) === 'SQL') {
                 <div class="space-y-3">
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-slate-400 uppercase">
-                      {{ currentQuestion()?.question_type === 'SQL' ? 'SQL Query Execution' : 'Code Implementation (Python / JS)' }}
+                      {{ getQuestionType(currentQuestion()) === 'SQL' ? 'SQL Query Execution' : 'Code Implementation (Python / JS)' }}
                     </span>
                     <span class="text-[10px] text-emerald-500 font-bold">&bull; Isolated Sandboxed Execution</span>
                   </div>
@@ -200,13 +200,13 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
                     [(ngModel)]="codingSolution" 
                     (ngModelChange)="onCodeChanged()"
                     rows="10" 
-                    [placeholder]="currentQuestion()?.question_type === 'SQL' ? 'SELECT * FROM table_name WHERE ...' : 'def solve():\n    pass'"
+                    [placeholder]="getQuestionType(currentQuestion()) === 'SQL' ? 'SELECT * FROM table_name WHERE ...' : 'def solve():\n    pass'"
                     class="w-full font-mono text-xs p-4 bg-slate-950 text-slate-100 border border-slate-800 rounded-xl focus:outline-none focus:ring-1 focus:ring-[#008FBB]"></textarea>
                 </div>
               }
 
               <!-- Written / Subjective / Scenario / Communication Area -->
-              @if (currentQuestion()?.question_type === 'SHORT_ANSWER' || currentQuestion()?.question_type === 'SCENARIO' || currentQuestion()?.question_type === 'COMMUNICATION') {
+              @if (getQuestionType(currentQuestion()) === 'WRITTEN' || getQuestionType(currentQuestion()) === 'SHORT_ANSWER' || getQuestionType(currentQuestion()) === 'SCENARIO' || getQuestionType(currentQuestion()) === 'COMMUNICATION') {
                 <div class="space-y-3">
                   <div class="flex items-center justify-between">
                     <span class="text-xs font-bold text-slate-400 uppercase">Written Response</span>
@@ -222,7 +222,7 @@ import { ActiveAssessmentAttempt, LearnerService } from '../../core/services/lea
               }
 
               <!-- File Upload Area -->
-              @if (currentQuestion()?.question_type === 'FILE_UPLOAD') {
+              @if (getQuestionType(currentQuestion()) === 'FILE_UPLOAD') {
                 <div class="space-y-3 p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50">
                   <span class="text-xs font-bold text-slate-700 block">Deliverable Document / Asset URL</span>
                   <input 
@@ -352,16 +352,25 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  getQuestionType(q: any): string {
+    return (q?.type || q?.question_type || 'MCQ').toUpperCase();
+  }
+
+  getQuestionText(q: any): string {
+    return q?.text || q?.content || q?.statement || q?.description || '';
+  }
+
   jumpToQuestion(idx: number): void {
     this.currentQuestionIndex.set(idx);
     const q = this.currentQuestion();
     if (q) {
       const existing = this.answers()[q.id] || {};
-      if (q.question_type === 'CODING' || q.question_type === 'SQL') {
+      const qType = this.getQuestionType(q);
+      if (qType === 'CODING' || qType === 'SQL') {
         this.codingSolution = existing.source_code || '';
-      } else if (q.question_type === 'SHORT_ANSWER' || q.question_type === 'SCENARIO' || q.question_type === 'COMMUNICATION') {
+      } else if (qType === 'WRITTEN' || qType === 'SHORT_ANSWER' || qType === 'SCENARIO' || qType === 'COMMUNICATION') {
         this.textSolution = existing.text_response || '';
-      } else if (q.question_type === 'FILE_UPLOAD') {
+      } else if (qType === 'FILE_UPLOAD') {
         this.fileUrl = existing.file_url || '';
         this.fileName = existing.file_name || '';
       }
@@ -425,7 +434,9 @@ export class LearnerAssessmentsComponent implements OnInit, OnDestroy {
   }
 
   isAnswered(qid: string): boolean {
-    return !!this.answers()[qid];
+    const a = this.answers()[qid];
+    if (!a) return false;
+    return !!(a.selected_option_id || (a.source_code && a.source_code.trim()) || (a.text_response && a.text_response.trim()) || a.file_url);
   }
 
   isFlagged(qid: string): boolean {

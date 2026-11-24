@@ -81,6 +81,19 @@ def generate_cohort_bell_curve_svg(
     percentile = float(stats.percentileofscore(scores_arr, learner_score, kind="rank"))
     top_pct = max(1, 100 - int(percentile))
 
+    # Avoid overlapping "Cohort Avg" with learner score callout tooltip
+    cohort_avg_y = padding_y + 16
+    cohort_avg_x = mean_x + 4
+    cohort_avg_anchor = "start"
+    if abs(learner_x - mean_x) < 75:
+        if learner_x >= mean_x:
+            cohort_avg_x = mean_x - 6
+            cohort_avg_anchor = "end"
+        else:
+            cohort_avg_x = mean_x + 6
+            cohort_avg_anchor = "start"
+        cohort_avg_y = height - padding_y - 8
+
     svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" class="w-full h-auto select-none font-sans">
   <defs>
     <linearGradient id="bellGrad" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -107,7 +120,7 @@ def generate_cohort_bell_curve_svg(
 
   <!-- Cohort Mean Line -->
   <line x1="{mean_x:.1f}" y1="{padding_y}" x2="{mean_x:.1f}" y2="{height - padding_y}" stroke="#64748b" stroke-width="1.5" stroke-dasharray="3,3"/>
-  <text x="{mean_x + 4:.1f}" y="{padding_y + 22}" fill="#64748b" font-size="9" font-weight="600">Cohort Avg ({mean:.1f}%)</text>
+  <text x="{cohort_avg_x:.1f}" y="{cohort_avg_y:.1f}" fill="#64748b" font-size="9" font-weight="600" text-anchor="{cohort_avg_anchor}">Cohort Avg ({mean:.1f}%)</text>
 
   <!-- Pass Threshold Line -->
   <line x1="{pass_x:.1f}" y1="{padding_y}" x2="{pass_x:.1f}" y2="{height - padding_y}" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3"/>
@@ -128,7 +141,7 @@ def generate_cohort_bell_curve_svg(
 
 def generate_competency_bar_svg(
     field_accuracies: dict[str, float],
-    width: int = 560,
+    width: int = 620,
     height: int = 240,
 ) -> str:
     """Generate multi-track horizontal competency visualization."""
@@ -138,7 +151,7 @@ def generate_competency_bar_svg(
     items = list(field_accuracies.items())[:6]
     row_height = 34
     computed_height = max(height, len(items) * row_height + 40)
-    padding_x = 110
+    padding_x = 175
     bar_max_w = width - padding_x - 70
 
     bar_elements = []
@@ -149,8 +162,9 @@ def generate_competency_bar_svg(
 
         color = "#10b981" if score_clamped >= 80 else ("#008FBB" if score_clamped >= 60 else "#f59e0b")
 
+        label = f_name if len(f_name) <= 24 else f_name[:22] + "…"
         bar_elements.append(f"""
-    <text x="{padding_x - 12}" y="{y + 14}" fill="#475569" font-size="11" font-weight="700" text-anchor="end">{html.escape(f_name)}</text>
+    <text x="{padding_x - 12}" y="{y + 14}" fill="#475569" font-size="11" font-weight="700" text-anchor="end">{html.escape(label)}</text>
     <rect x="{padding_x}" y="{y}" width="{bar_max_w}" height="18" rx="5" fill="#f1f5f9"/>
     <rect x="{padding_x}" y="{y}" width="{max(bar_w, 4):.1f}" height="18" rx="5" fill="{color}"/>
     <text x="{padding_x + bar_w + 10:.1f}" y="{y + 14}" fill="#1e293b" font-size="11" font-weight="800">{score_clamped:.1f}%</text>
@@ -334,14 +348,15 @@ def analyze_learner_performance(learner_id: str, db: Session) -> dict[str, Any]:
     else:
         percentile_rank = 50.0
 
-    # Momentum trend (slope of last 5 scores)
+    # Momentum trend (slope of last scores)
     recent_scores = scores[-8:] if len(scores) >= 2 else [avg_score, avg_score]
     if len(recent_scores) >= 2:
         slope = float(np.polyfit(np.arange(len(recent_scores)), np.array(recent_scores), 1)[0])
     else:
         slope = 0.0
 
-    momentum_status = "Accelerating" if slope > 1.5 else ("Steady" if slope >= -1.0 else "Declining")
+    # Momentum status must strictly agree with regression slope
+    momentum_status = "Accelerating" if slope > 1.0 else ("Steady" if slope >= 0.0 else "Declining")
 
     # Determine Top Strengths & Blindspots
     sorted_fields = sorted(field_accuracies.items(), key=lambda x: x[1], reverse=True)
@@ -352,6 +367,30 @@ def analyze_learner_performance(learner_id: str, db: Session) -> dict[str, Any]:
     blindspots = [f"{k} (Review Recommended: {v}%)" for k, v in sorted_fields if v < 70.0]
     if not blindspots and len(sorted_fields) > 1:
         blindspots = [f"{sorted_fields[-1][0]} (Growth Opportunity: {sorted_fields[-1][1]}%)"]
+
+    # Attendance Rate calculation from real MeetingAttendance rows
+    from app.models.meetings import MeetingAttendance
+    attnd_records = db.execute(
+        select(MeetingAttendance).where(MeetingAttendance.learner_id == learner_id)
+    ).scalars().all()
+    if attnd_records:
+        attendance_rate = round(sum(1 for a in attnd_records if a.attended) / len(attnd_records) * 100.0, 1)
+    else:
+        attendance_rate = None
+
+    # Coding Acceptance Rate (First-pass acceptance on coding test suites)
+    sub_records = db.execute(
+        select(Submission).where(Submission.learner_id == learner_id).order_by(Submission.created_at.asc())
+    ).scalars().all()
+    if sub_records:
+        first_pass_subs: dict[str, bool] = {}
+        for s in sub_records:
+            if s.coding_problem_id not in first_pass_subs:
+                first_pass_subs[s.coding_problem_id] = (s.verdict == "ACCEPTED")
+        passed_first = sum(1 for passed in first_pass_subs.values() if passed)
+        coding_acceptance_rate = round(passed_first / len(first_pass_subs) * 100.0, 1) if first_pass_subs else 0.0
+    else:
+        coding_acceptance_rate = None
 
     # Practical, professional performance summary (Immediate computation with zero latency)
     top_str_text = top_strengths[0] if top_strengths else "Core Fundamentals"
@@ -405,10 +444,19 @@ def analyze_learner_performance(learner_id: str, db: Session) -> dict[str, Any]:
         "median_score": round(median_score, 1),
         "std_dev": round(std_dev, 1),
         "percentile_rank": round(percentile_rank, 1),
+        "percentile": round(percentile_rank, 1),
         "top_percentile": top_pct,
         "cohort_mean": round(cohort_mean, 1),
         "velocity_index": velocity_index,
+        "slope": round(slope, 2),
+        "learning_velocity": {
+            "slope": round(slope, 2),
+            "trend_label": momentum_status,
+            "velocity_index": velocity_index,
+        },
         "momentum": momentum_status,
+        "attendance_rate": attendance_rate,
+        "coding_acceptance_rate": coding_acceptance_rate,
         "streak_days": getattr(learner, "streak_days", 0) or 12,
         "total_assessments": len(att_rows),
         "total_practice": len(prac_rows),

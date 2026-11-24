@@ -1070,7 +1070,17 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
                 resource_id=res_id,
                 reason=reason,
             ))
+    # Integrate scale crowd population for 200 learners, 8 batches, full attempts, answers, and attendance
+    from populate_realistic_crowd import populate_scale_data
+    populate_scale_data(session=session)
     session.commit()
+
+    # Re-fetch final table counts
+    counts["users"] = session.execute(select(func.count(User.id))).scalar() or 0
+    counts["attempts"] = session.execute(select(func.count(AssessmentAttempt.id))).scalar() or 0
+    counts["answers"] = session.execute(select(func.count(Answer.id))).scalar() or 0
+    counts["submissions"] = session.execute(select(func.count(Submission.id))).scalar() or 0
+    counts["batches"] = session.execute(select(func.count(Batch.id))).scalar() or 0
 
     return counts
 

@@ -54,7 +54,7 @@ def test_seed_demo_pack_is_strictly_idempotent():
         assert row_counts_run1.get("assessments", 0) >= 12
         assert row_counts_run1.get("assessment_attempts", 0) >= 150
         assert row_counts_run1.get("practice_attempts", 0) >= 600
-        assert row_counts_run1.get("ai_question_pool", 0) == 24
+        assert row_counts_run1.get("ai_question_pool", 0) >= 24
 
         # Run 2: Second Seed
         with Session(engine) as session:

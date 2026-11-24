@@ -14,7 +14,7 @@ import { LearnerService } from '../../core/services/learner.service';
         <div>
           <h1 class="text-2xl font-black text-slate-900 tracking-tight">Performance Analytics &amp; Reports</h1>
           <p class="text-xs text-slate-500">
-            Comprehensive graphical analysis, Gaussian cohort benchmarks, competency heatmaps, and AI Growth Ring reports.
+            Comprehensive graphical analysis, Score distribution, competency heatmaps, and AI Growth Ring reports.
           </p>
         </div>
 
@@ -48,7 +48,7 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="absolute top-0 left-0 right-0 h-1 bg-[#008FBB]"></div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Cohort Percentile Rank</span>
               <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-3xl font-black text-slate-900">{{ diagnostic()?.percentile != null ? diagnostic()?.percentile + 'th' : 'N/A' }}</span>
+                <span class="text-3xl font-black text-slate-900">{{ (diagnostic()?.percentile != null ? diagnostic()?.percentile + 'th' : (diagnostic()?.percentile_rank != null ? diagnostic()?.percentile_rank + 'th' : 'Needs 3+ assessments')) }}</span>
                 <span class="text-xs font-semibold text-[#008FBB]">Percentile</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Relative to active cohort</p>
@@ -59,9 +59,9 @@ import { LearnerService } from '../../core/services/learner.service';
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Score Trajectory Velocity</span>
               <div class="mt-2 flex items-baseline gap-2">
                 <span class="text-3xl font-black text-emerald-600">
-                  {{ diagnostic()?.learning_velocity?.slope != null ? ((diagnostic()?.learning_velocity?.slope > 0 ? '+' : '') + diagnostic()?.learning_velocity?.slope + '%') : 'N/A' }}
+                  {{ diagnostic()?.learning_velocity?.slope != null ? ((diagnostic()?.learning_velocity?.slope > 0 ? '+' : '') + diagnostic()?.learning_velocity?.slope + '%') : (diagnostic()?.slope != null ? ((diagnostic()?.slope > 0 ? '+' : '') + diagnostic()?.slope + '%') : 'Needs 2+ attempts') }}
                 </span>
-                <span class="text-xs font-semibold text-emerald-600">{{ diagnostic()?.learning_velocity?.trend_label || 'Calculated' }}</span>
+                <span class="text-xs font-semibold text-emerald-600">{{ diagnostic()?.learning_velocity?.trend_label || diagnostic()?.momentum || 'Calculated' }}</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Linear regression slope</p>
             </div>
@@ -70,7 +70,7 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="absolute top-0 left-0 right-0 h-1 bg-[#FAA634]"></div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Session Attendance</span>
               <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-3xl font-black text-slate-900">{{ diagnostic()?.attendance_rate != null ? diagnostic()?.attendance_rate + '%' : 'N/A' }}</span>
+                <span class="text-3xl font-black text-slate-900">{{ diagnostic()?.attendance_rate != null ? diagnostic()?.attendance_rate + '%' : 'Pending sync' }}</span>
                 <span class="text-xs font-semibold text-[#FAA634]">Sync Rate</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Cohort sync attendance</p>
@@ -80,7 +80,7 @@ import { LearnerService } from '../../core/services/learner.service';
               <div class="absolute top-0 left-0 right-0 h-1 bg-purple-500"></div>
               <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Coding Acceptance</span>
               <div class="mt-2 flex items-baseline gap-2">
-                <span class="text-3xl font-black text-purple-600">{{ diagnostic()?.coding_acceptance_rate != null ? diagnostic()?.coding_acceptance_rate + '%' : 'N/A' }}</span>
+                <span class="text-3xl font-black text-purple-600">{{ diagnostic()?.coding_acceptance_rate != null ? diagnostic()?.coding_acceptance_rate + '%' : 'Pending lab tests' }}</span>
                 <span class="text-xs font-semibold text-purple-600">First-Pass</span>
               </div>
               <p class="mt-1 text-[11px] text-slate-400">Sandboxed test suite runs</p>
