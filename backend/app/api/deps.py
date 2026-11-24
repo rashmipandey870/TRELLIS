@@ -69,18 +69,15 @@ def get_sync_engine() -> Any:
             engine_kwargs["connect_args"] = {"timeout": 30.0, "check_same_thread": False}
         else:
             engine_kwargs.update({
-                "pool_size": 10,
-                "max_overflow": 20,
-                "pool_recycle": 45,
-                "pool_timeout": 15,
+                "pool_size": 15,
+                "max_overflow": 25,
+                "pool_recycle": 300,
+                "pool_timeout": 30,
             })
             if "postgresql" in db_url or "postgres" in db_url:
                 connect_args: dict[str, Any] = {
-                    "connect_timeout": 10,
+                    "connect_timeout": 35,
                     "keepalives": 1,
-                    "keepalives_idle": 5,
-                    "keepalives_interval": 2,
-                    "keepalives_count": 2,
                 }
                 if "sslmode" not in db_url:
                     connect_args["sslmode"] = "require"

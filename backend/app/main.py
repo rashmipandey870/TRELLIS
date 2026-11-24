@@ -1,5 +1,7 @@
 """TRELLIS Main FastAPI Application Entrypoint."""
 
+import asyncio
+import contextlib
 import logging
 import time
 from collections.abc import AsyncGenerator
@@ -27,6 +29,24 @@ from app.core.audit_middleware import AuditLogMiddleware
 from app.core.config import settings
 
 
+async def _neon_keepalive_loop() -> None:
+    """Background task that pings Neon PostgreSQL every 30 seconds to keep compute active and connection pool warm."""
+    from sqlalchemy import text
+    from app.api.deps import get_sync_engine
+    while True:
+        try:
+            await asyncio.sleep(30)
+            engine = get_sync_engine()
+            def _ping() -> None:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+            await asyncio.to_thread(_ping)
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.debug("Neon heartbeat ping failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager handling startup and shutdown events."""
@@ -37,12 +57,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         )
 
     # Warm up database connection with retry backoff for serverless/cold-start databases (e.g. Neon)
-    if settings.TRELLIS_ENV not in ("dev", "test"):
-        from app.api.deps import get_sync_engine, warmup_database
-        try:
-            warmup_database(get_sync_engine())
-        except Exception as e:
-            print(f"Warning: Database warmup encountered error: {e}")
+    from app.api.deps import get_sync_engine, warmup_database
+    try:
+        warmup_database(get_sync_engine(), max_retries=3, initial_delay=1.0)
+        print("Neon PostgreSQL connection pool initialized and warmed up.")
+    except Exception as e:
+        print(f"Warning: Database warmup encountered error: {e}")
+
+    # Launch background keepalive task so Neon never enters idle/suspended sleep
+    heartbeat_task = asyncio.create_task(_neon_keepalive_loop())
 
     # In production environments, verify isolated runner passes startup self-test
     if settings.TRELLIS_ENV != "dev":
@@ -55,6 +78,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"Tagline: {settings.TAGLINE}")
     yield
     # Shutdown
+    heartbeat_task.cancel()
+    with contextlib.suppress(Exception):
+        await heartbeat_task
     print(f"Shutting down {settings.PROJECT_NAME}")
 
 
