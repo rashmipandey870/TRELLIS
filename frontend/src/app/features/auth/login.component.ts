@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 interface DemoAccount {
@@ -15,7 +15,7 @@ interface DemoAccount {
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="min-h-screen flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <!-- Background subtle gradient decorative flare -->
@@ -25,6 +25,12 @@ interface DemoAccount {
         
         <!-- CSM Header Brand & Logo -->
         <div class="text-center space-y-2">
+          <div class="flex items-center justify-between pb-2">
+            <a routerLink="/" class="text-xs font-bold text-slate-500 hover:text-[#008FBB] transition flex items-center gap-1">
+              &larr; Back to Home
+            </a>
+            <span class="text-[10px] font-mono font-bold text-slate-400">CSM &bull; TRELLIS</span>
+          </div>
           <div class="inline-flex items-center justify-center gap-2 mb-1">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#FAA634] to-[#D7182A] flex items-center justify-center shadow-md">
               <span class="text-white font-black text-xl tracking-tight">T</span>

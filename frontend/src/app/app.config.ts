@@ -9,8 +9,8 @@ import { LoginComponent } from './features/auth/login.component';
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'login',
-    pathMatch: 'full',
+    loadComponent: () =>
+      import('./features/landing/csm-landing.component').then((m) => m.CsmLandingComponent),
   },
   {
     path: 'landing',
