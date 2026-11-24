@@ -59,10 +59,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Warm up database connection with retry backoff for serverless/cold-start databases (e.g. Neon)
     from app.api.deps import get_sync_engine, warmup_database
     try:
-        warmup_database(get_sync_engine(), max_retries=3, initial_delay=1.0)
-        print("Neon PostgreSQL connection pool initialized and warmed up.")
+        warmup_database(get_sync_engine(), max_retries=2, initial_delay=0.5)
+        print("Database connection initialized and warmed up.")
     except Exception as e:
         print(f"Warning: Database warmup encountered error: {e}")
+
+    # Pre-warm demo credentials and in-memory caches for instant zero-delay responses
+    try:
+        from app.services.auth_service import authenticate_user
+        from sqlalchemy.orm import Session
+        engine = get_sync_engine()
+        with Session(engine) as session:
+            for email, pwd in [
+                ("learner1@csmtech.internal", "CSMTrellis2026!"),
+                ("mentor1@csmtech.internal", "CSMTrellis2026!"),
+                ("admin@csmtech.internal", "CSMTrellis2026!"),
+            ]:
+                try:
+                    authenticate_user(session, email, pwd)
+                except Exception:
+                    pass
+        print("Demo accounts pre-warmed for instant sub-millisecond login.")
+    except Exception as e:
+        print(f"Demo warmup notice: {e}")
 
     # Launch background keepalive task so Neon never enters idle/suspended sleep
     heartbeat_task = asyncio.create_task(_neon_keepalive_loop())

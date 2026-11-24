@@ -145,9 +145,15 @@ def get_me(
     claims: dict[str, Any] = Depends(get_current_user_claims),
 ) -> UserMeResponse:
     """Retrieve profile and assigned roles for currently authenticated user."""
+    from app.core.cache import fast_cache
+    cache_key = f"auth:me:{current_user.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     roles = claims.get("roles", [current_user.role or "LEARNER"])
     primary_role = (current_user.role or (roles[0] if roles else "LEARNER")).upper()
-    return UserMeResponse(
+    profile = UserMeResponse(
         id=current_user.id,
         org_id=current_user.org_id,
         email=current_user.email,
@@ -158,6 +164,8 @@ def get_me(
         must_change_password=getattr(current_user, "must_change_password", False),
         preferences_json=current_user.preferences_json,
     )
+    fast_cache.set(cache_key, profile, ttl_seconds=60.0)
+    return profile
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK, summary="Change user password")

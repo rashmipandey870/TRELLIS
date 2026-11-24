@@ -19,18 +19,30 @@ _IN_MEMORY_ATTEMPTS: dict[str, tuple[int, datetime]] = {}
 _IN_MEMORY_LOCKOUTS: dict[str, datetime] = {}
 
 
+_REDIS_CLIENT_CACHE: tuple[float, redis.Redis[str] | None] = (0.0, None)
+
+
 def _get_redis_client() -> redis.Redis[str] | None:
-    """Attempt connection to configured Redis instance."""
+    """Attempt connection to configured Redis instance with negative backoff cache."""
+    global _REDIS_CLIENT_CACHE
+    import time
+    now = time.time()
+    last_check, cached_client = _REDIS_CLIENT_CACHE
+    if now - last_check < 30.0:
+        return cached_client
+
     try:
         client = redis.Redis.from_url(
             settings.REDIS_URL,
-            socket_connect_timeout=0.5,
-            socket_timeout=0.5,
+            socket_connect_timeout=0.05,
+            socket_timeout=0.05,
             decode_responses=True,
         )
         client.ping()
+        _REDIS_CLIENT_CACHE = (now, client)
         return client
     except Exception:
+        _REDIS_CLIENT_CACHE = (now, None)
         return None
 
 
