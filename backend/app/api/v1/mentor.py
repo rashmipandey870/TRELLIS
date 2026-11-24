@@ -390,6 +390,12 @@ def get_mentor_dashboard(
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
 ) -> dict[str, Any]:
+    from app.core.cache import fast_cache
+    cache_key = f"mentor:dashboard:{mentor.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Query assigned learners count via SQL aggregation
     assigned_learners_count = (
         db.execute(
@@ -439,7 +445,7 @@ def get_mentor_dashboard(
         .all()
     )
 
-    return {
+    result = {
         "assigned_learners_count": assigned_learners_count,
         "upcoming_meetings": [
             {
@@ -473,6 +479,8 @@ def get_mentor_dashboard(
             for r in pending_alerts_rows
         ],
     }
+    fast_cache.set(cache_key, result, ttl_seconds=20.0)
+    return result
 
 
 # --- Meeting Scheduling & Attendance ---
@@ -2076,6 +2084,11 @@ def get_assigned_learners(
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
 ) -> list[dict[str, Any]]:
+    from app.core.cache import fast_cache
+    cache_key = f"mentor:learners:{mentor.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
     # Get all batches this mentor is assigned to
     batches = db.execute(
         select(Batch).join(MentorLearnerAssignment, MentorLearnerAssignment.batch_id == Batch.id).where(
@@ -2134,7 +2147,7 @@ def get_assigned_learners(
         if r.learner_id not in remark_map:
             remark_map[r.learner_id] = r.remark_text
 
-    return [
+    result = [
         {
             "id": l.id,
             "name": l.full_name,
@@ -2147,6 +2160,8 @@ def get_assigned_learners(
         }
         for l in learners
     ]
+    fast_cache.set(cache_key, result, ttl_seconds=30.0)
+    return result
 
 
 # --- Learner Review & Remarks ---

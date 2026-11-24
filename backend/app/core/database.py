@@ -8,9 +8,9 @@ from typing import Any
 try:
     _orig_getaddrinfo = socket.getaddrinfo
     _NEON_FALLBACKS = {
-        'ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech': '52.76.128.157',
-        'ep-weathered-base-az6lrn9p-pooler.c-3.ap-southeast-1.aws.neon.tech': '52.76.128.157',
-        'c-3.ap-southeast-1.aws.neon.tech': '52.76.128.157'
+        'ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech': '13.251.213.89',
+        'ep-weathered-base-az6lrn9p-pooler.c-3.ap-southeast-1.aws.neon.tech': '13.251.213.89',
+        'c-3.ap-southeast-1.aws.neon.tech': '13.251.213.89'
     }
     def _neon_safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
         try:
@@ -43,13 +43,16 @@ if "asyncpg" in _db_url and "?" in _db_url:
 
 _extra_engine_kwargs = {}
 if "sqlite" not in _db_url:
-    _extra_engine_kwargs["pool_size"] = 10
-    _extra_engine_kwargs["max_overflow"] = 20
+    _extra_engine_kwargs["pool_size"] = 15
+    _extra_engine_kwargs["max_overflow"] = 25
+    _extra_engine_kwargs["pool_recycle"] = 300
+    _extra_engine_kwargs["pool_timeout"] = 10
 if "neon.tech" in _db_url or "52.76.128.157" in _db_url:
     ep = "ep-weathered-base-az6lrn9p-pooler" if "pooler" in _db_url else "ep-weathered-base-az6lrn9p"
     _extra_engine_kwargs["connect_args"] = {
         "server_settings": {"options": f"endpoint={ep}"},
         "ssl": "require",
+        "command_timeout": 15,
     }
 
 engine: AsyncEngine = create_async_engine(

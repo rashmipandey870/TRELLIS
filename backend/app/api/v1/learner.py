@@ -68,6 +68,11 @@ def get_learner_dashboard(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> dict[str, Any]:
+    from app.core.cache import fast_cache
+    cache_key = f"learner:dashboard:{learner.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
     # 1. Upcoming Meetings
     meetings = (
         db.execute(
@@ -142,7 +147,7 @@ def get_learner_dashboard(
         .all()
     )
 
-    return {
+    result = {
         "upcoming_meetings": [
             {
                 "id": m.id,
@@ -176,6 +181,8 @@ def get_learner_dashboard(
             for r in remarks_rows
         ],
     }
+    fast_cache.set(cache_key, result, ttl_seconds=20.0)
+    return result
 
 
 # --- My Meetings & .ics Download ---
@@ -184,6 +191,12 @@ def list_learner_meetings(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> list[dict[str, Any]]:
+    from app.core.cache import fast_cache
+    cache_key = f"learner:meetings:{learner.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     meetings = (
         db.execute(
             select(Meeting)
@@ -194,7 +207,7 @@ def list_learner_meetings(
         .scalars()
         .all()
     )
-    return [
+    result = [
         {
             "id": m.id,
             "title": m.title,
@@ -209,6 +222,8 @@ def list_learner_meetings(
         }
         for m in meetings
     ]
+    fast_cache.set(cache_key, result, ttl_seconds=30.0)
+    return result
 
 
 @router.get("/meetings/{meeting_id}/ics", summary="Download standard iCalendar (.ics) file")
@@ -500,6 +515,12 @@ def list_learner_assessments(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> list[dict[str, Any]]:
+    from app.core.cache import fast_cache
+    cache_key = f"learner:assessments:{learner.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     # Find learner's batch
     batch_assignment = (
         db.execute(
@@ -536,7 +557,7 @@ def list_learner_assessments(
             if not has_audience:
                 assigned_assessments.append(a)
 
-    return [
+    result = [
         {
             "id": a.id,
             "title": a.title,
@@ -549,6 +570,8 @@ def list_learner_assessments(
         }
         for a in assigned_assessments
     ]
+    fast_cache.set(cache_key, result, ttl_seconds=30.0)
+    return result
 
 
 @router.get("/assessments/{assessment_id}/notes", summary="Get mentor study notes for an assessment")
@@ -603,6 +626,11 @@ def list_learner_study_notes(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> list[dict[str, Any]]:
+    from app.core.cache import fast_cache
+    cache_key = f"notes:learner:{search or 'none'}:{field or 'all'}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
     query = (
         select(AssessmentNote)
         .join(Assessment, Assessment.id == AssessmentNote.assessment_id)
@@ -623,7 +651,7 @@ def list_learner_study_notes(
             | (Assessment.title.ilike(f"%{search}%"))
         )
     notes = db.execute(query).scalars().all()
-    return [
+    result = [
         {
             "id": n.id,
             "assessment_id": n.assessment_id,
@@ -643,6 +671,8 @@ def list_learner_study_notes(
         }
         for n in notes
     ]
+    fast_cache.set(cache_key, result, ttl_seconds=60.0)
+    return result
 
 
 @router.post("/assessments/{assessment_id}/start", summary="Start or resume a timed assessment")
@@ -986,6 +1016,12 @@ def list_learner_results(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> list[dict[str, Any]]:
+    from app.core.cache import fast_cache
+    cache_key = f"learner:results:{learner.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     attempts = (
         db.execute(
             select(AssessmentAttempt)
@@ -1044,6 +1080,7 @@ def list_learner_results(
                 for ans in a.answers
             ],
         })
+    fast_cache.set(cache_key, results, ttl_seconds=30.0)
     return results
 
 
@@ -1064,8 +1101,16 @@ def get_learner_ai_diagnostic(
     db: Session = Depends(get_db),
     learner: User = Depends(require_learner),
 ) -> dict[str, Any]:
+    from app.core.cache import fast_cache
+    cache_key = f"learner:diagnostic:{learner.id}"
+    cached = fast_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     from app.services.ai_analytics_engine import analyze_learner_performance
-    return analyze_learner_performance(learner.id, db)
+    diag = analyze_learner_performance(learner.id, db)
+    fast_cache.set(cache_key, diag, ttl_seconds=60.0)
+    return diag
 
 
 @router.get("/results/{attempt_id}/report", summary="View AI Growth Ring Report for an assessment attempt")

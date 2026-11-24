@@ -71,17 +71,23 @@ def get_sync_engine() -> Any:
             engine_kwargs.update({
                 "pool_size": 10,
                 "max_overflow": 20,
-                "pool_recycle": 60,
-                "pool_timeout": 30,
+                "pool_recycle": 45,
+                "pool_timeout": 15,
             })
             if "postgresql" in db_url or "postgres" in db_url:
-                connect_args: dict[str, Any] = {}
+                connect_args: dict[str, Any] = {
+                    "connect_timeout": 10,
+                    "keepalives": 1,
+                    "keepalives_idle": 5,
+                    "keepalives_interval": 2,
+                    "keepalives_count": 2,
+                }
                 if "sslmode" not in db_url:
                     connect_args["sslmode"] = "require"
-                if "neon.tech" in db_url or "52.76.128.157" in db_url:
+                if "neon.tech" in db_url or "52.76.128.157" in db_url or "13.251.213.89" in db_url:
                     ep = "ep-weathered-base-az6lrn9p-pooler" if "pooler" in db_url else "ep-weathered-base-az6lrn9p"
                     connect_args["options"] = f"endpoint={ep}"
-                    connect_args["hostaddr"] = "52.76.128.157"
+                    connect_args["hostaddr"] = "13.251.213.89"
                 engine_kwargs["connect_args"] = connect_args
 
         _sync_engine = create_engine(db_url, **engine_kwargs)

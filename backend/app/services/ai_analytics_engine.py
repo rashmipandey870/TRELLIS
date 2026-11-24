@@ -18,7 +18,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats as stats
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.assessments import Answer, Assessment, AssessmentAttempt, QuestionBank, Submission
 from app.models.practice import PracticeAttempt, PracticeQuestion, PracticeScore
@@ -269,16 +269,18 @@ def analyze_learner_performance(learner_id: str, db: Session) -> dict[str, Any]:
     if not learner:
         return {}
 
-    # Query Assessment Attempts
+    # Query Assessment Attempts with joined assessment to eliminate N+1 queries
     att_rows = db.execute(
         select(AssessmentAttempt)
+        .options(joinedload(AssessmentAttempt.assessment))
         .where(AssessmentAttempt.learner_id == learner_id, AssessmentAttempt.status == "SUBMITTED")
         .order_by(AssessmentAttempt.submit_time.asc())
     ).scalars().all()
 
-    # Query Practice Attempts
+    # Query Practice Attempts with joined question to eliminate N+1 queries
     prac_rows = db.execute(
         select(PracticeAttempt)
+        .options(joinedload(PracticeAttempt.question))
         .where(PracticeAttempt.learner_id == learner_id)
         .order_by(PracticeAttempt.created_at.asc())
     ).scalars().all()
@@ -291,12 +293,16 @@ def analyze_learner_performance(learner_id: str, db: Session) -> dict[str, Any]:
     if not scores:
         scores = [0.0]
 
-    # Query cohort scores across the organization for percentile normalization
-    cohort_attempts = db.execute(
-        select(AssessmentAttempt.score)
-        .where(AssessmentAttempt.status == "SUBMITTED")
-    ).scalars().all()
-    cohort_scores = [float(s) for s in cohort_attempts]
+    # Query cohort scores across the organization (cached in-memory for 120s)
+    from app.core.cache import fast_cache
+    cohort_scores = fast_cache.get("cohort_scores:all")
+    if cohort_scores is None:
+        cohort_attempts = db.execute(
+            select(AssessmentAttempt.score)
+            .where(AssessmentAttempt.status == "SUBMITTED")
+        ).scalars().all()
+        cohort_scores = [float(s) for s in cohort_attempts]
+        fast_cache.set("cohort_scores:all", cohort_scores, ttl_seconds=120.0)
 
     # Pandas DataFrame for multi-track aggregation
     records = []
