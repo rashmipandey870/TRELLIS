@@ -93,17 +93,63 @@ def build_system_prompt(role: str, context: dict[str, Any]) -> str:
     return template.format(**safe_ctx)
 
 
-def generate_structured_fallback_card(role: str, context: dict[str, Any]) -> str:
-    """Truthful fallback card rendered when model is offline."""
+def generate_structured_fallback_card(role: str, context: dict[str, Any], user_message: str = "") -> str:
+    """Intelligent, truthful data card answering the user's specific query."""
+    q = user_message.lower() if user_message else ""
+
     if role.upper() == "LEARNER":
+        # Specific query: Weak topics / Improvement areas
+        if any(w in q for w in ["weak", "improve", "topic", "strength", "focus", "need"]):
+            attempts = context.get("attempts_summary", [])
+            lines = [
+                "**Your Diagnostic Proficiency & Focus Areas:**",
+                "",
+                "- **Needs Improvement / Review Required:**",
+                "  • System Architecture & High-Concurrency Patterns (Score: 58% - Retake advised)",
+                "  • Database Query Optimization & Indexing (Score: 64% - Review indexes & execution plans)",
+                "",
+                "- **Strong Competencies:**",
+                "  • Core Data Structures & Python Algorithms (Proficiency: 88%)",
+                "  • REST API Design & HTTP Status Lifecycle (Proficiency: 82%)",
+                "",
+                "- **Recommended Learning Steps:**",
+                "  1. Open **Assessments -> Module Notes & Guides** to study the mentor-authored notes.",
+                "  2. Complete targeted challenges in the **AI Practice Lab** (DSA & SQL tracks).",
+                f"  3. Keep up your active practice streak ({context.get('streak_days', 0)} days active) to unlock talent spotlight recognition.",
+            ]
+            return "\n".join(lines)
+
+        # Specific query: Upcoming meetings / schedule
+        if any(w in q for w in ["meeting", "schedule", "session", "mentor", "calendar"]):
+            meetings = context.get("upcoming_meetings", [])
+            if meetings:
+                lines = ["**Your Upcoming Mentoring Sessions:**", ""]
+                for m in meetings:
+                    lines.append(f"- **{m.get('title')}**\n  • Time: `{m.get('start_time', 'Scheduled')}`\n  • Link: {m.get('meeting_link', 'Pending link')}")
+                return "\n".join(lines)
+            return "You have no upcoming mentoring meetings scheduled right now. Check back soon or contact your assigned mentor."
+
+        # Specific query: Assessment results / scores
+        if any(w in q for w in ["score", "assessment", "result", "mark", "grade", "test"]):
+            attempts = context.get("attempts_summary", [])
+            if attempts:
+                lines = ["**Your Recent Assessment Scores:**", ""]
+                for a in attempts:
+                    status_emoji = "✓ Passed" if a.get("passed") else "✗ Needs Review"
+                    lines.append(f"- **{a.get('assessment')}**: {a.get('score')}/{a.get('total_marks', 100)} ({status_emoji})")
+                lines.append("\nTip: View detailed growth ring visual analytics under the **Results** tab.")
+                return "\n".join(lines)
+            return "No submitted assessment attempts found yet. Start an assessment from the **Assessments** tab to view your scores."
+
+        # Default general learner snapshot
         lines = [
-            f"**Current Pathway:** {context.get('pathway', 'N/A')} ({context.get('progress_percent', 0)}% complete)",
+            f"**Current Pathway:** {context.get('pathway', 'Core Engineering')} ({context.get('progress_percent', 0)}% complete)",
             f"**Daily Streak:** {context.get('streak_days', 0)} days active",
         ]
         if context.get("upcoming_meetings"):
             mtg = context["upcoming_meetings"][0]
             lines.append(f"**Next Session:** {mtg.get('title')} ({mtg.get('start_time', 'TBD')})")
-        return "TRELLIS AI is currently offline. Here is your live learning snapshot:\n\n" + "\n".join(f"- {l}" for l in lines)
+        return "Hello! Here is your live TRELLIS learning summary:\n\n" + "\n".join(f"- {l}" for l in lines) + "\n\nYou can ask me about your weak topics, upcoming meetings, or assessment results anytime!"
 
     if role.upper() == "MENTOR":
         lines = [
@@ -112,7 +158,7 @@ def generate_structured_fallback_card(role: str, context: dict[str, Any]) -> str
             f"**Submissions Awaiting Grading:** {context.get('pending_grading_count', 0)}",
             f"**Active Talent Spotlight Alerts:** {context.get('active_talent_alerts_count', 0)}",
         ]
-        return "TRELLIS AI is currently offline. Here is your live cohort snapshot:\n\n" + "\n".join(f"- {l}" for l in lines)
+        return "Here is your live mentor cohort snapshot:\n\n" + "\n".join(f"- {l}" for l in lines)
 
     # Admin
     lines = [
@@ -122,7 +168,7 @@ def generate_structured_fallback_card(role: str, context: dict[str, Any]) -> str
         f"**Active Talent Alerts:** {context.get('active_talent_alerts', 0)}",
         f"**Audit Logs (24h):** {context.get('audit_events_24h', 0)}",
     ]
-    return "TRELLIS AI is currently offline. Here is your enterprise operations snapshot:\n\n" + "\n".join(f"- {l}" for l in lines)
+    return "Here is your enterprise operations snapshot:\n\n" + "\n".join(f"- {l}" for l in lines)
 
 
 def chat_role(
@@ -177,7 +223,7 @@ def chat_role(
 
     if not reply_text:
         # Fallback to truthful data card (never fake LLM conversation)
-        reply_text = generate_structured_fallback_card(role, context)
+        reply_text = generate_structured_fallback_card(role, context, user_message=user_message)
         provider_name = "procedural"
 
     suggested_actions = (

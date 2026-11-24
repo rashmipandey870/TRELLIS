@@ -288,6 +288,8 @@ export class AssistantComponent {
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let accumulatedText = '';
+      let currentEvent = 'message';
 
       while (true) {
         const { done, value } = await reader.read();
@@ -298,7 +300,6 @@ export class AssistantComponent {
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        let currentEvent = 'message';
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed.startsWith('event:')) {
@@ -307,13 +308,23 @@ export class AssistantComponent {
             const rawData = trimmed.substring(5).trim();
             try {
               const data = JSON.parse(rawData);
-              if (currentEvent === 'delta' && data.delta) {
+              if (data.delta) {
+                accumulatedText += data.delta;
                 this.messages.update((list) =>
                   list.map((m) =>
-                    m.id === assistantMsgId ? { ...m, text: m.text + data.delta } : m
+                    m.id === assistantMsgId ? { ...m, text: accumulatedText } : m
                   )
                 );
-              } else if (currentEvent === 'done') {
+              } else if (data.reply && !accumulatedText) {
+                accumulatedText = data.reply;
+                this.messages.update((list) =>
+                  list.map((m) =>
+                    m.id === assistantMsgId ? { ...m, text: accumulatedText } : m
+                  )
+                );
+              }
+
+              if (currentEvent === 'done' || data.provenance) {
                 const isOffline = data.provenance?.served_from === 'fallback';
                 this.messages.update((list) =>
                   list.map((m) =>
@@ -328,12 +339,13 @@ export class AssistantComponent {
                   )
                 );
               } else if (currentEvent === 'error') {
+                const errText = data.message || data.error || 'The AI assistant encountered a temporary error.';
                 this.messages.update((list) =>
                   list.map((m) =>
                     m.id === assistantMsgId
                       ? {
                           ...m,
-                          text: data.error || 'The AI assistant is temporarily unavailable.',
+                          text: errText,
                           isStreaming: false,
                           isOfflineCard: true,
                         }
@@ -370,7 +382,17 @@ export class AssistantComponent {
       this.isReceivingStream.set(false);
       this.activeAbortController = null;
       this.messages.update((list) =>
-        list.map((m) => (m.isStreaming ? { ...m, isStreaming: false } : m))
+        list.map((m) => {
+          if (m.id === assistantMsgId) {
+            const hasText = m.text && m.text.trim().length > 0;
+            return {
+              ...m,
+              isStreaming: false,
+              text: hasText ? m.text : 'I am your TRELLIS learning assistant. You can ask about your assessment marks, weak topics, practice streak, or upcoming mentoring schedule.',
+            };
+          }
+          return m;
+        })
       );
     }
   }
