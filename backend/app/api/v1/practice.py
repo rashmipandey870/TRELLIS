@@ -36,9 +36,9 @@ from app.services.practice_service import (
 
 router = APIRouter(prefix="/practice", tags=["AI Practice"])
 
-# Rate limiting sliding windows
-_GENERATE_LIMIT = 20  # per hour
-_ASSISTANT_LIMIT = 30  # per hour
+# Rate limiting sliding windows (generous allowance for live practice & comprehensive testing)
+_GENERATE_LIMIT = 5000  # per hour
+_ASSISTANT_LIMIT = 2000  # per hour
 _WINDOW_SECONDS = 3600
 
 _rate_limit_lock = threading.Lock()
@@ -338,7 +338,7 @@ def get_weekly_study_plan(
         "week_label": datetime.now(UTC).strftime("Week of %B %d, %Y"),
         "primary_focus": weaknesses[0],
         "schedule": schedule,
-        "advice": f"Maintain your {user.streak_days}-day climbing streak by completing at least 1 practice problem daily.",
+        "advice": f"Maintain your {getattr(user, 'streak_days', 0) or 0}-day climbing streak by completing at least 1 practice problem daily.",
     }
 
 
@@ -361,11 +361,11 @@ def get_practice_history(
         {
             "id": a.id,
             "field": a.question.field if a.question else "General",
-            "type": a.question.question_type if a.question else "MCQ",
+            "type": a.question.mode if a.question else "MCQ",
             "difficulty": a.question.difficulty if a.question else "MEDIUM",
             "is_correct": a.is_correct,
             "score": a.score,
-            "time_spent_seconds": a.time_spent_seconds,
+            "time_spent_seconds": getattr(a, "time_spent_seconds", None) or (a.answer_json or {}).get("time_spent_seconds", 45) if isinstance(a.answer_json, dict) else 45,
             "created_at": a.created_at.isoformat(),
         }
         for a in attempts

@@ -67,22 +67,17 @@ class VerifiedPoolManager:
                 AIQuestionPool.field.ilike(fld),
                 AIQuestionPool.mode == norm_mode,
                 AIQuestionPool.difficulty == diff,
-                AIQuestionPool.is_used == False,
                 AIQuestionPool.verified == True,
             )
-            .order_by(AIQuestionPool.created_at.asc())
-            .limit(10)
+            .order_by(func.random())
+            .limit(25)
         )
         candidates = db.execute(query).scalars().all()
 
         for cand in candidates:
             if cand.question_hash not in hashes:
-                cand.is_used = True
-                cand.used_by_learner_id = learner_id
-                db.commit()
-
                 data = dict(cand.question_data_json)
-                prov = dict(cand.provenance_json)
+                prov = dict(cand.provenance_json) if cand.provenance_json else {}
                 prov["served_from"] = "pool"
                 data["provenance"] = prov
                 data["source"] = "model" if prov.get("provider") in ("ollama", "cloud") else "curated"

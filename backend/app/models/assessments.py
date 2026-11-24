@@ -9,6 +9,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -275,6 +276,9 @@ class Submission(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Code submission executed and evaluated against test cases."""
 
     __tablename__ = "submissions"
+    __table_args__ = (
+        Index("ix_submissions_problem_learner", "coding_problem_id", "learner_id"),
+    )
 
     attempt_id: Mapped[str | None] = mapped_column(
         String(36), ForeignKey("assessment_attempts.id", ondelete="CASCADE"), index=True, nullable=True

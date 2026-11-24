@@ -97,6 +97,10 @@ export class LearnerService {
     return this.http.get(`/api/v1/learner/results/${attemptId}/report`);
   }
 
+  getAIDiagnostic(): Observable<any> {
+    return this.http.get('/api/v1/learner/analytics/ai-diagnostic');
+  }
+
   chatWithGardener(message: string, history: Array<{ role: string; content: string }> = []): Observable<any> {
     return this.http.post('/api/v1/learner/chatbot/chat', {
       message,

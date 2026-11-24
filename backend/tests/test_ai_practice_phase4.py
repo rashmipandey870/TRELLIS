@@ -246,9 +246,12 @@ def test_deduplication_prevents_same_question_hash(p4_db):
     assert q1.id != q2.id
 
 
-def test_generate_rate_limit_per_user(p4_db):
+def test_generate_rate_limit_per_user(p4_db, monkeypatch):
     session = p4_db["session"]
     learner = p4_db["learner"]
+
+    import app.api.v1.practice as practice_mod
+    monkeypatch.setattr(practice_mod, "_GENERATE_LIMIT", 20)
 
     # Clear rate limit bucket for this learner
     _user_generate_timestamps[learner.id] = []

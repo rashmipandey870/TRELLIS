@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, Up
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import get_db, get_uow, require_learner
 from app.models.assessments import (
@@ -125,14 +125,19 @@ def get_learner_dashboard(
     streak_days = learner.streak_days or 0
 
     # 4. Remarks from Mentor
-    remarks = (
+    remarks_rows = (
         db.execute(
-            select(MentorRemark)
+            select(
+                MentorRemark.id,
+                MentorRemark.remark_text,
+                MentorRemark.created_at,
+                User.full_name.label("mentor_name"),
+            )
+            .outerjoin(User, User.id == MentorRemark.mentor_id)
             .where(MentorRemark.learner_id == learner.id, MentorRemark.visibility == "LEARNER_AND_ADMIN")
             .order_by(MentorRemark.created_at.desc())
             .limit(3)
         )
-        .scalars()
         .all()
     )
 
@@ -163,11 +168,11 @@ def get_learner_dashboard(
         "mentor_remarks": [
             {
                 "id": r.id,
-                "mentor_name": r.mentor.full_name if r.mentor else "Mentor",
+                "mentor_name": r.mentor_name or "Mentor",
                 "remark": r.remark_text,
                 "created_at": r.created_at.strftime("%Y-%m-%d"),
             }
-            for r in remarks
+            for r in remarks_rows
         ],
     }
 
@@ -884,6 +889,10 @@ def list_learner_results(
     attempts = (
         db.execute(
             select(AssessmentAttempt)
+            .options(
+                joinedload(AssessmentAttempt.assessment),
+                selectinload(AssessmentAttempt.answers).joinedload(Answer.question),
+            )
             .where(AssessmentAttempt.learner_id == learner.id, AssessmentAttempt.status == "SUBMITTED")
             .order_by(AssessmentAttempt.submit_time.desc())
         )
@@ -894,17 +903,25 @@ def list_learner_results(
     if not attempts:
         return []
 
+    assessment_ids = list({a.assessment_id for a in attempts if a.assessment_id})
+    avg_map: dict[str, float] = {}
+    if assessment_ids:
+        avg_rows = db.execute(
+            select(
+                AssessmentAttempt.assessment_id,
+                func.avg(AssessmentAttempt.score),
+            )
+            .where(
+                AssessmentAttempt.assessment_id.in_(assessment_ids),
+                AssessmentAttempt.status == "SUBMITTED",
+            )
+            .group_by(AssessmentAttempt.assessment_id)
+        ).all()
+        avg_map = {row[0]: round(float(row[1]), 1) for row in avg_rows}
+
     results = []
     for a in attempts:
-        batch_avg = (
-            db.execute(
-                select(func.avg(AssessmentAttempt.score)).where(
-                    AssessmentAttempt.assessment_id == a.assessment_id,
-                    AssessmentAttempt.status == "SUBMITTED",
-                )
-            ).scalar()
-            or a.score
-        )
+        batch_avg = avg_map.get(a.assessment_id, a.score)
         results.append({
             "id": a.id,
             "assessment_id": a.assessment_id,

@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { AdminService, LearnerDetailData } from '../../core/services/admin.service';
 
 @Component({
   selector: 'app-admin-learners',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -35,10 +36,16 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
           <select 
             [(ngModel)]="selectedBatch" 
             (ngModelChange)="applyFilters()"
-            class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs">
-            <option value="">All Cohorts</option>
-            <option value="BATCH_ALPHA">Batch Alpha</option>
-            <option value="BATCH_BETA">Batch Beta</option>
+            class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-800">
+            <option value="">All 8 Enterprise Cohorts</option>
+            <option value="Batch Alpha">Batch Alpha (Full-Stack)</option>
+            <option value="Batch Beta">Batch Beta (Cloud &amp; DevOps)</option>
+            <option value="Batch Gamma">Batch Gamma (AI &amp; ML)</option>
+            <option value="Batch Delta">Batch Delta (Data Platform)</option>
+            <option value="Batch Epsilon">Batch Epsilon (Cybersecurity)</option>
+            <option value="Batch Zeta">Batch Zeta (Mobile &amp; IoT)</option>
+            <option value="Batch Eta">Batch Eta (Distributed Systems)</option>
+            <option value="Batch Theta">Batch Theta (Enterprise Systems)</option>
           </select>
         </div>
       </div>
@@ -50,35 +57,49 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
             <div class="flex items-start justify-between">
               <div class="flex items-center gap-2.5">
                 <div class="w-10 h-10 rounded-full bg-sky-100 text-[#008FBB] font-black text-sm flex items-center justify-center">
-                  {{ l.full_name[0] }}
+                  {{ (l.name || l.full_name || 'L')[0] }}
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-slate-900 leading-tight">{{ l.full_name }}</h3>
+                  <h3 class="text-sm font-bold text-slate-900 leading-tight">{{ l.name || l.full_name }}</h3>
                   <p class="text-[11px] text-slate-400">{{ l.email }}</p>
                 </div>
               </div>
-              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-[#FAA634] border border-amber-200">
-                {{ l.streak_days || 0 }}d streak
-              </span>
+              <div class="text-right">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-[#FAA634] border border-amber-200 block">
+                  {{ l.streak_days || 0 }}d streak
+                </span>
+                @if (l.average_score !== undefined) {
+                  <span class="text-[10px] font-bold text-emerald-600 mt-0.5 block">
+                    {{ l.average_score }}% avg
+                  </span>
+                }
+              </div>
             </div>
 
             <div class="py-2 border-y border-slate-100 grid grid-cols-2 gap-2 text-[11px]">
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Assigned Batch</span>
-                <span class="font-bold text-slate-700">{{ l.batch || 'Batch Alpha' }}</span>
+                <span class="font-bold text-slate-700 truncate block">{{ l.batch || 'Batch Alpha' }}</span>
               </div>
               <div>
                 <span class="text-slate-400 block text-[10px] uppercase font-bold">Mentor</span>
-                <span class="font-bold text-slate-700">{{ l.mentor || 'Ananya Rao' }}</span>
+                <span class="font-bold text-slate-700 truncate block">{{ l.mentor || 'Ananya Rao' }}</span>
               </div>
             </div>
 
-            <button 
-              type="button" 
-              (click)="openLearnerDetail(l.id)"
-              class="w-full py-2 px-3 rounded-xl bg-slate-100 group-hover:bg-[#008FBB] group-hover:text-white text-slate-700 text-xs font-bold transition text-center">
-              View Complete Performance Dossier &rarr;
-            </button>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button 
+                type="button" 
+                (click)="openLearnerDetail(l.id)"
+                class="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition text-center">
+                Audit Modal
+              </button>
+              <a 
+                [routerLink]="['/admin/learners', l.id, 'analytics']"
+                class="py-2 px-2.5 rounded-xl bg-sky-50 hover:bg-[#008FBB] hover:text-white border border-sky-200 text-[#008FBB] text-[11px] font-bold transition text-center shadow-2xs">
+                Dossier &rarr;
+              </a>
+            </div>
           </div>
         }
       </div>
@@ -91,7 +112,7 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
             <!-- Detail Header -->
             <div class="flex items-start justify-between pb-4 border-b border-slate-200">
               <div>
-                <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">Learner Dossier &bull; Read-Only</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">Learner Dossier &bull; Read-Only Audit</span>
                 <h2 class="text-xl font-black text-slate-900">{{ selectedLearnerDetail()?.full_name }}</h2>
                 <p class="text-xs text-slate-400">{{ selectedLearnerDetail()?.email }} &bull; {{ selectedLearnerDetail()?.batch || 'Batch Alpha' }}</p>
               </div>
@@ -142,28 +163,32 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
             <div class="space-y-2">
               <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Formal Assessments History</h4>
               <div class="rounded-xl border border-slate-200 overflow-hidden text-xs">
-                <table class="w-full text-left">
-                  <thead class="bg-slate-50 text-[10px] uppercase font-bold text-slate-400">
-                    <tr>
-                      <th class="py-2 px-3">Assessment Title</th>
-                      <th class="py-2 px-3 text-center">Score</th>
-                      <th class="py-2 px-3 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    @for (a of selectedLearnerDetail()?.assessment_scores ?? fallbackAssessments; track a.assessment_title) {
+                @if (selectedLearnerDetail()?.assessment_scores?.length) {
+                  <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-[10px] uppercase font-bold text-slate-400">
                       <tr>
-                        <td class="py-2 px-3 font-semibold text-slate-800">{{ a.assessment_title }}</td>
-                        <td class="py-2 px-3 text-center font-mono font-bold">{{ a.score }}%</td>
-                        <td class="py-2 px-3 text-center">
-                          <span class="px-2 py-0.5 rounded text-[10px] font-bold" [ngClass]="a.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
-                            {{ a.passed ? 'Passed' : 'Failed' }}
-                          </span>
-                        </td>
+                        <th class="py-2 px-3">Assessment Title</th>
+                        <th class="py-2 px-3 text-center">Score</th>
+                        <th class="py-2 px-3 text-center">Status</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                      @for (a of selectedLearnerDetail()?.assessment_scores; track a.assessment_title) {
+                        <tr>
+                          <td class="py-2 px-3 font-semibold text-slate-800">{{ a.assessment_title }}</td>
+                          <td class="py-2 px-3 text-center font-mono font-bold">{{ a.score }}%</td>
+                          <td class="py-2 px-3 text-center">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold" [ngClass]="a.passed ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'">
+                              {{ a.passed ? 'Passed' : 'Failed' }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <div class="p-4 text-center text-xs text-slate-400">No assessment attempts recorded for this learner yet.</div>
+                }
               </div>
             </div>
 
@@ -171,37 +196,47 @@ import { AdminService, LearnerDetailData } from '../../core/services/admin.servi
             <div class="space-y-2">
               <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Recent Coding Submissions</h4>
               <div class="rounded-xl border border-slate-200 overflow-hidden text-xs">
-                <table class="w-full text-left">
-                  <thead class="bg-slate-50 text-[10px] uppercase font-bold text-slate-400">
-                    <tr>
-                      <th class="py-2 px-3">Problem</th>
-                      <th class="py-2 px-3 text-center">Lang</th>
-                      <th class="py-2 px-3 text-center">Verdict</th>
-                      <th class="py-2 px-3 text-right">Runtime</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    @for (c of selectedLearnerDetail()?.coding_submissions ?? fallbackCoding; track c.problem_title) {
+                @if (selectedLearnerDetail()?.coding_submissions?.length) {
+                  <table class="w-full text-left">
+                    <thead class="bg-slate-50 text-[10px] uppercase font-bold text-slate-400">
                       <tr>
-                        <td class="py-2 px-3 font-semibold text-slate-800">{{ c.problem_title }}</td>
-                        <td class="py-2 px-3 text-center font-mono text-[10px] uppercase">{{ c.language }}</td>
-                        <td class="py-2 px-3 text-center">
-                          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" [ngClass]="c.verdict === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
-                            {{ c.verdict }}
-                          </span>
-                        </td>
-                        <td class="py-2 px-3 text-right font-mono">{{ c.runtime_ms }}ms</td>
+                        <th class="py-2 px-3">Problem</th>
+                        <th class="py-2 px-3 text-center">Lang</th>
+                        <th class="py-2 px-3 text-center">Verdict</th>
+                        <th class="py-2 px-3 text-right">Runtime</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                      @for (c of selectedLearnerDetail()?.coding_submissions; track c.problem_title) {
+                        <tr>
+                          <td class="py-2 px-3 font-semibold text-slate-800">{{ c.problem_title }}</td>
+                          <td class="py-2 px-3 text-center font-mono text-[10px] uppercase">{{ c.language }}</td>
+                          <td class="py-2 px-3 text-center">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold" [ngClass]="c.verdict === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'">
+                              {{ c.verdict }}
+                            </span>
+                          </td>
+                          <td class="py-2 px-3 text-right font-mono">{{ c.runtime_ms }}ms</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                } @else {
+                  <div class="p-4 text-center text-xs text-slate-400">No coding sandbox submissions recorded yet.</div>
+                }
               </div>
             </div>
 
-            <!-- Close button -->
-            <div class="pt-4 flex justify-end">
-              <button (click)="selectedLearnerDetail.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold text-slate-700">
-                Close Dossier
+            <!-- Close and Navigate buttons -->
+            <div class="pt-4 flex items-center justify-between border-t border-slate-100">
+              <a 
+                [routerLink]="['/admin/learners', selectedLearnerDetail()?.id, 'analytics']"
+                (click)="selectedLearnerDetail.set(null)"
+                class="px-4 py-2 rounded-xl bg-[#008FBB] hover:bg-[#007499] text-xs font-bold text-white transition shadow-sm">
+                Open Full Executive Analytics Page &rarr;
+              </a>
+              <button (click)="selectedLearnerDetail.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700">
+                Close
               </button>
             </div>
 
@@ -221,18 +256,8 @@ export class AdminLearnersComponent {
   searchQuery = '';
   selectedBatch = '';
 
-  readonly fallbackAssessments = [
-    { assessment_title: 'Full-Stack Foundation Assessment', score: 94, passed: true, date: '2026-11-10' },
-    { assessment_title: 'FastAPI Backend Architecture', score: 88, passed: true, date: '2026-11-04' },
-  ];
-
-  readonly fallbackCoding = [
-    { problem_title: 'Two Sum', language: 'python', verdict: 'ACCEPTED', runtime_ms: 45, date: '2026-11-18' },
-    { problem_title: 'Reverse Linked List', language: 'python', verdict: 'ACCEPTED', runtime_ms: 38, date: '2026-11-17' },
-  ];
-
   ngOnInit(): void {
-    this.adminService.getUsers('LEARNER').subscribe({
+    this.adminService.getLearners().subscribe({
       next: (list) => {
         this.learners.set(list || []);
         this.applyFilters();
@@ -243,8 +268,14 @@ export class AdminLearnersComponent {
 
   applyFilters(): void {
     const q = this.searchQuery.toLowerCase();
+    const batchFilter = this.selectedBatch.toLowerCase();
     const result = this.learners().filter((l) => {
-      return !q || l.full_name.toLowerCase().includes(q) || l.email.toLowerCase().includes(q);
+      const name = (l.name || l.full_name || '').toLowerCase();
+      const email = (l.email || '').toLowerCase();
+      const batch = (l.batch || '').toLowerCase();
+      const matchesSearch = !q || name.includes(q) || email.includes(q);
+      const matchesBatch = !batchFilter || batch.includes(batchFilter);
+      return matchesSearch && matchesBatch;
     });
     this.filteredLearners.set(result);
   }
@@ -252,28 +283,7 @@ export class AdminLearnersComponent {
   openLearnerDetail(id: string): void {
     this.adminService.getLearnerDetail(id).subscribe({
       next: (res) => this.selectedLearnerDetail.set(res),
-      error: () => {
-        // Fallback detail
-        const l = this.learners().find((item) => item.id === id);
-        this.selectedLearnerDetail.set({
-          id,
-          full_name: l?.full_name || 'Learner',
-          email: l?.email || '',
-          batch: 'Batch Alpha',
-          mentor: 'Ananya Rao',
-          streak_days: l?.streak_days || 14,
-          assessment_scores: this.fallbackAssessments,
-          coding_submissions: this.fallbackCoding,
-          meeting_attendance: [{ meeting_title: 'Weekly Standup', attended: true, date: '2026-11-15' }],
-          practice_activity: [{ field: 'Python', problems_attempted: 18, accuracy: 88, dedication_score: 92 }],
-          performance_analysis: {
-            strengths: ['FastAPI REST APIs', 'Docker Sandbox Automation', 'SQL Joins'],
-            weak_topics: ['Dynamic Programming', 'Thread Synchronization'],
-            batch_percentile: 12,
-            practice_dedication: 92,
-          },
-        });
-      },
+      error: () => {},
     });
   }
 }

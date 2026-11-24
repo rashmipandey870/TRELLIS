@@ -7,6 +7,7 @@ This ASGI middleware is restricted to request correlation tracking (X-Request-ID
 and secondary access logging; it never performs after-the-fact state mutation audits.
 """
 
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -54,11 +55,14 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
             except Exception:
                 pass
 
+        start_time = time.perf_counter()
         # Execute downstream route handler
         response: Response = await call_next(request)
+        dur_ms = (time.perf_counter() - start_time) * 1000
 
-        # Attach correlation header and Enterprise Security Headers (Phase 3.3)
+        # Attach correlation header, Server-Timing, and Enterprise Security Headers (Phase 3.3)
         response.headers["X-Request-ID"] = request_id
+        response.headers["Server-Timing"] = f"total;dur={dur_ms:.2f}"
         for header_key, header_val in SECURITY_HEADERS.items():
             response.headers[header_key] = header_val
         return response

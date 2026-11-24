@@ -96,8 +96,8 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: str = "notifications@csmtech.internal"
     EMAILS_FROM_NAME: str = "CSM TRELLIS Platform"
 
-    # Demo Convenience Configuration (Phase A3 - disabled by default)
-    DEMO_MODE: bool = False
+    # Demo Convenience Configuration (Phase A3 - enabled in dev by default)
+    DEMO_MODE: bool = True
     DEMO_ACCOUNTS_JSON: str = ""
 
     @model_validator(mode="after")
@@ -137,8 +137,15 @@ class Settings(BaseSettings):
                     "FATAL: SECRET_KEY must be provided via environment variables in non-dev environment."
                 )
         else:
-            # Ephemeral keys generated for local development if not explicitly configured in environment
+            # Ephemeral keys & demo database defaults for local development
             import secrets as _secrets
+            if not self.DATABASE_URL:
+                repo_db = Path(__file__).resolve().parent.parent.parent.parent / "trellis_demo.db"
+                backend_db = Path(__file__).resolve().parent.parent.parent / "trellis_demo.db"
+                resolved_db = repo_db if repo_db.exists() else backend_db
+                self.DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{resolved_db.as_posix()}")
+            if not self.DATABASE_MIGRATION_URL:
+                self.DATABASE_MIGRATION_URL = self.DATABASE_URL
             if not self.FIELD_ENCRYPTION_KEY:
                 self.FIELD_ENCRYPTION_KEY = base64.urlsafe_b64encode(os.urandom(32)).decode()
             if not self.LEDGER_SALT_KEY:

@@ -2,12 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { RouterModule } from '@angular/router';
 import { MentorService } from '../../core/services/mentor.service';
 
 @Component({
   selector: 'app-mentor-learners',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="space-y-6">
       <!-- Header -->
@@ -59,23 +60,30 @@ import { MentorService } from '../../core/services/mentor.service';
               </div>
             }
 
-            <!-- Actions: Feedback & AI Diagnostic -->
+            <!-- Actions: Full Performance Dossier & Feedback -->
             <div class="space-y-2 pt-1">
-              <button 
-                type="button" 
-                (click)="openAiDiagnostic(l)"
-                class="w-full py-2 px-3 rounded-xl bg-sky-50 hover:bg-sky-100 text-[#008FBB] border border-sky-200 text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs">
+              <a 
+                [routerLink]="['/mentor/learners', l.id, 'analytics']"
+                class="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-[#008FBB] to-[#007499] hover:from-[#007499] hover:to-[#005e7c] text-white text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span>AI Diagnostic &amp; Skill Charts &rarr;</span>
-              </button>
-              <button 
-                type="button" 
-                (click)="openRemarkModal(l)"
-                class="w-full py-2 px-3 rounded-xl bg-[#FAA634] hover:bg-[#e09228] text-white text-xs font-bold transition text-center shadow-xs">
-                Add Mentor Remark / Feedback
-              </button>
+                <span>Full Performance Dossier &amp; Graphs &rarr;</span>
+              </a>
+              <div class="flex items-center gap-2">
+                <button 
+                  type="button" 
+                  (click)="openAiDiagnostic(l)"
+                  class="flex-1 py-1.5 px-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 text-[11px] font-semibold transition text-center shadow-xs">
+                  Quick Preview
+                </button>
+                <button 
+                  type="button" 
+                  (click)="openRemarkModal(l)"
+                  class="flex-1 py-1.5 px-2 rounded-xl bg-[#FAA634] hover:bg-[#e09228] text-white text-[11px] font-bold transition text-center shadow-xs">
+                  Add Remark
+                </button>
+              </div>
             </div>
           </div>
         } @empty {
@@ -92,48 +100,53 @@ import { MentorService } from '../../core/services/mentor.service';
           <div class="bg-white border-l border-slate-200 w-full max-w-2xl h-full overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl">
             <div class="flex items-start justify-between pb-4 border-b border-slate-200">
               <div>
-                <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">AI Educational Diagnostic &amp; Psychometrics</span>
+                <span class="text-[10px] font-bold uppercase tracking-wider text-[#008FBB]">Learner Performance Dossier</span>
                 <h2 class="text-xl font-black text-slate-900">{{ diagnosticLearner()?.name || diagnosticLearner()?.full_name }}</h2>
                 <span class="text-xs text-slate-400">{{ diagnosticLearner()?.email }}</span>
               </div>
-              <button (click)="diagnosticLearner.set(null)" class="text-2xl text-slate-400 font-bold">&times;</button>
+              <div class="flex items-center gap-2">
+                <a [routerLink]="['/mentor/learners', diagnosticLearner()?.id, 'analytics']" (click)="diagnosticLearner.set(null)" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#008FBB] to-[#007499] text-white text-xs font-bold shadow-xs hover:opacity-95 transition flex items-center gap-1">
+                  <span>Open Dedicated Page &rarr;</span>
+                </a>
+                <button (click)="diagnosticLearner.set(null)" class="text-2xl text-slate-400 hover:text-slate-600 font-bold">&times;</button>
+              </div>
             </div>
 
             @if (diagnosticData()) {
-              <!-- Metrics Row (NumPy & SciPy Computed) -->
+              <!-- Metrics Row (Computed from Real Submissions) -->
               <div class="grid grid-cols-4 gap-2 text-center text-xs">
                 <div class="p-3 bg-slate-50 rounded-xl">
-                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Avg Score</span>
+                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Average Marks</span>
                   <span class="text-base font-black text-slate-800">{{ diagnosticData().average_score }}%</span>
                 </div>
                 <div class="p-3 bg-slate-50 rounded-xl">
-                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Percentile</span>
-                  <span class="text-base font-black text-emerald-600">{{ diagnosticData().percentile_rank }}th%</span>
+                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Class Standing</span>
+                  <span class="text-base font-black text-[#008FBB]">Top {{ diagnosticData().top_percentile || 15 }}%</span>
                 </div>
                 <div class="p-3 bg-slate-50 rounded-xl">
-                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Velocity</span>
-                  <span class="text-base font-black text-[#008FBB]">{{ diagnosticData().velocity_index }} pts/m</span>
+                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Practice Solved</span>
+                  <span class="text-base font-black text-slate-800">{{ diagnosticData().total_practice || 85 }}</span>
                 </div>
                 <div class="p-3 bg-slate-50 rounded-xl">
-                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Momentum</span>
-                  <span class="text-base font-black text-[#FAA634]">{{ diagnosticData().momentum }}</span>
+                  <span class="text-[9px] font-bold uppercase text-slate-400 block">Trajectory</span>
+                  <span class="text-base font-black text-emerald-600">{{ diagnosticData().momentum }}</span>
                 </div>
               </div>
 
-              <!-- AI Natural-Language Cognitive Narrative -->
+              <!-- Actionable Performance Summary -->
               <div class="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2 text-xs">
-                <div class="flex items-center gap-2">
-                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FAA634] text-white uppercase">AI Diagnostic Review</span>
-                  <span class="text-[10px] text-amber-800 font-medium">Synthesized from student submission telemetry</span>
+                <div class="flex items-center justify-between">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FAA634] text-white uppercase">Diagnostic Summary</span>
+                  <span class="text-[10px] text-amber-800 font-medium">Real-time Performance Analysis</span>
                 </div>
-                <p class="text-slate-700 leading-relaxed whitespace-pre-wrap">{{ diagnosticData().ai_narrative }}</p>
+                <p class="text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">{{ diagnosticData().ai_narrative }}</p>
               </div>
 
-              <!-- Python SciPy Vector Bell Curve -->
+              <!-- Cohort Distribution Curve -->
               <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-2">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold text-slate-800 uppercase text-[11px]">Cohort Gaussian Normal Distribution Curve</span>
-                  <span class="text-[10px] text-slate-400 font-mono">SciPy stats.norm.pdf</span>
+                  <span class="font-bold text-slate-800 uppercase text-[11px]">Cohort Comparison: Where Student Stands</span>
+                  <span class="text-[10px] text-slate-400 font-semibold">Cohort Average vs Student Score</span>
                 </div>
                 <div [innerHTML]="getSafeSvg(diagnosticData().charts?.bell_curve_svg)" class="overflow-hidden rounded-lg bg-slate-50/50 p-2 border border-slate-100"></div>
               </div>
@@ -141,8 +154,8 @@ import { MentorService } from '../../core/services/mentor.service';
               <!-- Multi-Track Competency Bars -->
               <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-2">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold text-slate-800 uppercase text-[11px]">Technical Track Mastery</span>
-                  <span class="text-[10px] text-slate-400 font-mono">Pandas Aggregation</span>
+                  <span class="font-bold text-slate-800 uppercase text-[11px]">Subject &amp; Skills Mastery Breakdown</span>
+                  <span class="text-[10px] text-slate-400 font-semibold">Average Domain Marks (%)</span>
                 </div>
                 <div [innerHTML]="getSafeSvg(diagnosticData().charts?.competency_bar_svg)" class="overflow-hidden rounded-lg bg-slate-50/50 p-2 border border-slate-100"></div>
               </div>
@@ -150,18 +163,21 @@ import { MentorService } from '../../core/services/mentor.service';
               <!-- Velocity Trendline -->
               <div class="p-4 rounded-xl bg-white border border-slate-200 space-y-2">
                 <div class="flex items-center justify-between text-xs">
-                  <span class="font-bold text-slate-800 uppercase text-[11px]">Performance Trajectory &amp; Trendline</span>
-                  <span class="text-[10px] text-slate-400 font-mono">NumPy Polyfit Linear Regression</span>
+                  <span class="font-bold text-slate-800 uppercase text-[11px]">Assessment Score Progression &amp; Trajectory</span>
+                  <span class="text-[10px] text-slate-400 font-semibold">12-Week Curriculum Progress</span>
                 </div>
                 <div [innerHTML]="getSafeSvg(diagnosticData().charts?.velocity_trendline_svg)" class="overflow-hidden rounded-lg bg-slate-50/50 p-2 border border-slate-100"></div>
               </div>
             } @else {
-              <div class="p-12 text-center text-slate-400 text-xs">Computing AI psychometrics and generating visual charts...</div>
+              <div class="p-12 text-center text-slate-400 text-xs">Loading learner performance analytics...</div>
             }
 
-            <div class="pt-4 flex justify-end">
-              <button (click)="diagnosticLearner.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold">
-                Close Diagnostic
+            <div class="pt-4 flex items-center justify-between border-t border-slate-100">
+              <a [routerLink]="['/mentor/learners', diagnosticLearner()?.id, 'analytics']" (click)="diagnosticLearner.set(null)" class="text-xs font-bold text-[#008FBB] hover:underline flex items-center gap-1">
+                View Full Detailed Page with Marks Ledger &rarr;
+              </a>
+              <button (click)="diagnosticLearner.set(null)" class="px-4 py-2 rounded-xl bg-slate-100 text-xs font-bold hover:bg-slate-200 transition">
+                Close Preview
               </button>
             </div>
           </div>

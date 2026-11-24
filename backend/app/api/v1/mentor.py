@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, model_validator
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, load_only, selectinload
 
-from app.api.deps import get_db, get_uow, require_mentor, verify_mentor_learner_access
+from app.api.deps import get_db, get_uow, require_mentor, require_role, verify_mentor_learner_access
 from app.core.config import settings
 from app.models.audit import AuditLog
 from app.models.assessments import (
@@ -63,6 +63,24 @@ class MeetingCreateRequest(BaseModel):
     meeting_link: str = Field(..., min_length=10)  # Teams / Meet / Zoom
     batch_id: str | None = None
     learner_ids: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_datetimes(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            start = data.get("start_time", "")
+            end = data.get("end_time", "")
+            if "T" in str(start):
+                parts = str(start).split("T")
+                if not data.get("meeting_date"):
+                    data["meeting_date"] = parts[0]
+                data["start_time"] = parts[1][:5]
+            if "T" in str(end):
+                parts = str(end).split("T")
+                data["end_time"] = parts[1][:5]
+            if not data.get("meeting_date"):
+                data["meeting_date"] = datetime.now(UTC).strftime("%Y-%m-%d")
+        return data
 
 
 class AttendanceItem(BaseModel):
@@ -370,15 +388,13 @@ def get_mentor_dashboard(
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
 ) -> dict[str, Any]:
-    # Query assigned learners
-    assigned_learners = (
+    # Query assigned learners count via SQL aggregation
+    assigned_learners_count = (
         db.execute(
-            select(User)
-            .join(MentorLearnerAssignment, MentorLearnerAssignment.learner_id == User.id)
+            select(func.count(MentorLearnerAssignment.learner_id.distinct()))
             .where(MentorLearnerAssignment.mentor_id == mentor.id)
-        )
-        .scalars()
-        .all()
+        ).scalar()
+        or 0
     )
 
     # Upcoming meetings
@@ -406,18 +422,23 @@ def get_mentor_dashboard(
     )
 
     # Practice alerts
-    pending_alerts = (
+    pending_alerts_rows = (
         db.execute(
-            select(TalentAlert)
+            select(
+                TalentAlert.id,
+                TalentAlert.field,
+                TalentAlert.evidence_json,
+                User.full_name.label("learner_name"),
+            )
+            .outerjoin(User, User.id == TalentAlert.learner_id)
             .where(TalentAlert.mentor_id == mentor.id, TalentAlert.status == "PENDING")
             .order_by(TalentAlert.created_at.desc())
         )
-        .scalars()
         .all()
     )
 
     return {
-        "assigned_learners_count": len(assigned_learners),
+        "assigned_learners_count": assigned_learners_count,
         "upcoming_meetings": [
             {
                 "id": m.id,
@@ -439,15 +460,15 @@ def get_mentor_dashboard(
             }
             for a in assessments
         ],
-        "talent_alerts_count": len(pending_alerts),
+        "talent_alerts_count": len(pending_alerts_rows),
         "talent_alerts": [
             {
-                "id": al.id,
-                "learner_name": al.learner.full_name if al.learner else "Learner",
-                "field": al.field,
-                "evidence": al.evidence_json,
+                "id": r.id,
+                "learner_name": r.learner_name or "Learner",
+                "field": r.field,
+                "evidence": r.evidence_json,
             }
-            for al in pending_alerts
+            for r in pending_alerts_rows
         ],
     }
 
@@ -713,7 +734,17 @@ def list_mentor_assessments(
     mentor: User = Depends(require_mentor),
 ) -> list[dict[str, Any]]:
     assessments = (
-        db.execute(select(Assessment).where(Assessment.mentor_id == mentor.id).order_by(Assessment.created_at.desc()))
+        db.execute(
+            select(Assessment)
+            .options(
+                joinedload(Assessment.batch),
+                selectinload(Assessment.attempts),
+                selectinload(Assessment.audience_learners),
+                selectinload(Assessment.questions).joinedload(AssessmentQuestion.question),
+            )
+            .where(Assessment.mentor_id == mentor.id)
+            .order_by(Assessment.created_at.desc())
+        )
         .scalars()
         .all()
     )
@@ -876,7 +907,6 @@ def publish_assessment(
     assessment_id: str,
     db: Session = Depends(get_db),
     mentor: User = Depends(require_mentor),
-    _uow: Any = Depends(get_uow),
 ) -> dict[str, Any]:
     assessment = db.get(Assessment, assessment_id)
     if not assessment or assessment.mentor_id != mentor.id:
@@ -1502,6 +1532,7 @@ def get_assessment_analysis(
     attempts = (
         db.execute(
             select(AssessmentAttempt)
+            .options(joinedload(AssessmentAttempt.learner))
             .where(AssessmentAttempt.assessment_id == assessment.id, AssessmentAttempt.status == "SUBMITTED")
         )
         .scalars()
@@ -1531,11 +1562,20 @@ def get_assessment_analysis(
     avg_score = sum(scores) / len(scores) if scores else 0.0
     pass_rate = (sum(1 for a in attempts if a.passed) / len(attempts) * 100.0) if attempts else 0.0
 
+    from app.services.analytics_service import analyze_assessment_comprehensive
+
+    comp_analysis = analyze_assessment_comprehensive(assessment_id, db)
+
     return {
         "assessment_title": assessment.title,
+        "n": comp_analysis.get("n", len(attempts)),
+        "computed_at": comp_analysis.get("computed_at"),
+        "definition": comp_analysis.get("definition"),
         "total_attempts": len(attempts),
         "average_score": round(avg_score, 1),
         "pass_rate": round(pass_rate, 1),
+        "funnel": comp_analysis.get("funnel"),
+        "item_analysis": comp_analysis.get("item_analysis"),
         "score_distribution": {
             "0-50": sum(1 for s in scores if s < 50),
             "50-70": sum(1 for s in scores if 50 <= s < 70),
@@ -1845,14 +1885,15 @@ def reject_assessment_report(
     return {"status": "REJECTED", "attempt_id": attempt.id, "message": "Growth Ring report held for revision."}
 
 
-@router.get("/learners/{learner_id}/ai-diagnostic", summary="Get mentor AI diagnostic review for a learner")
+@router.get("/learners/{learner_id}/ai-diagnostic", summary="Get mentor/admin AI diagnostic review for a learner")
 def get_learner_ai_diagnostic_for_mentor(
     learner_id: str,
     db: Session = Depends(get_db),
-    mentor: User = Depends(require_mentor),
+    mentor: User = Depends(require_role("MENTOR", "ADMIN")),
 ) -> dict[str, Any]:
-    if not verify_mentor_learner_access(mentor, learner_id, db):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Learner is not assigned to you.")
+    if (mentor.role or "").upper() != "ADMIN":
+        if not verify_mentor_learner_access(mentor, learner_id, db):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Learner is not assigned to you.")
     from app.services.ai_analytics_engine import analyze_learner_performance
     return analyze_learner_performance(learner_id, db)
 
@@ -1900,44 +1941,57 @@ def get_assigned_learners(
         ).scalars().all()
         learner_ids = list({a.learner_id for a in batch_assignments if a.learner_id})
 
-    learners = db.execute(select(User).where(User.id.in_(learner_ids))).scalars().all() if learner_ids else []
+    if not learner_ids:
+        return []
 
+    learners = db.execute(select(User).where(User.id.in_(learner_ids))).scalars().all()
     if not learners:
         return []
 
-    result = []
-    for l in learners:
-        # Get latest remark
-        latest_remark = db.execute(
-            select(MentorRemark)
-            .where(MentorRemark.learner_id == l.id)
-            .order_by(MentorRemark.created_at.desc())
-        ).scalars().first()
+    # Eager load assignments with batch for all learners in one query
+    learner_assignments = db.execute(
+        select(MentorLearnerAssignment)
+        .options(joinedload(MentorLearnerAssignment.batch))
+        .where(MentorLearnerAssignment.learner_id.in_(learner_ids))
+    ).scalars().all()
+    batch_map = {
+        la.learner_id: (la.batch.name if la.batch else "Direct Assignment")
+        for la in learner_assignments
+        if la.learner_id
+    }
 
-        # Get average score
-        attempts = db.execute(
-            select(AssessmentAttempt)
-            .where(AssessmentAttempt.learner_id == l.id, AssessmentAttempt.status == "SUBMITTED")
-        ).scalars().all()
-        avg_score = round(sum(a.score for a in attempts) / len(attempts), 1) if attempts else 0.0
+    # Grouped average score in one query
+    score_rows = db.execute(
+        select(AssessmentAttempt.learner_id, func.avg(AssessmentAttempt.score))
+        .where(AssessmentAttempt.learner_id.in_(learner_ids), AssessmentAttempt.status == "SUBMITTED")
+        .group_by(AssessmentAttempt.learner_id)
+    ).all()
+    score_map = {row[0]: round(float(row[1]), 1) for row in score_rows}
 
-        # Find learner batch
-        assignment = db.execute(
-            select(MentorLearnerAssignment).where(MentorLearnerAssignment.learner_id == l.id)
-        ).scalars().first()
-        batch_name = assignment.batch.name if assignment and assignment.batch else "Direct Assignment"
+    # Remarks in one query
+    remarks = db.execute(
+        select(MentorRemark)
+        .where(MentorRemark.learner_id.in_(learner_ids))
+        .order_by(MentorRemark.created_at.desc())
+    ).scalars().all()
+    remark_map: dict[str, str] = {}
+    for r in remarks:
+        if r.learner_id not in remark_map:
+            remark_map[r.learner_id] = r.remark_text
 
-        result.append({
+    return [
+        {
             "id": l.id,
             "name": l.full_name,
             "full_name": l.full_name,
             "email": l.email,
             "streak_days": l.streak_days or 0,
-            "batch_name": batch_name,
-            "avg_score": avg_score,
-            "latest_remark": latest_remark.remark_text if latest_remark else "",
-        })
-    return result
+            "batch_name": batch_map.get(l.id, "Direct Assignment"),
+            "avg_score": score_map.get(l.id, 0.0),
+            "latest_remark": remark_map.get(l.id, ""),
+        }
+        for l in learners
+    ]
 
 
 # --- Learner Review & Remarks ---

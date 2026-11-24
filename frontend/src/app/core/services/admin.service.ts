@@ -31,7 +31,17 @@ export interface AdminDashboardData {
     total_attempts: number;
     active_learners_30d: number;
   };
-  talent_alerts: Array<any>;
+  talent_alerts?: Array<any>;
+  batches?: Array<{
+    id: string;
+    name: string;
+    code: string;
+    field: string;
+    mentor_name: string;
+    learner_count: number;
+    average_score: number;
+    is_active: boolean;
+  }>;
 }
 
 export interface UserSummary {
@@ -101,6 +111,10 @@ export class AdminService {
 
   getDashboard(): Observable<AdminDashboardData> {
     return this.http.get<AdminDashboardData>('/api/v1/admin/dashboard');
+  }
+
+  getCohortIntelligence(): Observable<any> {
+    return this.http.get<any>('/api/v1/admin/analytics/cohort-intelligence');
   }
 
   getUsers(role?: string, search?: string): Observable<UserSummary[]> {

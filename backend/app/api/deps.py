@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -42,9 +42,12 @@ def get_sync_engine() -> Any:
     """
     global _sync_engine
     if _sync_engine is None:
-        db_url = settings.DATABASE_URL
+        db_url = settings.DATABASE_URL or os.environ.get("DATABASE_URL")
         if not db_url:
-            raise RuntimeError("DATABASE_URL is not configured in settings.")
+            repo_db = Path(__file__).resolve().parent.parent.parent.parent / "trellis_demo.db"
+            backend_db = Path(__file__).resolve().parent.parent.parent / "trellis_demo.db"
+            resolved_db = repo_db if repo_db.exists() else backend_db
+            db_url = f"sqlite:///{resolved_db.as_posix()}"
 
         if db_url.startswith("mysql+asyncmy://"):
             db_url = db_url.replace("mysql+asyncmy://", "mysql+pymysql://", 1)
@@ -60,7 +63,9 @@ def get_sync_engine() -> Any:
         engine_kwargs: dict[str, Any] = {
             "pool_pre_ping": True,
         }
-        if "sqlite" not in db_url:
+        if "sqlite" in db_url:
+            engine_kwargs["connect_args"] = {"timeout": 30.0, "check_same_thread": False}
+        else:
             engine_kwargs.update({
                 "pool_size": 10,
                 "max_overflow": 20,
@@ -74,6 +79,16 @@ def get_sync_engine() -> Any:
                 engine_kwargs["connect_args"] = connect_args
 
         _sync_engine = create_engine(db_url, **engine_kwargs)
+        if "sqlite" in db_url:
+            @event.listens_for(_sync_engine, "connect")
+            def _set_sqlite_pragma(dbapi_connection, connection_record):
+                try:
+                    cursor = dbapi_connection.cursor()
+                    cursor.execute("PRAGMA journal_mode=WAL")
+                    cursor.execute("PRAGMA busy_timeout=30000")
+                    cursor.close()
+                except Exception:
+                    pass
     return _sync_engine
 
 
@@ -135,7 +150,8 @@ def get_current_user(
     claims: dict[str, Any] = Depends(get_current_user_claims),
     db: Session = Depends(get_db),
 ) -> User:
-    """Retrieve active authenticated User entity."""
+    """Retrieve active authenticated User entity, loaded once per request and cached on request.state."""
+    cached_user = getattr(request.state, "current_user", None)
     user_id = claims.get("sub")
     if not user_id:
         raise HTTPException(
@@ -143,12 +159,16 @@ def get_current_user(
             detail="Token subject invalid.",
         )
 
-    user = db.get(User, user_id)
-    if not user or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or account is deactivated.",
-        )
+    if cached_user and getattr(cached_user, "id", None) == user_id:
+        user = cached_user
+    else:
+        user = db.get(User, user_id)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or account is deactivated.",
+            )
+        request.state.current_user = user
 
     # Invariant: Enforce password change at initial login
     if getattr(user, "must_change_password", False):

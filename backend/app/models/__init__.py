@@ -32,6 +32,7 @@ from app.models.practice import (
 from app.models.reviews import MentorRemark
 from app.models.settings import SystemSetting
 from app.models.skill import RoleRequirement, Skill, SkillEdge, SkillLevel
+from app.models.summaries import AssessmentStats, BatchStats, LearnerStats, TopicMastery
 from app.models.tenancy import Organisation
 from app.models.user import Consent, EmploymentRecord, Grant, Role, User
 
@@ -58,6 +59,10 @@ __all__ = [
     "Module",
     "Cohort",
     "Batch",
+    "LearnerStats",
+    "AssessmentStats",
+    "BatchStats",
+    "TopicMastery",
     "MentorLearnerAssignment",
     "Enrolment",
     "Meeting",

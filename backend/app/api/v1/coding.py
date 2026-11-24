@@ -103,38 +103,8 @@ def verify_problem_access(
             )
         return problem
 
-    # If no attempt_id, check if problem is part of any active IN_PROGRESS attempt for this learner
-    active_assessment_ids = db.execute(
-        select(AssessmentAttempt.assessment_id).where(
-            AssessmentAttempt.learner_id == user.id,
-            AssessmentAttempt.status == "IN_PROGRESS",
-        )
-    ).scalars().all()
-    if active_assessment_ids:
-        bank_ids = db.execute(
-            select(AssessmentQuestion.bank_question_id).where(
-                AssessmentQuestion.assessment_id.in_(active_assessment_ids)
-            )
-        ).scalars().all()
-        if problem.bank_id in bank_ids or problem.id in bank_ids:
-            return problem
-
-    # Check if problem is part of an active PracticeSession generated for this learner
-    practice_count = db.execute(
-        select(func.count(PracticeQuestion.id))
-        .join(PracticeSession, PracticeQuestion.session_id == PracticeSession.id)
-        .where(
-            PracticeSession.learner_id == user.id,
-            (PracticeQuestion.id == problem.id) | (PracticeQuestion.title == problem.title),
-        )
-    ).scalar() or 0
-    if practice_count > 0:
-        return problem
-
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Access denied: Problem is neither part of your active assessment attempt nor your practice sessions.",
-    )
+    # If no attempt_id, learner is in open Coding Lab practice mode -> allowed
+    return problem
 
 
 class RunCodeRequest(BaseModel):
@@ -156,10 +126,11 @@ class SubmitCodeRequest(BaseModel):
 def list_coding_problems(
     category: str | None = None,
     difficulty: str | None = None,
+    attempt_id: str | None = None,
     db: Session = Depends(get_db),
     user: User = Depends(require_role("LEARNER", "MENTOR", "ADMIN")),
 ) -> list[dict[str, Any]]:
-    """List accessible coding problems; returns empty list if none exist, never mock data."""
+    """List accessible coding problems; returns open practice problems or assessment attempt problems."""
     query = select(CodingProblem)
     if difficulty:
         query = query.where(CodingProblem.difficulty == difficulty.upper())
@@ -167,34 +138,16 @@ def list_coding_problems(
         query = query.where(CodingProblem.field == category)
 
     problems = db.execute(query).scalars().all()
-    # Filter for learners: only problems in their active attempts or practice sessions
-    if (user.role or "").upper() == "LEARNER":
-        active_assessment_ids = db.execute(
-            select(AssessmentAttempt.assessment_id).where(
-                AssessmentAttempt.learner_id == user.id,
-                AssessmentAttempt.status == "IN_PROGRESS",
-            )
-        ).scalars().all()
-        bank_ids = set()
-        if active_assessment_ids:
-            bank_ids = set(
-                db.execute(
-                    select(AssessmentQuestion.bank_question_id).where(
-                        AssessmentQuestion.assessment_id.in_(active_assessment_ids)
-                    )
-                ).scalars().all()
-            )
-        practice_titles = set(
+    # If attempt_id is provided, filter to that assessment's questions only
+    if attempt_id and (user.role or "").upper() == "LEARNER":
+        bank_ids = set(
             db.execute(
-                select(PracticeQuestion.title)
-                .join(PracticeSession, PracticeQuestion.session_id == PracticeSession.id)
-                .where(PracticeSession.learner_id == user.id)
+                select(AssessmentQuestion.bank_question_id)
+                .join(AssessmentAttempt, AssessmentAttempt.assessment_id == AssessmentQuestion.assessment_id)
+                .where(AssessmentAttempt.id == attempt_id, AssessmentAttempt.learner_id == user.id)
             ).scalars().all()
         )
-        problems = [
-            p for p in problems
-            if (p.bank_id and p.bank_id in bank_ids) or (p.id in bank_ids) or (p.title in practice_titles)
-        ]
+        problems = [p for p in problems if (p.bank_id and p.bank_id in bank_ids) or (p.id in bank_ids)]
 
     return [
         {

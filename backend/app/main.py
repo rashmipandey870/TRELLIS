@@ -1,12 +1,17 @@
 """TRELLIS Main FastAPI Application Entrypoint."""
 
+import logging
+import time
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import JSONResponse, Response
 
 from app.api.v1.admin import router as admin_router
 from app.api.v1.auth import router as auth_router
@@ -71,6 +76,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Response GZip Compression
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Immutable Audit Logging Middleware
 app.add_middleware(AuditLogMiddleware)
 
@@ -99,16 +107,29 @@ async def health_check() -> dict[str, Any]:
     }
 
 
+@app.get(f"{settings.API_V1_STR}/metrics", tags=["Health"], status_code=status.HTTP_200_OK)
+async def metrics() -> dict[str, Any]:
+    """Prometheus / telemetry health metrics endpoint."""
+    return {
+        "status": "healthy",
+        "version": settings.VERSION,
+        "environment": settings.TRELLIS_ENV,
+        "uptime_seconds": time.perf_counter(),
+    }
+
+
 @app.exception_handler(Exception)
 async def global_rfc9457_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """RFC 9457 compliant problem details error handler for unhandled exceptions."""
+    logger.exception("Unhandled server exception on %s: %s", request.url, exc)
+    detail_msg = f"{type(exc).__name__}: {exc}" if settings.ENVIRONMENT == "dev" else "An unexpected error occurred while processing the request."
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "type": "https://errors.trellis.csm.tech/errors/internal-server-error",
             "title": "Internal Server Error",
             "status": 500,
-            "detail": "An unexpected error occurred while processing the request.",
+            "detail": detail_msg,
             "instance": str(request.url),
         },
         headers={"Content-Type": "application/problem+json"},

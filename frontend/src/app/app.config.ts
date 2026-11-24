@@ -9,9 +9,13 @@ import { LoginComponent } from './features/auth/login.component';
 export const routes: Routes = [
   {
     path: '',
+    redirectTo: 'login',
+    pathMatch: 'full',
+  },
+  {
+    path: 'landing',
     loadComponent: () =>
       import('./features/landing/csm-landing.component').then((m) => m.CsmLandingComponent),
-    pathMatch: 'full',
   },
   { path: 'login', component: LoginComponent },
   {
@@ -51,6 +55,20 @@ export const routes: Routes = [
           import('./features/admin/admin-learners.component').then((m) => m.AdminLearnersComponent),
       },
       {
+        path: 'learners/:id/analytics',
+        loadComponent: () =>
+          import('./features/mentor/mentor-learner-analytics.component').then(
+            (m) => m.MentorLearnerAnalyticsComponent
+          ),
+      },
+      {
+        path: 'learners/:id',
+        loadComponent: () =>
+          import('./features/mentor/mentor-learner-analytics.component').then(
+            (m) => m.MentorLearnerAnalyticsComponent
+          ),
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/admin/admin-settings.component').then((m) => m.AdminSettingsComponent),
@@ -86,6 +104,13 @@ export const routes: Routes = [
         path: 'learners',
         loadComponent: () =>
           import('./features/mentor/mentor-learners.component').then((m) => m.MentorLearnersComponent),
+      },
+      {
+        path: 'learners/:id/analytics',
+        loadComponent: () =>
+          import('./features/mentor/mentor-learner-analytics.component').then(
+            (m) => m.MentorLearnerAnalyticsComponent
+          ),
       },
       {
         path: 'spotlight',
