@@ -1067,31 +1067,64 @@ class LocalSubprocessRunner(BaseCodeRunner):
 
             start_t = time.perf_counter()
             try:
-                proc = subprocess.run(
+                proc = subprocess.Popen(
                     cmd,
-                    input=input_text,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
                     cwd=cwd,
                     env=proc_env if proc_env is not None else {},  # Empty environment: no leaked secrets or paths
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_sec,
                     preexec_fn=preexec,
                 )
+
+                # Measure child process memory specifically via /proc/<pid>/status VmHWM / cgroups
+                # to prevent ru_maxrss from inheriting the API server's accumulated memory
+                mem_holder = [12.0]
+                stop_monitor = threading.Event()
+
+                def _monitor_child(pid: int):
+                    status_f = f"/proc/{pid}/status"
+                    cg_v2 = f"/sys/fs/cgroup/{pid}/memory.peak"
+                    cg_v1 = f"/sys/fs/cgroup/memory/{pid}/memory.max_usage_in_bytes"
+                    while not stop_monitor.is_set():
+                        try:
+                            if os.path.exists(status_f):
+                                with open(status_f, "r", encoding="utf-8") as sf:
+                                    for line in sf:
+                                        if line.startswith("VmHWM:"):
+                                            parts = line.split()
+                                            if len(parts) >= 2:
+                                                mem_holder[0] = max(mem_holder[0], float(parts[1]) / 1024.0)
+                                            break
+                            elif os.path.exists(cg_v2):
+                                with open(cg_v2, "r", encoding="utf-8") as cgf:
+                                    mem_holder[0] = max(mem_holder[0], float(cgf.read().strip()) / (1024.0 * 1024.0))
+                            elif os.path.exists(cg_v1):
+                                with open(cg_v1, "r", encoding="utf-8") as cgf:
+                                    mem_holder[0] = max(mem_holder[0], float(cgf.read().strip()) / (1024.0 * 1024.0))
+                        except Exception:
+                            pass
+                        time.sleep(0.005)
+
+                mon_thread = threading.Thread(target=_monitor_child, args=(proc.pid,), daemon=True)
+                mon_thread.start()
+
+                try:
+                    stdout_str, stderr_str = proc.communicate(input=input_text, timeout=timeout_sec)
+                finally:
+                    stop_monitor.set()
+                    mon_thread.join(timeout=0.1)
+
                 elapsed_ms = (time.perf_counter() - start_t) * 1000.0
                 max_runtime = max(max_runtime, elapsed_ms)
 
                 # Cap output bytes
-                stdout_str = proc.stdout[: self.MAX_OUTPUT_BYTES]
-                stderr_str = proc.stderr[: self.MAX_OUTPUT_BYTES]
+                stdout_str = (stdout_str or "")[: self.MAX_OUTPUT_BYTES]
+                stderr_str = (stderr_str or "")[: self.MAX_OUTPUT_BYTES]
 
-                # Memory usage estimation
-                mem_used = 12.0
-                if resource and sys.platform != "win32":
-                    try:
-                        rusage = resource.getrusage(resource.RUSAGE_CHILDREN)
-                        mem_used = rusage.ru_maxrss / 1024.0  # Linux KB to MB
-                    except Exception:
-                        mem_used = 12.0
+                # Child-only peak memory measurement
+                mem_used = mem_holder[0]
                 max_memory = max(max_memory, mem_used)
 
                 if is_custom:
@@ -1115,12 +1148,22 @@ class LocalSubprocessRunner(BaseCodeRunner):
                         err = None
 
             except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=2.0)
+                except Exception:
+                    pass
                 elapsed_ms = timeout_sec * 1000.0
                 max_runtime = max(max_runtime, elapsed_ms)
                 verdict = "TIME_LIMIT_EXCEEDED" if not is_custom else None
                 stdout_str = ""
                 err = "Time limit exceeded."
             except Exception as ex:
+                try:
+                    proc.kill()
+                    proc.wait(timeout=1.0)
+                except Exception:
+                    pass
                 elapsed_ms = (time.perf_counter() - start_t) * 1000.0
                 verdict = "RUNTIME_ERROR" if not is_custom else None
                 stdout_str = ""

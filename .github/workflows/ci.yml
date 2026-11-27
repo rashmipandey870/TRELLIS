@@ -62,18 +62,23 @@ jobs:
           pytest backend/tests/test_permission_matrix.py -v
 
   backend-tests:
-    name: Backend Unit, Integration & Immutability Tests (MySQL 8.4 & Redis)
+    name: Backend Unit, Integration & Immutability Tests (PostgreSQL 16 & Redis)
     needs: [backend-lint-and-types, permission-matrix-verification]
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.4
+      postgres:
+        image: postgres:16-alpine
         env:
-          MYSQL_ROOT_PASSWORD: root_ci_test_password
-          MYSQL_DATABASE: trellis_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: root_ci_test_password
+          POSTGRES_DB: trellis_db
         ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
       redis:
         image: redis:7.4-alpine
         ports:
@@ -83,15 +88,15 @@ jobs:
       run:
         working-directory: backend
     env:
-      MYSQL_HOST: 127.0.0.1
-      MYSQL_PORT: 3306
-      MYSQL_ROOT_USER: root
-      MYSQL_ROOT_PASSWORD: root_ci_test_password
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: root_ci_test_password
       TRELLIS_DB_NAME: trellis_db
       TRELLIS_MIGRATOR_PASSWORD: migrator_ci_pass_2026
       TRELLIS_APP_PASSWORD: app_ci_pass_2026
-      DATABASE_MIGRATION_URL: mysql+asyncmy://trellis_migrator:migrator_ci_pass_2026@127.0.0.1:3306/trellis_db
-      DATABASE_URL: mysql+asyncmy://trellis_app:app_ci_pass_2026@127.0.0.1:3306/trellis_db
+      DATABASE_MIGRATION_URL: postgresql+psycopg2://trellis_migrator:migrator_ci_pass_2026@127.0.0.1:5432/trellis_db
+      DATABASE_URL: postgresql+asyncpg://trellis_app:app_ci_pass_2026@127.0.0.1:5432/trellis_db
       REDIS_URL: redis://127.0.0.1:6379/0
       FIELD_ENCRYPTION_KEY: gAAAAABnhX-dummy-fernet-key-32bytes-base64-dev-only=
       TRELLIS_ENV: dev

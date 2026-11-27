@@ -274,6 +274,18 @@ class Answer(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     def question_id(self) -> str:
         return self.bank_question_id
 
+    @property
+    def selected_option_id(self) -> str | None:
+        """Backward-compatible single selected option ID accessor."""
+        if self.selected_option_ids_json and len(self.selected_option_ids_json) > 0:
+            return self.selected_option_ids_json[0]
+        return None
+
+    @property
+    def answer_text(self) -> str | None:
+        """Backward-compatible text response accessor."""
+        return self.text_response
+
 
 class Submission(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     """Code submission executed and evaluated against test cases."""

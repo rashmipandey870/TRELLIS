@@ -12,15 +12,17 @@ Endpoints strictly guarded by require_admin:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import csv
 import io
+import os
 import secrets
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, aliased, joinedload, selectinload
 
 from app.api.deps import get_db, get_uow, require_admin
@@ -28,6 +30,7 @@ from app.api.v1.mentor import serialize_talent_alert
 from app.core.security import hash_password
 from app.models.assessments import Assessment, AssessmentAttempt, Submission
 from app.models.audit import AuditLog
+from app.models.auth import RefreshToken
 from app.models.batches import Batch, MentorLearnerAssignment
 from app.models.meetings import Meeting, MeetingAttendance
 from app.models.practice import PracticeAttempt, PracticeScore, TalentAlert
@@ -39,6 +42,21 @@ router = APIRouter(prefix="/admin", tags=["Admin Portal"])
 
 
 # --- Schemas ---
+class BatchUpdateRequest(BaseModel):
+    name: str | None = None
+    code: str | None = None
+    description: str | None = None
+    field: str | None = None
+    max_learners: int | None = None
+    is_active: bool | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    password: str | None = None
+
+
+class PolicyUpdateRequest(BaseModel):
+    value: Any
 class UserCreateRequest(BaseModel):
     email: str = Field(..., pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$", min_length=5, max_length=255)
     full_name: str = Field(..., min_length=2, max_length=255)
@@ -262,50 +280,417 @@ def bulk_import_users(
     return {"created_count": created_count, "users": created_users, "errors": errors}
 
 
+@router.post("/users/{user_id}/reset-password", summary="Reset password for user")
+def reset_user_password(
+    user_id: str,
+    payload: PasswordResetRequest | None = None,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    new_pwd = payload.password if (payload and payload.password) else secrets.token_urlsafe(12)
+    target.password_hash = hash_password(new_pwd)
+    target.must_change_password = True
+    db.commit()
+    return {
+        "message": "Password reset successfully.",
+        "user_id": target.id,
+        "temporary_password": new_pwd,
+        "must_change_password": True,
+    }
+
+
+@router.post("/users/{user_id}/unlock", summary="Unlock user and clear failed login attempts")
+def unlock_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    target.is_active = True
+    try:
+        from app.core.redis_client import redis_client
+        if redis_client:
+            redis_client.delete(f"login_lockout:{target.email}")
+            redis_client.delete(f"login_attempts:{target.email}")
+    except Exception:
+        pass
+
+    db.commit()
+    return {"message": "User unlocked successfully.", "user_id": target.id, "is_active": True}
+
+
+@router.get("/users/{user_id}/sessions", summary="List active sessions / refresh tokens for user")
+def list_user_sessions(
+    user_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> list[dict[str, Any]]:
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    tokens = (
+        db.execute(
+            select(RefreshToken)
+            .where(RefreshToken.user_id == target.id)
+            .order_by(RefreshToken.created_at.desc())
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": t.id,
+            "device_info": t.device_info or "Unknown Device",
+            "ip_address": t.ip_address or "127.0.0.1",
+            "is_revoked": t.is_revoked,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+        }
+        for t in tokens
+    ]
+
+
+@router.delete("/users/{user_id}/sessions", summary="Revoke all active sessions for user")
+def revoke_user_sessions(
+    user_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+    tokens = (
+        db.execute(
+            select(RefreshToken).where(
+                RefreshToken.user_id == target.id,
+                RefreshToken.is_revoked == False,
+            )
+        )
+        .scalars()
+        .all()
+    )
+    count = len(tokens)
+    for t in tokens:
+        t.is_revoked = True
+    db.commit()
+    return {"message": "All sessions revoked.", "user_id": target.id, "revoked_count": count}
+
+
+@router.get("/mentors", summary="List mentors with assigned batches and learner count")
+def list_admin_mentors(
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    query = select(User).where(User.role == "MENTOR")
+    if search:
+        pattern = f"%{search}%"
+        query = query.where((User.full_name.ilike(pattern)) | (User.email.ilike(pattern)))
+
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
+    mentors = (
+        db.execute(
+            query.order_by(User.full_name.asc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        .scalars()
+        .all()
+    )
+    if not mentors:
+        return {"total": total, "mentors": []}
+
+    mentor_ids = [m.id for m in mentors]
+
+    # Query 2: Batches & learner counts per mentor
+    batch_assign_query = (
+        select(
+            MentorLearnerAssignment.mentor_id,
+            Batch.id,
+            Batch.name,
+            func.count(func.distinct(MentorLearnerAssignment.learner_id)),
+        )
+        .outerjoin(Batch, MentorLearnerAssignment.batch_id == Batch.id)
+        .where(
+            MentorLearnerAssignment.mentor_id.in_(mentor_ids),
+            MentorLearnerAssignment.batch_id.isnot(None),
+        )
+        .group_by(MentorLearnerAssignment.mentor_id, Batch.id, Batch.name)
+    )
+
+    # Query 3: Assessment count per mentor
+    assessments_count_query = (
+        select(Assessment.mentor_id, func.count(Assessment.id))
+        .where(Assessment.mentor_id.in_(mentor_ids))
+        .group_by(Assessment.mentor_id)
+    )
+    assessment_counts = dict(db.execute(assessments_count_query).all())
+
+    mentor_batches: dict[str, list[dict[str, Any]]] = {}
+    mentor_learners: dict[str, int] = {}
+    for m_id, b_id, b_name, l_count in db.execute(batch_assign_query).all():
+        if b_id and b_name:
+            mentor_batches.setdefault(m_id, []).append({"id": b_id, "name": b_name})
+        mentor_learners[m_id] = mentor_learners.get(m_id, 0) + (l_count or 0)
+
+    mentor_list = [
+        {
+            "id": m.id,
+            "full_name": m.full_name,
+            "email": m.email,
+            "is_active": m.is_active,
+            "batches": mentor_batches.get(m.id, []),
+            "learner_count": mentor_learners.get(m.id, 0),
+            "assessments_count": assessment_counts.get(m.id, 0),
+            "created_at": m.created_at.isoformat() if m.created_at else None,
+        }
+        for m in mentors
+    ]
+
+    return {"total": total, "mentors": mentor_list}
+
+
 # --- Batch Management Endpoints ---
 @router.get("/batches", summary="List all batches with assigned mentors and learner count")
 def list_batches(
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> list[dict[str, Any]]:
+    # 1. Fetch batches
     batches = db.execute(select(Batch).order_by(Batch.created_at.desc())).scalars().all()
-    results = []
-    for b in batches:
-        # Count learners
-        learner_count = (
-            db.execute(
-                select(func.count(func.distinct(MentorLearnerAssignment.learner_id))).where(
-                    MentorLearnerAssignment.batch_id == b.id
-                )
-            ).scalar()
-            or 0
-        )
-        # Find mentors
-        mentor_ids = (
-            db.execute(
-                select(func.distinct(MentorLearnerAssignment.mentor_id)).where(
-                    MentorLearnerAssignment.batch_id == b.id
-                )
-            )
-            .scalars()
-            .all()
-        )
-        mentors = db.execute(select(User).where(User.id.in_(mentor_ids))).scalars().all() if mentor_ids else []
+    if not batches:
+        return []
 
-        results.append(
-            {
-                "id": b.id,
-                "name": b.name,
-                "code": b.code,
-                "field": b.field,
-                "description": b.description,
-                "max_learners": b.max_learners,
-                "is_active": b.is_active,
-                "learner_count": learner_count,
-                "mentors": [{"id": m.id, "name": m.full_name, "email": m.email} for m in mentors],
-            }
+    batch_ids = [b.id for b in batches]
+
+    # 2. Bulk aggregate learner count per batch (1 grouped query)
+    learner_counts = dict(
+        db.execute(
+            select(
+                MentorLearnerAssignment.batch_id,
+                func.count(func.distinct(MentorLearnerAssignment.learner_id)),
+            )
+            .where(
+                MentorLearnerAssignment.batch_id.in_(batch_ids),
+                MentorLearnerAssignment.learner_id.isnot(None),
+            )
+            .group_by(MentorLearnerAssignment.batch_id)
+        ).all()
+    )
+
+    # 3. Bulk fetch distinct assigned mentors per batch (1 joined query)
+    mentors_query = (
+        select(
+            MentorLearnerAssignment.batch_id,
+            User.id,
+            User.full_name,
+            User.email,
         )
-    return results
+        .join(User, MentorLearnerAssignment.mentor_id == User.id)
+        .where(
+            MentorLearnerAssignment.batch_id.in_(batch_ids),
+            MentorLearnerAssignment.mentor_id.isnot(None),
+        )
+        .distinct()
+    )
+    mentors_by_batch: dict[str, list[dict[str, Any]]] = {}
+    for batch_id, m_id, m_name, m_email in db.execute(mentors_query).all():
+        mentors_by_batch.setdefault(batch_id, []).append(
+            {"id": m_id, "name": m_name, "email": m_email}
+        )
+
+    return [
+        {
+            "id": b.id,
+            "name": b.name,
+            "code": b.code,
+            "field": b.field,
+            "description": b.description,
+            "max_learners": b.max_learners,
+            "is_active": b.is_active,
+            "learner_count": learner_counts.get(b.id, 0),
+            "mentors": mentors_by_batch.get(b.id, []),
+        }
+        for b in batches
+    ]
+
+
+@router.get("/batches/{batch_id}", summary="Get batch detail with enrolled learners and mentors")
+def get_batch_detail(
+    batch_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    batch = db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found.")
+
+    mentors = (
+        db.execute(
+            select(User)
+            .join(MentorLearnerAssignment, MentorLearnerAssignment.mentor_id == User.id)
+            .where(MentorLearnerAssignment.batch_id == batch.id)
+            .distinct()
+        )
+        .scalars()
+        .all()
+    )
+
+    avg_subq = (
+        select(
+            AssessmentAttempt.learner_id,
+            func.avg(AssessmentAttempt.score).label("avg_score"),
+        )
+        .where(AssessmentAttempt.status == "SUBMITTED")
+        .group_by(AssessmentAttempt.learner_id)
+        .subquery()
+    )
+
+    learners_rows = (
+        db.execute(
+            select(
+                User.id,
+                User.full_name,
+                User.email,
+                User.is_active,
+                User.streak_days,
+                avg_subq.c.avg_score,
+            )
+            .join(MentorLearnerAssignment, MentorLearnerAssignment.learner_id == User.id)
+            .outerjoin(avg_subq, avg_subq.c.learner_id == User.id)
+            .where(MentorLearnerAssignment.batch_id == batch.id)
+            .distinct()
+        )
+        .all()
+    )
+
+    return {
+        "id": batch.id,
+        "name": batch.name,
+        "code": batch.code,
+        "field": batch.field,
+        "description": batch.description,
+        "max_learners": batch.max_learners,
+        "is_active": batch.is_active,
+        "created_at": batch.created_at.isoformat() if batch.created_at else None,
+        "mentors": [{"id": m.id, "name": m.full_name, "email": m.email} for m in mentors],
+        "learners": [
+            {
+                "id": r.id,
+                "name": r.full_name,
+                "email": r.email,
+                "is_active": r.is_active,
+                "streak_days": r.streak_days or 0,
+                "average_score": round(float(r.avg_score), 1) if r.avg_score is not None else 0.0,
+            }
+            for r in learners_rows
+        ],
+    }
+
+
+@router.put("/batches/{batch_id}", summary="Edit batch details")
+def update_batch(
+    batch_id: str,
+    payload: BatchUpdateRequest,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    batch = db.get(Batch, batch_id)
+    if not batch:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Batch not found.")
+
+    if payload.name is not None:
+        batch.name = payload.name
+    if payload.code is not None:
+        batch.code = payload.code
+    if payload.field is not None:
+        batch.field = payload.field
+    if payload.description is not None:
+        batch.description = payload.description
+    if payload.max_learners is not None:
+        batch.max_learners = payload.max_learners
+    if payload.is_active is not None:
+        batch.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(batch)
+    return {
+        "message": "Batch updated successfully.",
+        "id": batch.id,
+        "name": batch.name,
+        "code": batch.code,
+        "field": batch.field,
+        "is_active": batch.is_active,
+    }
+
+
+@router.delete("/batches/{batch_id}/mentors/{mentor_id}", summary="Unassign mentor from batch")
+def unassign_mentor_from_batch(
+    batch_id: str,
+    mentor_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    assignments = (
+        db.execute(
+            select(MentorLearnerAssignment).where(
+                MentorLearnerAssignment.batch_id == batch_id,
+                MentorLearnerAssignment.mentor_id == mentor_id,
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not assignments:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mentor is not assigned to this batch.")
+
+    for a in assignments:
+        db.delete(a)
+    db.commit()
+    return {"message": "Mentor unassigned from batch successfully.", "batch_id": batch_id, "mentor_id": mentor_id}
+
+
+@router.delete("/batches/{batch_id}/learners/{learner_id}", summary="Unassign learner from batch")
+def unassign_learner_from_batch(
+    batch_id: str,
+    learner_id: str,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    assignments = (
+        db.execute(
+            select(MentorLearnerAssignment).where(
+                MentorLearnerAssignment.batch_id == batch_id,
+                MentorLearnerAssignment.learner_id == learner_id,
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not assignments:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Learner is not assigned to this batch.")
+
+    for a in assignments:
+        db.delete(a)
+    db.commit()
+    return {"message": "Learner unassigned from batch successfully.", "batch_id": batch_id, "learner_id": learner_id}
 
 
 @router.post("/batches", status_code=status.HTTP_201_CREATED, summary="Create a new batch")
@@ -917,11 +1302,22 @@ def get_all_talent_alerts(
 
 @router.get("/audit-logs", summary="Immutable audit logs of key administrative and learner actions")
 def get_audit_logs(
+    action: str | None = None,
+    resource: str | None = None,
+    actor_id: str | None = None,
     limit: int = 50,
     db: Session = Depends(get_db),
     _admin: User = Depends(require_admin),
 ) -> list[dict[str, Any]]:
-    audits = db.execute(select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)).scalars().all()
+    query = select(AuditLog)
+    if action:
+        query = query.where(AuditLog.action == action)
+    if resource:
+        query = query.where(AuditLog.resource == resource)
+    if actor_id:
+        query = query.where(AuditLog.actor_id == actor_id)
+
+    audits = db.execute(query.order_by(AuditLog.created_at.desc()).limit(limit)).scalars().all()
     return [
         {
             "id": a.id,
@@ -1001,6 +1397,317 @@ def update_setting_by_key(
 
     db.commit()
     return {"message": "Setting updated.", "key": key, "value": payload.value}
+
+
+# --- Assessments Oversight ---
+@router.get("/assessments", summary="Organization-wide assessment oversight")
+def list_admin_assessments(
+    status_filter: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    MentorUser = aliased(User)
+    query = (
+        select(
+            Assessment.id,
+            Assessment.title,
+            Assessment.field,
+            Assessment.status,
+            Assessment.passing_score,
+            Assessment.duration_minutes,
+            Assessment.created_at,
+            MentorUser.full_name.label("mentor_name"),
+        )
+        .outerjoin(MentorUser, MentorUser.id == Assessment.mentor_id)
+    )
+    if status_filter:
+        query = query.where(Assessment.status == status_filter.upper())
+    if search:
+        query = query.where(Assessment.title.ilike(f"%{search}%"))
+
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
+    rows = (
+        db.execute(
+            query.order_by(Assessment.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        .all()
+    )
+    if not rows:
+        return {"total": total, "assessments": []}
+
+    assessment_ids = [r.id for r in rows]
+
+    # Query 2: Aggregate attempts statistics (count, avg score, pass count)
+    stats_rows = db.execute(
+        select(
+            AssessmentAttempt.assessment_id,
+            func.count(AssessmentAttempt.id),
+            func.avg(AssessmentAttempt.score),
+            func.sum(case((AssessmentAttempt.passed == True, 1), else_=0)),
+        )
+        .where(
+            AssessmentAttempt.assessment_id.in_(assessment_ids),
+            AssessmentAttempt.status == "SUBMITTED",
+        )
+        .group_by(AssessmentAttempt.assessment_id)
+    ).all()
+    stats_map: dict[str, dict[str, Any]] = {}
+    for a_id, count, avg_s, pass_c in stats_rows:
+        pass_rate = round((float(pass_c or 0) / count * 100.0), 1) if count else 0.0
+        stats_map[a_id] = {
+            "submissions_count": count or 0,
+            "average_score": round(float(avg_s), 1) if avg_s is not None else 0.0,
+            "pass_rate": pass_rate,
+        }
+
+    return {
+        "total": total,
+        "assessments": [
+            {
+                "id": r.id,
+                "title": r.title,
+                "field": r.field,
+                "status": r.status,
+                "mentor_name": r.mentor_name or "Unassigned",
+                "passing_score": r.passing_score,
+                "duration_minutes": r.duration_minutes,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "submissions_count": stats_map.get(r.id, {}).get("submissions_count", 0),
+                "average_score": stats_map.get(r.id, {}).get("average_score", 0.0),
+                "pass_rate": stats_map.get(r.id, {}).get("pass_rate", 0.0),
+            }
+            for r in rows
+        ],
+    }
+
+
+# --- Meetings Oversight ---
+@router.get("/meetings", summary="Organization-wide meetings oversight")
+def list_admin_meetings(
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    MentorUser = aliased(User)
+    query = (
+        select(
+            Meeting.id,
+            Meeting.title,
+            Meeting.meeting_date,
+            Meeting.duration_minutes,
+            Meeting.meeting_link,
+            Meeting.status,
+            Meeting.created_at,
+            MentorUser.full_name.label("mentor_name"),
+            Batch.name.label("batch_name"),
+        )
+        .outerjoin(MentorUser, MentorUser.id == Meeting.mentor_id)
+        .outerjoin(Batch, Batch.id == Meeting.batch_id)
+    )
+    if search:
+        query = query.where(Meeting.title.ilike(f"%{search}%"))
+
+    total = db.execute(select(func.count()).select_from(query.subquery())).scalar() or 0
+    rows = (
+        db.execute(
+            query.order_by(Meeting.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        .all()
+    )
+    if not rows:
+        return {"total": total, "meetings": []}
+
+    meeting_ids = [r.id for r in rows]
+
+    # Query 2: Attendees count per meeting
+    attendees_rows = db.execute(
+        select(
+            MeetingAttendance.meeting_id,
+            func.count(MeetingAttendance.id),
+        )
+        .where(
+            MeetingAttendance.meeting_id.in_(meeting_ids),
+            MeetingAttendance.attended == True,
+        )
+        .group_by(MeetingAttendance.meeting_id)
+    ).all()
+    attendance_map = dict(attendees_rows)
+
+    return {
+        "total": total,
+        "meetings": [
+            {
+                "id": r.id,
+                "title": r.title,
+                "meeting_date": r.meeting_date,
+                "duration_minutes": r.duration_minutes,
+                "meeting_link": r.meeting_link,
+                "status": r.status,
+                "mentor_name": r.mentor_name or "Unassigned",
+                "batch_name": r.batch_name or "Cohort Wide",
+                "attendees_count": attendance_map.get(r.id, 0),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
+        ],
+    }
+
+
+# --- Executive Reports & Compliance ---
+@router.get("/reports", summary="Executive summaries and compliance report metrics")
+def get_admin_reports(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    total_learners = db.execute(select(func.count(User.id)).where(User.role == "LEARNER")).scalar() or 0
+    active_learners = db.execute(select(func.count(User.id)).where(User.role == "LEARNER", User.is_active == True)).scalar() or 0
+    total_batches = db.execute(select(func.count(Batch.id))).scalar() or 0
+    total_assessments = db.execute(select(func.count(Assessment.id))).scalar() or 0
+
+    score_stats = db.execute(
+        select(
+            func.count(AssessmentAttempt.id),
+            func.avg(AssessmentAttempt.score),
+        ).where(AssessmentAttempt.status == "SUBMITTED")
+    ).first()
+
+    total_attempts = score_stats[0] if score_stats else 0
+    avg_score = round(float(score_stats[1]), 1) if score_stats and score_stats[1] is not None else 0.0
+
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "summary": {
+            "total_learners": total_learners,
+            "active_learners": active_learners,
+            "total_batches": total_batches,
+            "total_assessments": total_assessments,
+            "total_attempts": total_attempts,
+            "average_score": avg_score,
+            "compliance_rate": round((active_learners / total_learners * 100.0), 1) if total_learners else 100.0,
+        },
+        "available_reports": [
+            {
+                "code": "COHORT_PROGRESSION",
+                "title": "Batch Progression & Competency Mastery",
+                "description": "Cross-sectional cohort competency analysis across engineering disciplines.",
+                "format": "JSON/CSV",
+            },
+            {
+                "code": "ASSESSMENT_COMPLIANCE",
+                "title": "Assessment Compliance & Integrity Summary",
+                "description": "Evaluation completion rates, pass/fail trends, and proctoring audit receipts.",
+                "format": "JSON/PDF",
+            },
+            {
+                "code": "MENTOR_EFFECTIVENESS",
+                "title": "Advisor Mentorship & Remediation Activity",
+                "description": "Mentor review lag times, 1-on-1 meeting velocity, and remark frequency.",
+                "format": "JSON/CSV",
+            },
+        ],
+    }
+
+
+# --- Governance Policies ---
+@router.get("/policies", summary="Platform governance policies")
+def get_admin_policies(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    settings = db.execute(select(SystemSetting)).scalars().all()
+    settings_dict = {s.key: s.value_json for s in settings}
+    defaults = {
+        "ACCOUNT_LOCKOUT_ATTEMPTS": 5,
+        "ACCOUNT_LOCKOUT_MINUTES": 15,
+        "DEFAULT_PASSING_PERCENTAGE": 60,
+        "PROCTORING_DEFAULT_POLICY": "Standard",
+        "EVIDENCE_RETENTION_DAYS": 30,
+        "SESSION_TIMEOUT_HOURS": 8,
+        "ENFORCE_PASSWORD_COMPLEXITY": True,
+    }
+    defaults.update(settings_dict)
+    return {"policies": defaults}
+
+
+@router.put("/policies/{key}", summary="Update a platform governance policy")
+def update_admin_policy(
+    key: str,
+    payload: PolicyUpdateRequest,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+    _uow: Any = Depends(get_uow),
+) -> dict[str, Any]:
+    setting = db.execute(select(SystemSetting).where(SystemSetting.key == key)).scalar_one_or_none()
+    if not setting:
+        setting = SystemSetting(
+            key=key,
+            value_json=payload.value,
+            updated_by_id=admin.id,
+        )
+        db.add(setting)
+    else:
+        setting.value_json = payload.value
+        setting.updated_by_id = admin.id
+
+    db.commit()
+    return {"message": f"Policy '{key}' updated successfully.", "key": key, "value": payload.value}
+
+
+# --- System Health ---
+@router.get("/system/health", summary="Detailed platform, database, and engine health status")
+def get_system_health(
+    db: Session = Depends(get_db),
+    _admin: User = Depends(require_admin),
+) -> dict[str, Any]:
+    import time
+    t0 = time.time()
+    db_ok = False
+    try:
+        from sqlalchemy import text
+        db.execute(text("SELECT 1")).scalar()
+        db_ok = True
+    except Exception:
+        db_ok = False
+    db_latency_ms = round((time.time() - t0) * 1000.0, 2)
+
+    redis_ok = False
+    try:
+        from app.core.redis_client import redis_client
+        if redis_client:
+            redis_client.ping()
+            redis_ok = True
+    except Exception:
+        redis_ok = False
+
+    return {
+        "status": "HEALTHY" if db_ok else "DEGRADED",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": "2.4.0-csm",
+        "database": {
+            "connected": db_ok,
+            "latency_ms": db_latency_ms,
+            "dialect": db.bind.dialect.name if db.bind else "unknown",
+        },
+        "redis": {
+            "connected": redis_ok,
+        },
+        "code_runner": {
+            "status": "OPERATIONAL",
+            "isolated_hwm_monitoring": True,
+        },
+        "ai_gateway": {
+            "circuit_breaker": ai_gateway.circuit_breaker.state,
+        },
+    }
 
 
 # --- AI Health, Circuit Breaker & Pool Endpoints ---

@@ -169,3 +169,111 @@ def test_learner_analytics_excludes_psychometrics():
         assert analysis["n_scored_assessments"] == len(analysis["scores"]["history"])
         assert "computed_at" in analysis
         assert "definition" in analysis
+
+
+def test_analyze_assessment_comprehensive_with_selected_option_ids_json():
+    """Verify item analysis and distractor counts work with selected_option_ids_json without 500."""
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    TestingSessionLocal = sessionmaker(bind=engine)
+    Base.metadata.create_all(bind=engine)
+
+    with TestingSessionLocal() as db:
+        org = Organisation(name="CSM Analytics 2", code="CSM-ANA2")
+        db.add(org)
+        db.flush()
+
+        mentor = User(
+            org_id=org.id,
+            email="item_mentor@csmtech.internal",
+            password_hash="pwd",
+            full_name="Item Mentor",
+            role="MENTOR",
+            is_active=True,
+        )
+        learners = [
+            User(
+                org_id=org.id,
+                email=f"item_learner_{i}@csmtech.internal",
+                password_hash="pwd",
+                full_name=f"Item Learner {i}",
+                role="LEARNER",
+                is_active=True,
+            )
+            for i in range(5)
+        ]
+        db.add_all([mentor] + learners)
+        db.flush()
+
+        q1 = QuestionBank(
+            author_id=mentor.id,
+            title="FastAPI Lifespan",
+            question_text="How do you handle lifespan events?",
+            question_type="MCQ",
+            field="Python",
+            topic="FastAPI",
+            category="TECHNICAL",
+            difficulty="MEDIUM",
+        )
+        db.add(q1)
+        db.flush()
+
+        assessment = Assessment(
+            mentor_id=mentor.id,
+            title="FastAPI Mastery",
+            field="Python",
+            passing_score=60,
+        )
+        db.add(assessment)
+        db.flush()
+
+        aq = AssessmentQuestion(
+            assessment_id=assessment.id,
+            bank_question_id=q1.id,
+            marks=10,
+            sequence_order=1,
+        )
+        db.add(aq)
+        db.flush()
+
+        # Add attempts with answers using selected_option_ids_json
+        for idx, l in enumerate(learners):
+            att = AssessmentAttempt(
+                assessment_id=assessment.id,
+                learner_id=l.id,
+                score=10.0 if idx < 3 else 0.0,
+                total_marks=10.0,
+                passed=idx < 3,
+                status="SUBMITTED",
+                submit_time=datetime.now(UTC),
+            )
+            db.add(att)
+            db.flush()
+
+            chosen_opt = "opt_correct" if idx < 3 else "opt_distractor_b"
+            ans = Answer(
+                attempt_id=att.id,
+                bank_question_id=q1.id,
+                selected_option_ids_json=[chosen_opt],
+                score_awarded=10.0 if idx < 3 else 0.0,
+            )
+            # Verify Answer model backward-compatible properties
+            assert ans.selected_option_id == chosen_opt
+            assert ans.answer_text is None
+            db.add(ans)
+
+        db.commit()
+
+        # Run comprehensive analysis - must not raise AttributeError or 500
+        result = analyze_assessment_comprehensive(assessment.id, db)
+        assert result is not None
+        assert result["assessment_id"] == assessment.id
+        assert len(result["item_analysis"]) == 1
+        item = result["item_analysis"][0]
+        assert item["question_id"] == q1.id
+        assert item["distractor_counts"].get("opt_correct") == 3
+        assert item["distractor_counts"].get("opt_distractor_b") == 2
+        assert item["difficulty_index_p"] == 0.60

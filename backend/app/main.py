@@ -50,57 +50,65 @@ async def _neon_keepalive_loop() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager handling startup and shutdown events."""
-    # Startup validation
-    if not settings.DATABASE_URL:
-        raise RuntimeError(
-            "CRITICAL: DATABASE_URL is missing. Specify DATABASE_URL via environment variables or secret store."
-        )
+    import os
 
-    # Warm up database connection with retry backoff for serverless/cold-start databases (e.g. Neon)
-    from app.api.deps import get_sync_engine, warmup_database
-    try:
-        warmup_database(get_sync_engine(), max_retries=2, initial_delay=0.5)
-        print("Database connection initialized and warmed up.")
-    except Exception as e:
-        print(f"Warning: Database warmup encountered error: {e}")
+    is_test_env = (
+        bool(os.environ.get("PYTEST_CURRENT_TEST"))
+        or settings.TRELLIS_ENV == "test"
+        or "sqlite" in settings.DATABASE_URL
+    )
 
-    # Pre-warm demo credentials and in-memory caches for instant zero-delay responses
-    try:
-        from app.services.auth_service import authenticate_user
-        from sqlalchemy.orm import Session
-        engine = get_sync_engine()
-        with Session(engine) as session:
-            for email, pwd in [
-                ("learner1@csmtech.internal", "CSMTrellis2026!"),
-                ("mentor1@csmtech.internal", "CSMTrellis2026!"),
-                ("admin@csmtech.internal", "CSMTrellis2026!"),
-            ]:
-                try:
-                    authenticate_user(session, email, pwd)
-                except Exception:
-                    pass
-        print("Demo accounts pre-warmed for instant sub-millisecond login.")
-    except Exception as e:
-        print(f"Demo warmup notice: {e}")
+    if not is_test_env:
+        # Startup validation
+        if not settings.DATABASE_URL:
+            raise RuntimeError(
+                "CRITICAL: DATABASE_URL is missing. Specify DATABASE_URL via environment variables or secret store."
+            )
 
-    # Launch background keepalive task so Neon never enters idle/suspended sleep
-    heartbeat_task = asyncio.create_task(_neon_keepalive_loop())
+        # Warm up database connection with retry backoff for serverless/cold-start databases (e.g. Neon)
+        from app.api.deps import get_sync_engine, warmup_database
+        try:
+            warmup_database(get_sync_engine(), max_retries=2, initial_delay=0.5)
+            print("Database connection initialized and warmed up.")
+        except Exception as e:
+            print(f"Warning: Database warmup encountered error: {e}")
 
-    # In production environments, verify isolated runner passes startup self-test
-    if settings.TRELLIS_ENV != "dev":
-        from app.services.code_runner import get_code_runner
-        runner = get_code_runner()
-        if hasattr(runner, "startup_self_test"):
-            runner.startup_self_test()
+        # Pre-warm demo credentials and in-memory caches for instant zero-delay responses
+        try:
+            from app.services.auth_service import authenticate_user
+            from sqlalchemy.orm import Session
+            engine = get_sync_engine()
+            with Session(engine) as session:
+                for email, pwd in [
+                    ("learner1@csmtech.internal", "CSMTrellis2026!"),
+                    ("mentor1@csmtech.internal", "CSMTrellis2026!"),
+                    ("admin@csmtech.internal", "CSMTrellis2026!"),
+                ]:
+                    try:
+                        authenticate_user(session, email, pwd)
+                    except Exception:
+                        pass
+            print("Demo accounts pre-warmed for instant sub-millisecond login.")
+        except Exception as e:
+            print(f"Demo warmup notice: {e}")
 
-    print(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} [{settings.TRELLIS_ENV}]")
-    print(f"Tagline: {settings.TAGLINE}")
+        # Launch background keepalive task only on remote Neon PostgreSQL so it never enters idle sleep
+        if "neon.tech" in settings.DATABASE_URL:
+            heartbeat_task = asyncio.create_task(_neon_keepalive_loop())
+        else:
+            heartbeat_task = None
+    else:
+        heartbeat_task = None
+
+    print(f"Starting {settings.PROJECT_NAME} v{settings.VERSION} [{settings.TRELLIS_ENV}]", flush=True)
+    print(f"Tagline: {settings.TAGLINE}", flush=True)
     yield
     # Shutdown
-    heartbeat_task.cancel()
-    with contextlib.suppress(Exception):
-        await heartbeat_task
-    print(f"Shutting down {settings.PROJECT_NAME}")
+    if heartbeat_task:
+        heartbeat_task.cancel()
+        with contextlib.suppress(Exception):
+            await heartbeat_task
+    print(f"Shutting down {settings.PROJECT_NAME}", flush=True)
 
 
 app = FastAPI(

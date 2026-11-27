@@ -1085,6 +1085,15 @@ def seed_demo_pack(session: Session) -> dict[str, int]:
     counts["submissions"] = session.execute(select(func.count(Submission.id))).scalar() or 0
     counts["batches"] = session.execute(select(func.count(Batch.id))).scalar() or 0
 
+    # Populate AssessmentStats pre-aggregated summaries
+    try:
+        from app.services.analytics_service import refresh_assessment_stats
+        refreshed = refresh_assessment_stats(session)
+        counts["assessment_stats"] = len(refreshed)
+        print(f"Aggregated AssessmentStats: {len(refreshed)} records computed.")
+    except Exception as e:
+        print(f"Warning: AssessmentStats aggregation skipped: {e}")
+
     return counts
 
 
@@ -1114,16 +1123,9 @@ if __name__ == "__main__":
     else:
         sync_url = db_url
 
-    if "neon.tech" in sync_url and "hostaddr=" not in sync_url:
-        delimiter = "&" if "?" in sync_url else "?"
-        sync_url = f"{sync_url}{delimiter}hostaddr=52.76.128.157"
-
     connect_args = {}
-    if "neon.tech" in sync_url or "52.76.128.157" in sync_url:
-        connect_args = {
-            "options": "endpoint=ep-weathered-base-az6lrn9p",
-            "hostaddr": "52.76.128.157",
-        }
+    if "neon.tech" in sync_url:
+        connect_args["sslmode"] = "require"
     engine = create_engine(sync_url, connect_args=connect_args)
     backend_dir = Path(__file__).resolve().parent.parent / "backend"
     ini_path = backend_dir / "alembic.ini"

@@ -387,9 +387,18 @@ def analyze_assessment_comprehensive(assessment_id: str, db: Session) -> dict[st
                 if a in bottom_group and is_correct:
                     bottom_correct += 1
 
-                resp = matching_ans.selected_option_id or matching_ans.answer_text
-                if resp:
-                    distractor_counts[resp] = distractor_counts.get(resp, 0) + 1
+                # Distractor counts from selected options or text response
+                opt_ids = getattr(matching_ans, "selected_option_ids_json", None)
+                if opt_ids and isinstance(opt_ids, list):
+                    for oid in opt_ids:
+                        if oid:
+                            distractor_counts[str(oid)] = distractor_counts.get(str(oid), 0) + 1
+                elif opt_ids:
+                    distractor_counts[str(opt_ids)] = distractor_counts.get(str(opt_ids), 0) + 1
+                else:
+                    text_resp = getattr(matching_ans, "text_response", None) or getattr(matching_ans, "answer_text", None) or getattr(matching_ans, "selected_option_id", None)
+                    if text_resp:
+                        distractor_counts[str(text_resp)] = distractor_counts.get(str(text_resp), 0) + 1
 
         p_index = round(correct_q_attempts / total_q_attempts, 2) if total_q_attempts > 0 else 0.0
         p_top = top_correct / len(top_group) if top_group else 0.0
@@ -427,3 +436,58 @@ def analyze_assessment_comprehensive(assessment_id: str, db: Session) -> dict[st
         },
         "item_analysis": item_analysis,
     }
+
+
+def refresh_assessment_stats(db: Session, assessment_id: str | None = None) -> list[Any]:
+    """Calculate and upsert pre-aggregated AssessmentStats for one or all assessments."""
+    import json
+    from app.models.summaries import AssessmentStats
+
+    if assessment_id:
+        target = db.get(Assessment, assessment_id)
+        assessments = [target] if target is not None else []
+    else:
+        assessments = db.execute(select(Assessment)).scalars().all()
+
+    stats_records = []
+    for a in assessments:
+        analysis = analyze_assessment_comprehensive(a.id, db)
+        if not analysis:
+            continue
+
+        funnel = analysis.get("funnel", {})
+        score_stats = analysis.get("score_statistics", {})
+        item_analysis = analysis.get("item_analysis", [])
+
+        stats = db.get(AssessmentStats, a.id)
+        if not stats:
+            stats = AssessmentStats(
+                assessment_id=a.id,
+                assigned_count=funnel.get("assigned", 0),
+                started_count=funnel.get("started", 0),
+                submitted_count=funnel.get("submitted", 0),
+                graded_count=funnel.get("graded", 0),
+                pass_rate=float(score_stats.get("pass_rate_percentage", 0.0)),
+                mean_score=float(score_stats.get("mean_percentage", 0.0)),
+                median_score=float(score_stats.get("median_percentage", 0.0)),
+                stdev_score=float(score_stats.get("stdev_percentage", 0.0)),
+                histogram_json=json.dumps(score_stats.get("histogram", [])),
+                item_analysis_json=json.dumps(item_analysis),
+            )
+            db.add(stats)
+        else:
+            stats.assigned_count = funnel.get("assigned", 0)
+            stats.started_count = funnel.get("started", 0)
+            stats.submitted_count = funnel.get("submitted", 0)
+            stats.graded_count = funnel.get("graded", 0)
+            stats.pass_rate = float(score_stats.get("pass_rate_percentage", 0.0))
+            stats.mean_score = float(score_stats.get("mean_percentage", 0.0))
+            stats.median_score = float(score_stats.get("median_percentage", 0.0))
+            stats.stdev_score = float(score_stats.get("stdev_percentage", 0.0))
+            stats.histogram_json = json.dumps(score_stats.get("histogram", []))
+            stats.item_analysis_json = json.dumps(item_analysis)
+
+        stats_records.append(stats)
+
+    db.commit()
+    return stats_records

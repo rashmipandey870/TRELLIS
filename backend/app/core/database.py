@@ -1,27 +1,7 @@
 """TRELLIS Database Engine, Session Factory & Immutability Enforcement."""
 
-import socket
 from collections.abc import AsyncGenerator
 from typing import Any
-
-# Ensure Neon PostgreSQL host resolves reliably even on Windows environments with local DNS restrictions
-try:
-    _orig_getaddrinfo = socket.getaddrinfo
-    _NEON_FALLBACKS = {
-        'ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech': '13.251.213.89',
-        'ep-weathered-base-az6lrn9p-pooler.c-3.ap-southeast-1.aws.neon.tech': '13.251.213.89',
-        'c-3.ap-southeast-1.aws.neon.tech': '13.251.213.89'
-    }
-    def _neon_safe_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
-        try:
-            return _orig_getaddrinfo(host, port, family, type, proto, flags)
-        except socket.gaierror:
-            if host in _NEON_FALLBACKS:
-                return _orig_getaddrinfo(_NEON_FALLBACKS[host], port, family, type, proto, flags)
-            raise
-    socket.getaddrinfo = _neon_safe_getaddrinfo
-except Exception:
-    pass
 
 from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import (
@@ -41,19 +21,21 @@ if "asyncpg" in _db_url and "?" in _db_url:
     _query_params = [p for p in _query.split("&") if not p.startswith("sslmode=")]
     _db_url = f"{_base_url}?{'&'.join(_query_params)}" if _query_params else _base_url
 
-_extra_engine_kwargs = {}
+_extra_engine_kwargs: dict[str, Any] = {}
 if "sqlite" not in _db_url:
     _extra_engine_kwargs["pool_size"] = 15
     _extra_engine_kwargs["max_overflow"] = 25
     _extra_engine_kwargs["pool_recycle"] = 300
     _extra_engine_kwargs["pool_timeout"] = 10
-if "neon.tech" in _db_url or "52.76.128.157" in _db_url:
-    ep = "ep-weathered-base-az6lrn9p-pooler" if "pooler" in _db_url else "ep-weathered-base-az6lrn9p"
+
+if "pooler" in _db_url or "pgbouncer" in _db_url or "neon.tech" in _db_url:
+    # Transaction-pooled endpoints (e.g. PgBouncer / Neon pooler) require statement_cache_size=0
     _extra_engine_kwargs["connect_args"] = {
-        "server_settings": {"options": f"endpoint={ep}"},
-        "ssl": "require",
+        "statement_cache_size": 0,
         "command_timeout": 15,
     }
+    if "ssl" not in _extra_engine_kwargs["connect_args"] and "localhost" not in _db_url and "127.0.0.1" not in _db_url:
+        _extra_engine_kwargs["connect_args"]["ssl"] = "require"
 
 engine: AsyncEngine = create_async_engine(
     _db_url,

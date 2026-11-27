@@ -8,12 +8,24 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
+import os
 from sqlalchemy import create_engine, text
 
-DB_URL = "postgresql+psycopg2://neondb_owner:npg_h6xHNmjce4CE@ep-weathered-base-az6lrn9p-pooler.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
-CONNECT_ARGS = {"options": "endpoint=ep-weathered-base-az6lrn9p-pooler", "hostaddr": "52.76.128.157"}
+DB_URL = os.environ.get(
+    "DATABASE_MIGRATION_URL",
+    os.environ.get(
+        "DATABASE_URL",
+        "postgresql+psycopg2://trellis_migrator:trellis_migrator_pass@localhost:5432/trellis_db",
+    ),
+)
+if "asyncpg" in DB_URL:
+    DB_URL = DB_URL.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
-engine = create_engine(DB_URL, connect_args=CONNECT_ARGS, pool_recycle=60, pool_pre_ping=True)
+connect_args = {}
+if "neon.tech" in DB_URL:
+    connect_args["sslmode"] = "require"
+
+engine = create_engine(DB_URL, connect_args=connect_args, pool_recycle=60, pool_pre_ping=True)
 
 DOMAIN_NOTE_TEMPLATES = {
     "cloud": {

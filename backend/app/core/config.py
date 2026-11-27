@@ -42,13 +42,17 @@ class Settings(BaseSettings):
     def ENVIRONMENT(self, val: str) -> None:
         self.TRELLIS_ENV = val
 
-    # Database Configuration (Defaults to production Neon PostgreSQL cloud instance)
-    DATABASE_URL: str = (
-        "postgresql+asyncpg://neondb_owner:npg_h6xHNmjce4CE@ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
+    # Database Configuration (Environment-driven, clean non-owner credentials)
+    DATABASE_URL: str = os.environ.get(
+        "DATABASE_URL",
+        "postgresql+asyncpg://trellis_app:trellis_app_pass@localhost:5432/trellis_db",
     )
-    DATABASE_MIGRATION_URL: str = (
-        "postgresql+psycopg2://neondb_owner:npg_h6xHNmjce4CE@ep-weathered-base-az6lrn9p.c-3.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&hostaddr=13.251.213.89"
+    DATABASE_MIGRATION_URL: str = os.environ.get(
+        "DATABASE_MIGRATION_URL",
+        "postgresql+psycopg2://trellis_migrator:trellis_migrator_pass@localhost:5432/trellis_db",
     )
+    # Read-only connection string for demo sessions ensuring no destructive operations
+    DEMO_READONLY_DATABASE_URL: str | None = os.environ.get("DEMO_READONLY_DATABASE_URL", None)
 
     # Redis Cache & Message Broker
     REDIS_URL: str = "redis://127.0.0.1:6379/0"
